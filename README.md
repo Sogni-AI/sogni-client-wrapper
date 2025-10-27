@@ -1,4 +1,3 @@
-```markdown
 # Sogni Client Wrapper
 
 [![NPM version](https://img.shields.io/npm/v/sogni-client-wrapper.svg)](https://www.npmjs.com/package/sogni-client-wrapper) [![License](https://img.shields.io/npm/l/sogni-client-wrapper.svg)](https://www.npmjs.com/package/sogni-client-wrapper)
@@ -228,4 +227,3 @@ This library is written in TypeScript and exports all necessary types for a full
 ## License
 
 [MIT](LICENSE)
-```

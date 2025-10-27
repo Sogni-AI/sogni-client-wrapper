@@ -1,0 +1,50 @@
+{
+  "name": "sogni-client-wrapper",
+  "version": "1.0.0",
+  "description": "Enhanced Node.js wrapper for Sogni AI SDK with n8n compatibility and improved developer experience",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "test": "tsx test/basic-tests.ts",
+    "test:e2e": "tsx test/e2e-test.ts",
+    "test:all": "npm run test && npm run test:e2e"
+  },
+  "keywords": [
+    "sogni",
+    "ai",
+    "image-generation",
+    "n8n",
+    "workflow",
+    "automation",
+    "depin",
+    "stable-diffusion",
+    "flux"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "dependencies": {
+    "@sogni-ai/sogni-client": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "dotenv": "^17.2.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}

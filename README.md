@@ -1,6 +1,6 @@
 # Sogni Client Wrapper
 
-[![NPM version](https://img.shields.io/npm/v/sogni-client-wrapper.svg)](https://www.npmjs.com/package/sogni-client-wrapper) [![License](https://img.shields.io/npm/l/sogni-client-wrapper.svg)](https://www.npmjs.com/package/sogni-client-wrapper)
+[![NPM version](https://img.shields.io/npm/v/@sogni-ai/sogni-client-wrapper.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-client-wrapper) [![License](https://img.shields.io/npm/l/@sogni-ai/sogni-client-wrapper.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-client-wrapper)
 
 An enhanced Node.js wrapper for the [`@sogni-ai/sogni-client`](https://sdk-docs.sogni.ai/) library, designed for robustness, ease of use, and seamless integration with platforms like [n8n](https://n8n.io/).
 
@@ -19,13 +19,13 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 ## Installation
 
 ```bash
-npm install sogni-client-wrapper
+npm install @sogni-ai/sogni-client-wrapper
 ```
 
 Or with Yarn:
 
 ```bash
-yarn add sogni-client-wrapper
+yarn add @sogni-ai/sogni-client-wrapper
 ```
 
 ## Quick Start
@@ -33,7 +33,7 @@ yarn add sogni-client-wrapper
 Here is a simple example of how to generate an image using the wrapper:
 
 ```typescript
-import { SogniClientWrapper } from 'sogni-client-wrapper';
+import { SogniClientWrapper } from '@sogni-ai/sogni-client-wrapper';
 
 async function main() {
   // 1. Create and connect the client
@@ -122,7 +122,7 @@ Creates a new client instance.
 The wrapper is an `EventEmitter` and provides type-safe events.
 
 ```typescript
-import { ClientEvent } from 'sogni-client-wrapper';
+import { ClientEvent } from '@sogni-ai/sogni-client-wrapper';
 
 client.on(ClientEvent.CONNECTED, () => {
   console.log('Client is connected!');
@@ -159,7 +159,7 @@ The library throws custom errors that extend `SogniError`. This allows you to ca
 - `SogniBalanceError`: Insufficient token balance.
 
 ```typescript
-import { SogniAuthenticationError, SogniProjectError } from 'sogni-client-wrapper';
+import { SogniAuthenticationError, SogniProjectError } from '@sogni-ai/sogni-client-wrapper';
 
 try {
   // ... your code

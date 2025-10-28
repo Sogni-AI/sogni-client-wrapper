@@ -32,7 +32,6 @@ import {
   validateClientConfig,
   validateProjectConfig,
   waitFor,
-  sleep,
   retry,
 } from '../utils/helpers';
 
@@ -267,17 +266,15 @@ export class SogniClientWrapper extends EventEmitter {
   async getBalance(): Promise<BalanceInfo> {
     await this.ensureConnected();
 
-    // Note: We need to wait a bit for balance to be received
-    await sleep(1000);
+    // Use the correct refreshBalance() method from the account API
+    const balances = await this.client!.account.refreshBalance();
 
-    // Access balance through the client's account API
-    // Note: The Sogni SDK may not expose balances directly
-    // This is a placeholder that should be updated based on actual SDK API
-    const balances = (this.client!.account as any).balances;
-
+    // The refreshBalance() method returns a Balances object with sogni and spark properties
+    // Each contains multiple balance fields - we'll use the 'net' balance which represents
+    // the actual available balance (settled + credit - debit)
     return {
-      sogni: balances?.sogni || 0,
-      spark: balances?.spark || 0,
+      sogni: parseFloat(balances.sogni.net) || 0,
+      spark: parseFloat(balances.spark.net) || 0,
       lastUpdated: new Date(),
     };
   }

@@ -1,37 +1,75 @@
+import { config } from 'dotenv';
 import { SogniClientWrapper } from '../src';
 
-// This is a placeholder test file.
-// To run this, you would need to:
-// 1. Have a valid Sogni AI account.
-// 2. Create a .env file with your credentials:
-//    SOGNI_USERNAME=your_username
-//    SOGNI_PASSWORD=your_password
+// Load environment variables from .env file
+config();
 
+/**
+ * Example demonstrating basic Sogni Client Wrapper usage
+ *
+ * To run this example:
+ * 1. Create a .env file in the project root with your credentials:
+ *    SOGNI_USERNAME=your_username
+ *    SOGNI_PASSWORD=your_password
+ *
+ * 2. Run the example:
+ *    npm run build && node dist/examples/simple-test.js
+ *    or
+ *    npx tsx examples/simple-test.ts
+ */
 async function testClient() {
+  // Check for required environment variables
+  if (!process.env.SOGNI_USERNAME || !process.env.SOGNI_PASSWORD) {
+    console.error('❌ Error: Missing required environment variables');
+    console.error('Please create a .env file with SOGNI_USERNAME and SOGNI_PASSWORD');
+    console.error('See .env.example for reference');
+    process.exit(1);
+  }
+
   const client = new SogniClientWrapper({
-    username: process.env.SOGNI_USERNAME || '',
-    password: process.env.SOGNI_PASSWORD || '',
+    username: process.env.SOGNI_USERNAME,
+    password: process.env.SOGNI_PASSWORD,
     debug: true,
   });
 
   try {
-    console.log('Connecting...');
+    console.log('🔄 Connecting to Sogni Supernet...');
     await client.connect();
-    console.log('Connected!');
+    console.log('✅ Connected successfully!\n');
 
+    // Get account balance using the refreshBalance() method
+    console.log('💰 Fetching account balance...');
     const balance = await client.getBalance();
-    console.log('Balance:', balance);
+    console.log('Account Balance:');
+    console.log(`  - SOGNI tokens: ${balance.sogni.toFixed(2)}`);
+    console.log(`  - SPARK tokens: ${balance.spark.toFixed(2)}`);
+    console.log(`  - Last updated: ${balance.lastUpdated.toISOString()}\n`);
 
+    // Get available models
+    console.log('🎨 Fetching available models...');
     const models = await client.getAvailableModels({ sortByWorkers: true });
-    console.log('Top 5 Models:', models.slice(0, 5).map(m => ({ id: m.id, workers: m.workerCount })));
+    console.log(`Found ${models.length} models available`);
+
+    // Show top 5 models by worker count
+    console.log('\nTop 5 Most Popular Models:');
+    models.slice(0, 5).forEach((model, index) => {
+      console.log(`  ${index + 1}. ${model.id}`);
+      console.log(`     Workers: ${model.workerCount}`);
+      console.log(`     Recommended: ${model.recommendedSettings.steps} steps, ${model.recommendedSettings.guidance} guidance`);
+    });
 
   } catch (error) {
-    console.error('Test failed:', error);
+    console.error('❌ Test failed:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', error.message);
+    }
   } finally {
+    console.log('\n🔌 Disconnecting...');
     await client.disconnect();
-    console.log('Disconnected.');
+    console.log('✅ Disconnected successfully');
   }
 }
 
-testClient();
+// Run the test
+testClient().catch(console.error);
 

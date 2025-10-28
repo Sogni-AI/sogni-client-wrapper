@@ -79,11 +79,13 @@ async function runTests() {
     // Test 3: Get balance
     await test('Should retrieve account balance', async () => {
       if (!client) throw new Error('Client not initialized');
-      
+
       const balance = await client.getBalance();
       console.log(`   SOGNI tokens: ${balance.sogni}`);
       console.log(`   Spark tokens: ${balance.spark}`);
-      
+
+      // Note: refreshBalance() returns both SOGNI and Spark balances
+      // We're checking the 'net' balance (settled + credit - debit)
       if (typeof balance.sogni !== 'number') {
         throw new Error('Invalid balance format');
       }

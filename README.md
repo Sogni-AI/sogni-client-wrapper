@@ -30,16 +30,35 @@ yarn add @sogni-ai/sogni-client-wrapper
 
 ## Quick Start
 
-Here is a simple example of how to generate an image using the wrapper:
+### 1. Setup Environment Variables
+
+First, create a `.env` file in your project root to securely store your credentials:
+
+```bash
+# Copy the example file
+cp node_modules/@sogni-ai/sogni-client-wrapper/.env.example .env
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install dotenv
+```
+
+### 3. Create Your Script
 
 ```typescript
+import { config } from 'dotenv';
 import { SogniClientWrapper } from '@sogni-ai/sogni-client-wrapper';
 
+// Load environment variables from .env file
+config();
+
 async function main() {
-  // 1. Create and connect the client
+  // 1. Create and connect the client with credentials from .env
   const client = new SogniClientWrapper({
-    username: 'YOUR_SOGNI_USERNAME',
-    password: 'YOUR_SOGNI_PASSWORD',
+    username: process.env.SOGNI_USERNAME!,
+    password: process.env.SOGNI_PASSWORD!,
   });
 
   try {
@@ -80,6 +99,16 @@ async function main() {
 main();
 ```
 
+### 4. Run the Script
+
+```bash
+# If using TypeScript
+npx tsx your-script.ts
+
+# If using compiled JavaScript
+node your-script.js
+```
+
 ## API Reference
 
 ### `new SogniClientWrapper(config)`
@@ -114,7 +143,7 @@ Creates a new client instance.
 - `getAvailableModels(options?: GetModelsOptions): Promise<ModelInfo[]>`: Retrieves a list of available models.
 - `getModel(modelId: string): Promise<ModelInfo>`: Retrieves details for a specific model.
 - `getMostPopularModel(): Promise<ModelInfo>`: A helper to get the model with the most active workers.
-- `getBalance(): Promise<BalanceInfo>`: Fetches your current SOGNI and Spark token balance.
+- `getBalance(): Promise<BalanceInfo>`: Fetches your current SOGNI and Spark token balances using the `account.refreshBalance()` method.
 - `getSizePresets(network: 'fast' \| 'relaxed', modelId: string): Promise<SizePreset[]>`: Gets available output size presets for a model.
 
 ### Event Handling

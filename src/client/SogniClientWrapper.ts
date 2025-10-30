@@ -172,8 +172,15 @@ export class SogniClientWrapper extends EventEmitter {
     this.isReconnecting = false;
 
     if (this.client) {
-      // Note: Sogni SDK doesn't have explicit disconnect method
-      // Connection is managed by the SDK
+      try {
+        // Properly disconnect WebSocket to avoid connection leaks
+        if (this.client.apiClient && this.client.apiClient.socket) {
+          this.client.apiClient.socket.disconnect();
+          this.log('WebSocket disconnected');
+        }
+      } catch (error) {
+        this.log('Error disconnecting WebSocket:', error);
+      }
       this.client = null;
     }
 

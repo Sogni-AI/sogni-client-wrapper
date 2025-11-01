@@ -1,6 +1,6 @@
 {
   "name": "@sogni-ai/sogni-client-wrapper",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Enhanced Node.js wrapper for Sogni AI SDK with n8n compatibility and improved developer experience",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

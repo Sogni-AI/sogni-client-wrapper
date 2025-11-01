@@ -326,6 +326,8 @@ export class SogniClientWrapper extends EventEmitter {
         ...projectParams,
         negativePrompt: projectParams.negativePrompt || '',
         stylePrompt: projectParams.stylePrompt || '',
+        tokenType: projectParams.tokenType || 'spark',
+        network: projectParams.network || 'fast',
       };
 
       // Create the project

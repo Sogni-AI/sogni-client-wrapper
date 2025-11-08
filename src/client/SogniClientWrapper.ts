@@ -17,6 +17,8 @@ import type {
   SizePreset,
   GetModelsOptions,
   ClientEventCallbacks,
+  JobCompletedData,
+  JobFailedData,
 } from '../types';
 import { ClientEvent } from '../types';
 import {
@@ -336,30 +338,63 @@ export class SogniClientWrapper extends EventEmitter {
       this.emit(ClientEvent.PROJECT_CREATED, project);
 
       // Set up event listeners for this project
+      const totalJobs = projectParams.numberOfImages || 1;
+      let completedJobCount = 0;
+      let failedJobCount = 0;
+
       if (onProgress) {
         project.on('progress', (progress: number) => {
           const progressData: ProjectProgress = {
             projectId: project.id,
             percentage: progress,
-            completedJobs: 0, // SDK doesn't provide this
-            totalJobs: projectParams.numberOfImages || 1,
+            completedJobs: completedJobCount,
+            totalJobs,
           };
           onProgress(progressData);
           this.emit(ClientEvent.PROJECT_PROGRESS, progressData);
         });
       }
 
-      if (onJobCompleted) {
-        project.on('jobCompleted', (job: Job) => {
-          onJobCompleted(job);
-        });
-      }
+      // Always set up job event listeners to emit wrapper events
+      project.on('jobCompleted', (job: Job) => {
+        completedJobCount++;
 
-      if (onJobFailed) {
-        project.on('jobFailed', (job: Job) => {
+        const jobData: JobCompletedData = {
+          projectId: project.id,
+          job,
+          imageUrl: job.resultUrl || undefined,
+          jobIndex: completedJobCount - 1,
+          totalJobs,
+        };
+
+        // Emit wrapper event
+        this.emit(ClientEvent.JOB_COMPLETED, jobData);
+
+        // Call user callback if provided
+        if (onJobCompleted) {
+          onJobCompleted(job);
+        }
+      });
+
+      project.on('jobFailed', (job: Job) => {
+        failedJobCount++;
+
+        const jobData: JobFailedData = {
+          projectId: project.id,
+          job,
+          error: job.error?.message || 'Job failed',
+          jobIndex: failedJobCount - 1,
+          totalJobs,
+        };
+
+        // Emit wrapper event
+        this.emit(ClientEvent.JOB_FAILED, jobData);
+
+        // Call user callback if provided
+        if (onJobFailed) {
           onJobFailed(job);
-        });
-      }
+        }
+      });
 
       // If not waiting for completion, return immediately
       if (!waitForCompletion) {

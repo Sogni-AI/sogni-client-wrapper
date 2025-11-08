@@ -260,9 +260,51 @@ export const ClientEvent = {
   PROJECT_PROGRESS: 'projectProgress',
   PROJECT_COMPLETED: 'projectCompleted',
   PROJECT_FAILED: 'projectFailed',
+  JOB_COMPLETED: 'jobCompleted',
+  JOB_FAILED: 'jobFailed',
 } as const;
 
 export type ClientEvent = typeof ClientEvent[keyof typeof ClientEvent];
+
+/**
+ * Job completion information
+ */
+export interface JobCompletedData {
+  /** Project ID */
+  projectId: string;
+
+  /** Job instance */
+  job: Job;
+
+  /** Image URL (if available) */
+  imageUrl?: string;
+
+  /** Job index in the batch */
+  jobIndex?: number;
+
+  /** Total number of jobs in the project */
+  totalJobs: number;
+}
+
+/**
+ * Job failure information
+ */
+export interface JobFailedData {
+  /** Project ID */
+  projectId: string;
+
+  /** Job instance */
+  job: Job;
+
+  /** Error message */
+  error?: string;
+
+  /** Job index in the batch */
+  jobIndex?: number;
+
+  /** Total number of jobs in the project */
+  totalJobs: number;
+}
 
 /**
  * Event listener callback types
@@ -279,6 +321,8 @@ export interface ClientEventCallbacks {
   [ClientEvent.PROJECT_PROGRESS]: (progress: ProjectProgress) => void;
   [ClientEvent.PROJECT_COMPLETED]: (result: ProjectResult) => void;
   [ClientEvent.PROJECT_FAILED]: (error: ErrorData) => void;
+  [ClientEvent.JOB_COMPLETED]: (data: JobCompletedData) => void;
+  [ClientEvent.JOB_FAILED]: (data: JobFailedData) => void;
 }
 
 /**

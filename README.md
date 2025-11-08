@@ -164,7 +164,20 @@ client.on(ClientEvent.PROJECT_PROGRESS, (progress) => {
 client.on(ClientEvent.ERROR, (error) => {
   console.error('A client error occurred:', error.message);
 });
+
+// Per-image events - Display images as soon as they're ready!
+client.on(ClientEvent.JOB_COMPLETED, (data) => {
+  console.log(`Image ${data.jobIndex + 1}/${data.totalJobs} completed!`);
+  console.log(`URL: ${data.imageUrl}`);
+  // You can now display this individual image without waiting for the entire batch
+});
+
+client.on(ClientEvent.JOB_FAILED, (data) => {
+  console.log(`Image ${data.jobIndex + 1}/${data.totalJobs} failed:`, data.error);
+});
 ```
+
+#### Available Events
 
 | Event | Payload | Description |
 |---|---|---|
@@ -175,6 +188,38 @@ client.on(ClientEvent.ERROR, (error) => {
 | `projectProgress` | `ProjectProgress` | Fired with real-time progress updates for a project. |
 | `projectCompleted` | `ProjectResult` | Fired when a project successfully completes. |
 | `projectFailed` | `ErrorData` | Fired when a project fails. |
+| **`jobCompleted`** | **`JobCompletedData`** | **Fired when each individual image finishes - get images as they're ready!** |
+| **`jobFailed`** | **`JobFailedData`** | **Fired when an individual image fails.** |
+
+#### Per-Image Event Example
+
+Perfect for displaying images immediately as they complete in a batch:
+
+```typescript
+const client = new SogniClientWrapper({
+  username: process.env.SOGNI_USERNAME!,
+  password: process.env.SOGNI_PASSWORD!,
+});
+
+// Listen for individual image completions
+client.on(ClientEvent.JOB_COMPLETED, (data) => {
+  console.log(`✓ Image ${data.jobIndex + 1} of ${data.totalJobs} ready!`);
+  console.log(`  URL: ${data.imageUrl}`);
+  // Display the image in your UI immediately
+  displayImage(data.imageUrl);
+});
+
+// Generate a batch of images
+const result = await client.createProject({
+  modelId: 'flux-schnell',
+  positivePrompt: 'A beautiful landscape',
+  numberOfImages: 4, // Generate 4 images
+  steps: 4,
+  guidance: 3.5,
+});
+
+// All 4 images will be displayed as they complete, not all at once!
+```
 
 ## Error Handling
 
@@ -252,6 +297,8 @@ This library is written in TypeScript and exports all necessary types for a full
 - `ModelInfo`: Detailed information about an available model.
 - `BalanceInfo`: Your token balance.
 - `ErrorData`: The structure of error objects.
+- `JobCompletedData`: Data emitted when an individual image completes.
+- `JobFailedData`: Data emitted when an individual image fails.
 
 ## License
 

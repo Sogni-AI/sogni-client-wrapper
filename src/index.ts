@@ -20,6 +20,8 @@ export type {
   GetModelsOptions,
   CreateProjectOptions,
   ErrorData,
+  JobCompletedData,
+  JobFailedData,
   // Re-exported from Sogni SDK
   Project,
   Job,

@@ -10,6 +10,7 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 
 - **Promise-Based API**: Modern `async/await` support for all core operations.
 - **Connection Management**: Automatic connection and reconnection handling.
+- **Video Rendering Support**: Generate videos using WAN models (t2v, i2v, s2v, animate workflows).
 - **Simplified Configuration**: Sensible defaults and clear configuration options.
 - **Enhanced Error Handling**: Custom error classes for better error diagnosis.
 - **Type-Safe**: Written entirely in TypeScript with full type definitions.
@@ -72,10 +73,12 @@ async function main() {
     // 3. Generate an image
     console.log('Generating image...');
     const result = await client.createProject({
+      type: 'image',
       modelId: model.id,
       positivePrompt: 'A photorealistic portrait of a majestic lion in the savanna at sunset',
       negativePrompt: 'blurry, cartoon, low quality',
       stylePrompt: 'cinematic',
+      numberOfMedia: 1,
       steps: 30,
       guidance: 8,
     });
@@ -109,6 +112,92 @@ npx tsx your-script.ts
 node your-script.js
 ```
 
+## Video Rendering Support
+
+The wrapper now supports video generation using Sogni's WAN models. Generate stunning videos from text prompts, images, audio, or even other videos!
+
+### Video Generation Example
+
+```typescript
+// Text-to-Video (t2v)
+const videoResult = await client.createVideoProject({
+  modelId: 'wan_v2.2-14b-fp8_t2v',
+  positivePrompt: 'A serene waterfall flowing through a lush green forest',
+  numberOfMedia: 1,
+  frames: 60,        // Generate 60 frames
+  fps: 30,          // 30 frames per second
+  width: 1280,
+  height: 720,
+  outputFormat: 'mp4',
+});
+
+console.log('Video URLs:', videoResult.videoUrls);
+```
+
+### Video Workflows
+
+The wrapper supports multiple video generation workflows:
+
+1. **Text-to-Video (t2v)**: Generate videos from text prompts
+2. **Image-to-Video (i2v)**: Animate static images or interpolate between two images
+3. **Sound-to-Video (s2v)**: Generate videos synchronized with audio
+4. **Animate Workflows**: Create character animations or motion transfers
+
+### Advanced Video Examples
+
+```typescript
+// Image-to-Video with interpolation
+const i2vResult = await client.createVideoProject({
+  modelId: 'wan_v2.2-14b-fp8_i2v',
+  positivePrompt: 'Smooth camera movement',
+  referenceImage: startImageBuffer,     // Starting image
+  referenceImageEnd: endImageBuffer,    // Optional: end image for interpolation
+  frames: 90,
+  fps: 30,
+});
+
+// Sound-to-Video
+const s2vResult = await client.createVideoProject({
+  modelId: 'wan_v2.2-14b-fp8_s2v',
+  positivePrompt: 'Dancing person synchronized with music',
+  referenceAudio: audioBuffer,  // Audio file to sync with
+  frames: 120,
+  fps: 24,
+});
+
+// Animate with motion transfer
+const animateResult = await client.createVideoProject({
+  modelId: 'wan_v2.2-14b-fp8_animate',
+  positivePrompt: 'Character animation',
+  referenceImage: characterImage,     // Character to animate
+  referenceVideo: motionVideo,        // Video with motion to transfer
+  frames: 90,
+  fps: 30,
+});
+```
+
+### Convenience Methods
+
+For cleaner code, use the dedicated convenience methods:
+
+```typescript
+// For images
+const imageResult = await client.createImageProject({
+  modelId: 'flux-schnell',
+  positivePrompt: 'A beautiful sunset',
+  numberOfMedia: 1,
+});
+
+// For videos
+const videoResult = await client.createVideoProject({
+  modelId: 'wan_v2.2-14b-fp8_t2v',
+  positivePrompt: 'Ocean waves crashing on a beach',
+  numberOfMedia: 1,
+  frames: 60,
+  fps: 30,
+});
+```
+
 ## API Reference
 
 ### `new SogniClientWrapper(config)`
@@ -138,8 +227,12 @@ Creates a new client instance.
 
 ### Main Operations
 
-- `createProject(config: ProjectConfig): Promise<ProjectResult>`: Creates a new image generation project.
-  - `waitForCompletion` (default: `true`): If true, the promise resolves only when the image(s) are ready.
+- `createProject(config: ProjectConfig): Promise<ProjectResult>`: Creates a new image or video generation project.
+  - `waitForCompletion` (default: `true`): If true, the promise resolves only when the media is ready.
+  - For images: returns `imageUrls` in result
+  - For videos: returns `videoUrls` in result
+- `createImageProject(config)`: Convenience method for image generation (automatically sets `type: 'image'`).
+- `createVideoProject(config)`: Convenience method for video generation (automatically sets `type: 'video'`).
 - `getAvailableModels(options?: GetModelsOptions): Promise<ModelInfo[]>`: Retrieves a list of available models.
 - `getModel(modelId: string): Promise<ModelInfo>`: Retrieves details for a specific model.
 - `getMostPopularModel(): Promise<ModelInfo>`: A helper to get the model with the most active workers.
@@ -211,9 +304,10 @@ client.on(ClientEvent.JOB_COMPLETED, (data) => {
 
 // Generate a batch of images
 const result = await client.createProject({
+  type: 'image',
   modelId: 'flux-schnell',
   positivePrompt: 'A beautiful landscape',
-  numberOfImages: 4, // Generate 4 images
+  numberOfMedia: 4, // Generate 4 images
   steps: 4,
   guidance: 3.5,
 });
@@ -292,11 +386,14 @@ To run the end-to-end tests, you need to provide your Sogni API credentials via 
 This library is written in TypeScript and exports all necessary types for a fully-typed experience.
 
 - `SogniClientConfig`: Configuration for the client constructor.
-- `ProjectConfig`: Parameters for creating a project.
+- `ProjectConfig`: Parameters for creating a project (union of `ImageProjectConfig` and `VideoProjectConfig`).
+- `ImageProjectConfig`: Parameters specific to image generation.
+- `VideoProjectConfig`: Parameters specific to video generation.
 - `ProjectResult`: The return type for a completed project.
 - `ModelInfo`: Detailed information about an available model.
 - `BalanceInfo`: Your token balance.
 - `ErrorData`: The structure of error objects.
+- `VideoWorkflowType`: Video generation workflow types ('t2v' | 'i2v' | 's2v' | 'animate-move' | 'animate-replace').
 - `JobCompletedData`: Data emitted when an individual image completes.
 - `JobFailedData`: Data emitted when an individual image fails.
 

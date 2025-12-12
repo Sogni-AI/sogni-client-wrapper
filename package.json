@@ -35,7 +35,7 @@
   },
   "homepage": "https://github.com/sogni-ai/sogni-client-wrapper#readme",
   "dependencies": {
-    "@sogni-ai/sogni-client": "latest"
+    "@sogni-ai/sogni-client": "4.0.0-alpha.26"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -8,6 +8,8 @@ import { SogniClient, Project, Job, AvailableModel } from '@sogni-ai/sogni-clien
 import type {
   SogniClientConfig,
   ProjectConfig,
+  ImageProjectConfig,
+  VideoProjectConfig,
   ProjectResult,
   ProjectProgress,
   ConnectionStatus,
@@ -33,6 +35,8 @@ import {
   generateAppId,
   validateClientConfig,
   validateProjectConfig,
+  isImageProjectConfig,
+  isVideoProjectConfig,
   waitFor,
   retry,
 } from '../utils/helpers';
@@ -338,7 +342,7 @@ export class SogniClientWrapper extends EventEmitter {
       this.emit(ClientEvent.PROJECT_CREATED, project);
 
       // Set up event listeners for this project
-      const totalJobs = projectParams.numberOfImages || 1;
+      const totalJobs = projectParams.numberOfMedia || 1;
       let completedJobCount = 0;
       let failedJobCount = 0;
 
@@ -362,10 +366,16 @@ export class SogniClientWrapper extends EventEmitter {
         const jobData: JobCompletedData = {
           projectId: project.id,
           job,
-          imageUrl: job.resultUrl || undefined,
           jobIndex: completedJobCount - 1,
           totalJobs,
         };
+
+        // Add appropriate URL based on project type
+        if (isImageProjectConfig(config)) {
+          jobData.imageUrl = job.resultUrl || undefined;
+        } else if (isVideoProjectConfig(config)) {
+          jobData.videoUrl = job.resultUrl || undefined;
+        }
 
         // Emit wrapper event
         this.emit(ClientEvent.JOB_COMPLETED, jobData);
@@ -406,19 +416,26 @@ export class SogniClientWrapper extends EventEmitter {
 
       // Wait for completion with timeout
       this.log('Waiting for project completion...');
-      
-      const imageUrls = await Promise.race([
+
+      const mediaUrls = await Promise.race([
         project.waitForCompletion(),
         this.createTimeoutPromise<string[]>(timeout),
       ]);
 
       this.log('Project completed successfully');
 
+      // Prepare result based on project type
       const result: ProjectResult = {
         project,
-        imageUrls,
         completed: true,
       };
+
+      // Add appropriate URLs based on project type
+      if (isImageProjectConfig(config)) {
+        result.imageUrls = mediaUrls;
+      } else if (isVideoProjectConfig(config)) {
+        result.videoUrls = mediaUrls;
+      }
 
       this.emit(ClientEvent.PROJECT_COMPLETED, result);
 
@@ -456,6 +473,26 @@ export class SogniClientWrapper extends EventEmitter {
         },
       }
     );
+  }
+
+  /**
+   * Convenience method to create an image project
+   */
+  async createImageProject(config: Omit<ImageProjectConfig, 'type'>): Promise<ProjectResult> {
+    return this.createProject({
+      ...config,
+      type: 'image',
+    } as ImageProjectConfig);
+  }
+
+  /**
+   * Convenience method to create a video project
+   */
+  async createVideoProject(config: Omit<VideoProjectConfig, 'type'>): Promise<ProjectResult> {
+    return this.createProject({
+      ...config,
+      type: 'video',
+    } as VideoProjectConfig);
   }
 
   /**

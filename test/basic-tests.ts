@@ -3,13 +3,18 @@
  * These tests validate structure, types, and error handling without requiring actual API credentials
  */
 
-import { 
+import {
   SogniClientWrapper,
   SogniError,
   SogniValidationError,
   SogniAuthenticationError,
   ClientEvent,
   generateAppId,
+  isImageProjectConfig,
+  isVideoProjectConfig,
+  validateProjectConfig,
+  type ImageProjectConfig,
+  type VideoProjectConfig,
 } from '../src';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
@@ -240,6 +245,165 @@ async function runTests() {
 
     if (client1 === client2) {
       throw new Error('Clients should be separate instances');
+    }
+  })();
+
+  // Test 16: Video project type guard
+  await test('Should identify video project config', () => {
+    const videoConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      positivePrompt: 'A beautiful sunset over mountains',
+      numberOfMedia: 1,
+      frames: 30,
+      fps: 15,
+    };
+
+    if (!isVideoProjectConfig(videoConfig)) {
+      throw new Error('Video config not identified correctly');
+    }
+    if (isImageProjectConfig(videoConfig)) {
+      throw new Error('Video config misidentified as image config');
+    }
+  })();
+
+  // Test 17: Image project type guard
+  await test('Should identify image project config', () => {
+    const imageConfig: ImageProjectConfig = {
+      type: 'image',
+      modelId: 'flux-1-schnell',
+      positivePrompt: 'A beautiful sunset over mountains',
+      numberOfMedia: 1,
+      width: 1024,
+      height: 1024,
+    };
+
+    if (!isImageProjectConfig(imageConfig)) {
+      throw new Error('Image config not identified correctly');
+    }
+    if (isVideoProjectConfig(imageConfig)) {
+      throw new Error('Image config misidentified as video config');
+    }
+  })();
+
+  // Test 18: Video project validation
+  await test('Should validate video project parameters', () => {
+    const videoConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      positivePrompt: 'A beautiful sunset',
+      numberOfMedia: 1,
+      frames: 30,
+      fps: 15,
+      outputFormat: 'mp4',
+    };
+
+    // Should not throw
+    validateProjectConfig(videoConfig);
+  })();
+
+  // Test 19: Invalid video FPS validation
+  await test('Should reject invalid video FPS', () => {
+    const videoConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      positivePrompt: 'A beautiful sunset',
+      numberOfMedia: 1,
+      fps: 100, // Invalid: too high
+    };
+
+    try {
+      validateProjectConfig(videoConfig);
+      throw new Error('Should have rejected invalid FPS');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type for invalid FPS');
+      }
+    }
+  })();
+
+  // Test 20: Invalid video frames validation
+  await test('Should reject invalid video frames', () => {
+    const videoConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      positivePrompt: 'A beautiful sunset',
+      numberOfMedia: 1,
+      frames: 500, // Invalid: too many
+    };
+
+    try {
+      validateProjectConfig(videoConfig);
+      throw new Error('Should have rejected invalid frames');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type for invalid frames');
+      }
+    }
+  })();
+
+  // Test 21: Video output format validation
+  await test('Should validate video output format', () => {
+    const videoConfig = {
+      type: 'video' as const,
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      positivePrompt: 'A beautiful sunset',
+      numberOfMedia: 1,
+      outputFormat: 'avi', // Invalid format
+    };
+
+    try {
+      validateProjectConfig(videoConfig as VideoProjectConfig);
+      throw new Error('Should have rejected invalid video format');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type for invalid format');
+      }
+    }
+  })();
+
+  // Test 22: createImageProject method exists
+  await test('Should have createImageProject method', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    if (typeof client.createImageProject !== 'function') {
+      throw new Error('createImageProject method not found');
+    }
+  })();
+
+  // Test 23: createVideoProject method exists
+  await test('Should have createVideoProject method', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    if (typeof client.createVideoProject !== 'function') {
+      throw new Error('createVideoProject method not found');
+    }
+  })();
+
+  // Test 24: Project type is required
+  await test('Should require project type', () => {
+    const config = {
+      modelId: 'flux-1-schnell',
+      positivePrompt: 'A beautiful sunset',
+      numberOfMedia: 1,
+      // Missing 'type' field
+    } as any;
+
+    try {
+      validateProjectConfig(config);
+      throw new Error('Should have required project type');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type for missing type');
+      }
     }
   })();
 

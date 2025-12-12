@@ -7,11 +7,16 @@ import type {
   Job,
   AvailableModel,
   ProjectParams as SogniProjectParams,
+  ImageProjectParams as SogniImageProjectParams,
+  VideoProjectParams as SogniVideoProjectParams,
   SupernetType,
   TokenType,
-  OutputFormat,
+  ImageOutputFormat,
+  VideoOutputFormat,
   Scheduler,
-  TimeStepSpacing,
+  AudioFormat,
+  VideoFormat,
+  VideoWorkflowType,
 } from '@sogni-ai/sogni-client';
 
 import type {
@@ -27,9 +32,12 @@ export type {
   AvailableModel,
   SupernetType,
   TokenType,
-  OutputFormat,
+  ImageOutputFormat,
+  VideoOutputFormat,
   Scheduler,
-  TimeStepSpacing,
+  AudioFormat,
+  VideoFormat,
+  VideoWorkflowType,
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
@@ -68,33 +76,54 @@ export interface SogniClientConfig {
 }
 
 /**
- * Enhanced project configuration with additional options
+ * Base project configuration with additional options
  */
-export interface ProjectConfig extends Omit<SogniProjectParams, 'modelId' | 'negativePrompt' | 'stylePrompt'> {
+interface BaseProjectConfig {
   /** Model ID to use for generation */
   modelId: string;
-  
+
   /** Negative prompt (optional) */
   negativePrompt?: string;
-  
+
   /** Style prompt (optional) */
   stylePrompt?: string;
-  
+
   /** Wait for project completion before returning */
   waitForCompletion?: boolean;
-  
+
   /** Timeout for this specific project (overrides client timeout) */
   timeout?: number;
-  
+
   /** Progress callback function */
   onProgress?: (progress: ProjectProgress) => void;
-  
+
   /** Job completed callback */
   onJobCompleted?: (job: Job) => void;
-  
+
   /** Job failed callback */
   onJobFailed?: (job: Job) => void;
 }
+
+/**
+ * Image project configuration
+ */
+export interface ImageProjectConfig extends
+  Omit<SogniImageProjectParams, 'modelId' | 'negativePrompt' | 'stylePrompt'>,
+  BaseProjectConfig {
+}
+
+/**
+ * Video project configuration
+ */
+export interface VideoProjectConfig extends
+  Omit<SogniVideoProjectParams, 'modelId' | 'negativePrompt' | 'stylePrompt'>,
+  BaseProjectConfig {
+}
+
+/**
+ * Enhanced project configuration with additional options
+ */
+export type ProjectConfig = ImageProjectConfig | VideoProjectConfig;
 
 /**
  * Project creation result
@@ -102,16 +131,19 @@ export interface ProjectConfig extends Omit<SogniProjectParams, 'modelId' | 'neg
 export interface ProjectResult {
   /** Project instance */
   project: Project;
-  
-  /** Array of generated image URLs (if waitForCompletion is true) */
+
+  /** Array of generated image URLs (if waitForCompletion is true and project is image type) */
   imageUrls?: string[];
-  
+
+  /** Array of generated video URLs (if waitForCompletion is true and project is video type) */
+  videoUrls?: string[];
+
   /** Array of completed jobs */
   jobs?: Job[];
-  
+
   /** Project completion status */
   completed: boolean;
-  
+
   /** Error information if project failed */
   error?: ErrorData;
 }
@@ -219,12 +251,14 @@ export interface SizePreset {
 export interface ModelInfo extends AvailableModel {
   /** Whether model is currently available */
   isAvailable: boolean;
-  
+
   /** Recommended settings for this model */
   recommendedSettings?: {
     steps?: number;
     guidance?: number;
     scheduler?: Scheduler;
+    frames?: number; // For video models
+    fps?: number; // For video models
   };
 }
 
@@ -276,8 +310,11 @@ export interface JobCompletedData {
   /** Job instance */
   job: Job;
 
-  /** Image URL (if available) */
+  /** Image URL (if available for image projects) */
   imageUrl?: string;
+
+  /** Video URL (if available for video projects) */
+  videoUrl?: string;
 
   /** Job index in the batch */
   jobIndex?: number;
@@ -342,14 +379,14 @@ export interface GetModelsOptions {
 /**
  * Options for creating a project
  */
-export interface CreateProjectOptions extends ProjectConfig {
+export type CreateProjectOptions = ProjectConfig & {
   /** Retry failed projects */
   retry?: boolean;
-  
+
   /** Number of retry attempts */
   retryAttempts?: number;
-  
+
   /** Delay between retries in milliseconds */
   retryDelay?: number;
-}
+};
 

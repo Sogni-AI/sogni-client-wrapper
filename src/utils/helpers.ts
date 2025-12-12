@@ -3,7 +3,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import type { ProjectConfig, SogniClientConfig } from '../types';
+import type { ProjectConfig, SogniClientConfig, ImageProjectConfig, VideoProjectConfig } from '../types';
 import { SogniValidationError } from './errors';
 
 /**
@@ -11,6 +11,20 @@ import { SogniValidationError } from './errors';
  */
 export function generateAppId(): string {
   return randomUUID();
+}
+
+/**
+ * Type guard to check if config is for an image project
+ */
+export function isImageProjectConfig(config: ProjectConfig): config is ImageProjectConfig {
+  return config.type === 'image';
+}
+
+/**
+ * Type guard to check if config is for a video project
+ */
+export function isVideoProjectConfig(config: ProjectConfig): config is VideoProjectConfig {
+  return config.type === 'video';
 }
 
 /**
@@ -50,9 +64,14 @@ export function validateProjectConfig(config: ProjectConfig): void {
     throw new SogniValidationError('Positive prompt is required and must be a string');
   }
 
-  if (config.numberOfImages !== undefined) {
-    if (typeof config.numberOfImages !== 'number' || config.numberOfImages < 1 || config.numberOfImages > 10) {
-      throw new SogniValidationError('Number of images must be between 1 and 10');
+  if (!config.type || !['image', 'video'].includes(config.type)) {
+    throw new SogniValidationError('Project type must be either "image" or "video"');
+  }
+
+  if (config.numberOfMedia !== undefined) {
+    const maxMedia = config.type === 'video' ? 4 : 10; // Videos typically have lower limit
+    if (typeof config.numberOfMedia !== 'number' || config.numberOfMedia < 1 || config.numberOfMedia > maxMedia) {
+      throw new SogniValidationError(`Number of ${config.type}s must be between 1 and ${maxMedia}`);
     }
   }
 
@@ -84,8 +103,41 @@ export function validateProjectConfig(config: ProjectConfig): void {
     throw new SogniValidationError('Token type must be either "sogni" or "spark"');
   }
 
-  if (config.outputFormat && !['png', 'jpg'].includes(config.outputFormat)) {
-    throw new SogniValidationError('Output format must be either "png" or "jpg"');
+  // Type-specific validations
+  if (isImageProjectConfig(config)) {
+    if (config.outputFormat && !['png', 'jpg'].includes(config.outputFormat)) {
+      throw new SogniValidationError('Image output format must be either "png" or "jpg"');
+    }
+
+    if (config.startingImageStrength !== undefined) {
+      if (typeof config.startingImageStrength !== 'number' || config.startingImageStrength < 0 || config.startingImageStrength > 1) {
+        throw new SogniValidationError('Starting image strength must be between 0 and 1');
+      }
+    }
+  }
+
+  if (isVideoProjectConfig(config)) {
+    if (config.outputFormat && config.outputFormat !== 'mp4') {
+      throw new SogniValidationError('Video output format must be "mp4"');
+    }
+
+    if (config.frames !== undefined) {
+      if (typeof config.frames !== 'number' || config.frames < 1 || config.frames > 240) {
+        throw new SogniValidationError('Frames must be between 1 and 240');
+      }
+    }
+
+    if (config.fps !== undefined) {
+      if (typeof config.fps !== 'number' || config.fps < 1 || config.fps > 60) {
+        throw new SogniValidationError('FPS must be between 1 and 60');
+      }
+    }
+
+    if (config.shift !== undefined) {
+      if (typeof config.shift !== 'number' || config.shift < 0 || config.shift > 10) {
+        throw new SogniValidationError('Shift must be between 0 and 10');
+      }
+    }
   }
 }
 

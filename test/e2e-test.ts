@@ -51,6 +51,7 @@ function test(name: string, fn: () => void | Promise<void>) {
 
 async function runTests() {
   let client: SogniClientWrapper | null = null;
+  let catImageUrl: string | undefined; // Store the cat image URL for video test
 
   try {
     // Test 1: Create client
@@ -148,12 +149,13 @@ async function runTests() {
       let progressCount = 0;
       
       const result = await client.createProject({
+        type: 'image',
         modelId: model.id,
         positivePrompt: 'A cute cartoon cat wearing sunglasses',
         negativePrompt: 'blurry, low quality',
         steps: model.recommendedSettings?.steps || 4,
         guidance: model.recommendedSettings?.guidance || 3.5,
-        numberOfImages: 1,
+        numberOfMedia: 1,
         network: 'fast',
         tokenType: 'spark',
         waitForCompletion: true,
@@ -172,6 +174,7 @@ async function runTests() {
       
       if (result.imageUrls && result.imageUrls.length > 0) {
         console.log(`   Image URL: ${result.imageUrls[0]}`);
+        catImageUrl = result.imageUrls[0]; // Store for video test
       }
       
       if (!result.completed) {
@@ -212,11 +215,12 @@ async function runTests() {
       const model = await client.getMostPopularModel();
       
       await client.createProject({
+        type: 'image',
         modelId: model.id,
         positivePrompt: 'A simple red circle on white background',
         steps: model.recommendedSettings?.steps || 4,
         guidance: model.recommendedSettings?.guidance || 3.5,
-        numberOfImages: 1,
+        numberOfMedia: 1,
         network: 'fast',
         tokenType: 'spark',
         waitForCompletion: true,
@@ -233,7 +237,79 @@ async function runTests() {
       }
     })();
 
-    // Test 9: Disconnect
+    // Test 9: Generate a video with fastest settings
+    await test('Should generate video with wan_v2.2-14b-fp8_i2v_lightx2v model', async () => {
+      // Wait to avoid rate limiting
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      if (!catImageUrl) {
+        console.log('   ⚠️ No cat image URL from previous test, skipping i2v test');
+        throw new Error('Reference image required for i2v model - run image test first');
+      }
+
+      console.log('   Using model: wan_v2.2-14b-fp8_i2v_lightx2v (image-to-video)');
+      console.log('   Settings: 512x512, 16fps, 81 frames');
+      console.log('   Reference image: Using cat image from test 7');
+      console.log('   Fetching reference image...');
+
+      // Fetch the image from the URL
+      const imageResponse = await fetch(catImageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch reference image: ${imageResponse.statusText}`);
+      }
+
+      // Convert to Buffer for the SDK
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      const imageBuffer = Buffer.from(arrayBuffer);
+      console.log(`   Reference image fetched: ${(imageBuffer.length / 1024).toFixed(2)} KB`);
+
+      console.log('   Generating video...');
+
+      let progressCount = 0;
+
+      const result = await client.createProject({
+        type: 'video',
+        modelId: 'wan_v2.2-14b-fp8_i2v_lightx2v',
+        positivePrompt: 'The cat transforms into a majestic lion, morphing animation, smooth transition',
+        negativePrompt: 'blurry, low quality, distorted, glitchy',
+        referenceImage: imageBuffer, // Use the cat image as reference
+        width: 512,
+        height: 512,
+        fps: 16,
+        frames: 81,
+        numberOfMedia: 1,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 300000, // 5 minutes for video generation
+        onProgress: (progress) => {
+          progressCount++;
+          if (progressCount % 5 === 0) {
+            console.log(`   Progress: ${progress.percentage}%`);
+          }
+        },
+      });
+
+      console.log(`   Video generation completed: ${result.completed}`);
+      console.log(`   Project ID: ${result.project.id}`);
+      console.log(`   Videos generated: ${result.videoUrls?.length || 0}`);
+
+      if (result.videoUrls && result.videoUrls.length > 0) {
+        console.log(`   Video URL: ${result.videoUrls[0]}`);
+        console.log(`   Video duration: ~5 seconds (81 frames @ 16fps)`);
+      }
+
+      if (!result.completed) {
+        throw new Error('Video generation did not complete');
+      }
+
+      if (!result.videoUrls || result.videoUrls.length === 0) {
+        throw new Error('No video URLs returned');
+      }
+    })();
+
+    // Test 10: Disconnect
     await test('Should disconnect cleanly', async () => {
       if (!client) throw new Error('Client not initialized');
       
@@ -259,13 +335,10 @@ async function runTests() {
   console.log(`🎯 Success rate: ${((testsPassed / (testsPassed + testsFailed)) * 100).toFixed(1)}%`);
   console.log('='.repeat(60));
 
-  if (testsFailed > 0) {
-    process.exit(1);
-  }
+  process.exit(testsFailed > 0 ? 1 : 0);
 }
 
 runTests().catch((error) => {
   console.error('Test suite failed:', error);
   process.exit(1);
 });
-

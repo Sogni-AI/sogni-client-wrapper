@@ -54,6 +54,10 @@ export class SogniClientWrapper extends EventEmitter {
   constructor(config: SogniClientConfig) {
     super();
 
+    // Avoid Node's special-case 'error' event crashing the process when users
+    // haven't attached an error listener yet (especially with autoConnect).
+    this.on(ClientEvent.ERROR, (_error) => {});
+
     // Validate configuration
     validateClientConfig(config);
 
@@ -346,18 +350,20 @@ export class SogniClientWrapper extends EventEmitter {
       let completedJobCount = 0;
       let failedJobCount = 0;
 
-      if (onProgress) {
-        project.on('progress', (progress: number) => {
-          const progressData: ProjectProgress = {
-            projectId: project.id,
-            percentage: progress,
-            completedJobs: completedJobCount,
-            totalJobs,
-          };
+      project.on('progress', (progress: number) => {
+        const progressData: ProjectProgress = {
+          projectId: project.id,
+          percentage: progress,
+          completedJobs: completedJobCount,
+          totalJobs,
+        };
+
+        if (onProgress) {
           onProgress(progressData);
-          this.emit(ClientEvent.PROJECT_PROGRESS, progressData);
-        });
-      }
+        }
+
+        this.emit(ClientEvent.PROJECT_PROGRESS, progressData);
+      });
 
       // Always set up job event listeners to emit wrapper events
       project.on('jobCompleted', (job: Job) => {
@@ -417,10 +423,7 @@ export class SogniClientWrapper extends EventEmitter {
       // Wait for completion with timeout
       this.log('Waiting for project completion...');
 
-      const mediaUrls = await Promise.race([
-        project.waitForCompletion(),
-        this.createTimeoutPromise<string[]>(timeout),
-      ]);
+      const mediaUrls = await this.withTimeout(project.waitForCompletion(), timeout);
 
       this.log('Project completed successfully');
 
@@ -561,14 +564,24 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
-   * Create a timeout promise
+   * Await a promise with a timeout (clears the timer on settle)
    */
-  private createTimeoutPromise<T>(timeoutMs: number): Promise<T> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(() => {
         reject(new SogniTimeoutError(`Operation timed out after ${timeoutMs}ms`, timeoutMs));
       }, timeoutMs);
     });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   /**
@@ -617,4 +630,3 @@ export class SogniClientWrapper extends EventEmitter {
     return super.emit(event, ...args);
   }
 }
-

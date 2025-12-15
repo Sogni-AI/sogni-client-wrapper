@@ -414,13 +414,10 @@ async function runTests() {
   console.log(`📊 Total tests: ${testsPassed + testsFailed}`);
   console.log('='.repeat(50));
 
-  if (testsFailed > 0) {
-    process.exit(1);
-  }
+  process.exit(testsFailed > 0 ? 1 : 0);
 }
 
 runTests().catch((error) => {
   console.error('Test suite failed:', error);
   process.exit(1);
 });
-

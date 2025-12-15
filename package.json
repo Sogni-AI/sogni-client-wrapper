@@ -9,8 +9,8 @@
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
-    "test": "tsx test/basic-tests.ts",
-    "test:e2e": "tsx test/e2e-test.ts",
+    "test": "node --import tsx test/basic-tests.ts",
+    "test:e2e": "node --import tsx test/e2e-test.ts",
     "test:all": "npm run test && npm run test:e2e"
   },
   "keywords": [
@@ -49,6 +49,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    ".env.example"
   ]
 }

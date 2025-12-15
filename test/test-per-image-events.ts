@@ -4,7 +4,7 @@
  */
 
 import { config } from 'dotenv';
-import { SogniClientWrapper, ClientEvent, JobCompletedData, JobFailedData } from './src';
+import { SogniClientWrapper, ClientEvent, JobCompletedData, JobFailedData } from '../src';
 
 // Load environment variables
 config();
@@ -25,7 +25,7 @@ async function testPerImageEvents() {
 
     // Listen for per-image completion events
     client.on(ClientEvent.JOB_COMPLETED, (data: JobCompletedData) => {
-      console.log(`✅ Image ${data.jobIndex! + 1}/${data.totalJobs} completed!`);
+      console.log(`✅ Image ${data.jobIndex + 1}/${data.totalJobs} completed!`);
       console.log(`   Project: ${data.projectId}`);
       console.log(`   URL: ${data.imageUrl || 'N/A'}`);
       console.log(`   Job ID: ${data.job.id}`);
@@ -38,12 +38,12 @@ async function testPerImageEvents() {
 
     // Listen for per-image failure events
     client.on(ClientEvent.JOB_FAILED, (data: JobFailedData) => {
-      console.log(`❌ Image ${data.jobIndex! + 1}/${data.totalJobs} failed!`);
+      console.log(`❌ Image ${data.jobIndex + 1}/${data.totalJobs} failed!`);
       console.log(`   Project: ${data.projectId}`);
       console.log(`   Error: ${data.error || 'Unknown error'}`);
       console.log('');
 
-      failedImages.push(data.jobIndex!);
+      failedImages.push(data.jobIndex);
     });
 
     // Listen for overall project progress
@@ -64,10 +64,11 @@ async function testPerImageEvents() {
     // Create a project with multiple images
     console.log('🎨 Generating 3 images...\n');
     const result = await client.createProject({
+      type: 'image',
       modelId: model.id,
       positivePrompt: 'A serene mountain landscape at sunset, photorealistic',
       negativePrompt: 'blurry, low quality',
-      numberOfImages: 3,
+      numberOfMedia: 3,
       steps: model.recommendedSettings?.steps || 20,
       guidance: model.recommendedSettings?.guidance || 7.5,
       width: 512,

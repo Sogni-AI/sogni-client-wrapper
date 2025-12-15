@@ -317,7 +317,7 @@ export interface JobCompletedData {
   videoUrl?: string;
 
   /** Job index in the batch */
-  jobIndex?: number;
+  jobIndex: number;
 
   /** Total number of jobs in the project */
   totalJobs: number;
@@ -337,7 +337,7 @@ export interface JobFailedData {
   error?: string;
 
   /** Job index in the batch */
-  jobIndex?: number;
+  jobIndex: number;
 
   /** Total number of jobs in the project */
   totalJobs: number;
@@ -389,4 +389,3 @@ export type CreateProjectOptions = ProjectConfig & {
   /** Delay between retries in milliseconds */
   retryDelay?: number;
 };
-

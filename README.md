@@ -183,7 +183,7 @@ For cleaner code, use the dedicated convenience methods:
 ```typescript
 // For images
 const imageResult = await client.createImageProject({
-  modelId: 'flux-schnell',
+  modelId: 'flux1-schnell-fp8',
   positivePrompt: 'A beautiful sunset',
   numberOfMedia: 1,
 });
@@ -305,7 +305,7 @@ client.on(ClientEvent.JOB_COMPLETED, (data) => {
 // Generate a batch of images
 const result = await client.createProject({
   type: 'image',
-  modelId: 'flux-schnell',
+  modelId: 'flux1-schnell-fp8',
   positivePrompt: 'A beautiful landscape',
   numberOfMedia: 4, // Generate 4 images
   steps: 4,

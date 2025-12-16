@@ -309,7 +309,63 @@ async function runTests() {
       }
     })();
 
-    // Test 10: Disconnect
+    // Test 10: Generate text-to-video without reference image
+    await test('Should generate text-to-video with wan_v2.2-14b-fp8_t2v_lightx2v model', async () => {
+      // Wait to avoid rate limiting
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      console.log('   Using model: wan_v2.2-14b-fp8_t2v_lightx2v (text-to-video speed variant)');
+      console.log('   Settings: 640x640, 16fps, 81 frames');
+      console.log('   Steps: 4 (optimized for speed variant)');
+      console.log('   No reference image - pure text-to-video generation');
+      console.log('   Generating video...');
+
+      let progressCount = 0;
+
+      const result = await client.createProject({
+        type: 'video',
+        modelId: 'wan_v2.2-14b-fp8_t2v_lightx2v', // Use speed variant that works reliably
+        positivePrompt: 'A serene waterfall flowing through a lush green forest',
+        negativePrompt: '',  // Empty negative prompt like the working example
+        stylePrompt: '',     // Empty style prompt like the working example
+        width: 640,          // Use 640x640 like the working example
+        height: 640,
+        fps: 16,
+        frames: 81,
+        steps: 4,            // 4 steps for speed variant
+        numberOfMedia: 1,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 300000, // 5 minutes for video generation
+        onProgress: (progress) => {
+          progressCount++;
+          if (progressCount % 5 === 0) {
+            console.log(`   Progress: ${progress.percentage}%`);
+          }
+        },
+      });
+
+      console.log(`   Text-to-video generation completed: ${result.completed}`);
+      console.log(`   Project ID: ${result.project.id}`);
+      console.log(`   Videos generated: ${result.videoUrls?.length || 0}`);
+
+      if (result.videoUrls && result.videoUrls.length > 0) {
+        console.log(`   Video URL: ${result.videoUrls[0]}`);
+        console.log(`   Video duration: ~5 seconds (81 frames @ 16fps)`);
+      }
+
+      if (!result.completed) {
+        throw new Error('Text-to-video generation did not complete');
+      }
+
+      if (!result.videoUrls || result.videoUrls.length === 0) {
+        throw new Error('No video URLs returned from text-to-video');
+      }
+    })();
+
+    // Test 11: Disconnect
     await test('Should disconnect cleanly', async () => {
       if (!client) throw new Error('Client not initialized');
       

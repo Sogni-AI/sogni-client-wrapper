@@ -119,16 +119,19 @@ The wrapper now supports video generation using Sogni's WAN models. Generate stu
 ### Video Generation Example
 
 ```typescript
-// Text-to-Video (t2v)
+// Text-to-Video (t2v) using speed variant for reliability
 const videoResult = await client.createVideoProject({
-  modelId: 'wan_v2.2-14b-fp8_t2v',
+  modelId: 'wan_v2.2-14b-fp8_t2v_lightx2v', // Speed variant (4 steps)
   positivePrompt: 'A serene waterfall flowing through a lush green forest',
   numberOfMedia: 1,
-  frames: 60,        // Generate 60 frames
-  fps: 30,          // 30 frames per second
-  width: 1280,
-  height: 720,
+  frames: 81,        // Generate 81 frames (5 seconds at 16fps)
+  fps: 16,          // 16 frames per second
+  width: 640,       // 640x640 resolution
+  height: 640,
+  steps: 4,         // Optimized for speed variant
   outputFormat: 'mp4',
+  waitForCompletion: true,
+  timeout: 300000,  // 5 minute timeout for video generation
 });
 
 console.log('Video URLs:', videoResult.videoUrls);
@@ -140,29 +143,22 @@ The wrapper supports multiple video generation workflows:
 
 1. **Text-to-Video (t2v)**: Generate videos from text prompts
 2. **Image-to-Video (i2v)**: Animate static images or interpolate between two images
-3. **Sound-to-Video (s2v)**: Generate videos synchronized with audio
-4. **Animate Workflows**: Create character animations or motion transfers
+3. **Animate Workflows**: Create character animations or motion transfers
 
 ### Advanced Video Examples
 
 ```typescript
 // Image-to-Video with interpolation
 const i2vResult = await client.createVideoProject({
-  modelId: 'wan_v2.2-14b-fp8_i2v',
+  modelId: 'wan_v2.2-14b-fp8_i2v_lightx2v',
   positivePrompt: 'Smooth camera movement',
   referenceImage: startImageBuffer,     // Starting image
   referenceImageEnd: endImageBuffer,    // Optional: end image for interpolation
-  frames: 90,
-  fps: 30,
-});
-
-// Sound-to-Video
-const s2vResult = await client.createVideoProject({
-  modelId: 'wan_v2.2-14b-fp8_s2v',
-  positivePrompt: 'Dancing person synchronized with music',
-  referenceAudio: audioBuffer,  // Audio file to sync with
-  frames: 120,
-  fps: 24,
+  width: 512,
+  height: 512,
+  frames: 81,
+  fps: 16,
+  steps: 4,
 });
 
 // Animate with motion transfer

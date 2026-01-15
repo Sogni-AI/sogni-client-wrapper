@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 import { SogniClient, Project, Job, AvailableModel } from '@sogni-ai/sogni-client';
 import type {
   SogniClientConfig,
+  AuthType,
   ProjectConfig,
   ImageProjectConfig,
   VideoProjectConfig,
@@ -37,16 +38,33 @@ import {
   validateProjectConfig,
   isImageProjectConfig,
   isVideoProjectConfig,
+  isCookieAuth,
   waitFor,
   retry,
 } from '../utils/helpers';
+
+/**
+ * Internal configuration type with resolved defaults
+ */
+interface InternalConfig {
+  username: string;
+  password: string;
+  appId: string;
+  network: 'fast' | 'relaxed';
+  autoConnect: boolean;
+  reconnect: boolean;
+  reconnectInterval: number;
+  timeout: number;
+  debug: boolean;
+  authType: AuthType;
+}
 
 /**
  * Enhanced Sogni Client with improved developer experience
  */
 export class SogniClientWrapper extends EventEmitter {
   private client: SogniClient | null = null;
-  private config: Required<SogniClientConfig>;
+  private config: InternalConfig;
   private connectionState: ConnectionState;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isReconnecting: boolean = false;
@@ -61,10 +79,10 @@ export class SogniClientWrapper extends EventEmitter {
     // Validate configuration
     validateClientConfig(config);
 
-    // Set defaults
+    // Set defaults - username/password default to empty for cookie auth
     this.config = {
-      username: config.username,
-      password: config.password,
+      username: config.username || '',
+      password: config.password || '',
       appId: config.appId || generateAppId(),
       network: config.network || 'fast',
       autoConnect: config.autoConnect !== false,
@@ -72,6 +90,7 @@ export class SogniClientWrapper extends EventEmitter {
       reconnectInterval: config.reconnectInterval || 5000,
       timeout: config.timeout || 300000, // 5 minutes default
       debug: config.debug || false,
+      authType: config.authType || 'token',
     };
 
     // Initialize connection state
@@ -113,20 +132,42 @@ export class SogniClientWrapper extends EventEmitter {
 
     try {
       this.log('Creating Sogni client...');
-      
-      // Create client instance
+
+      // Create client instance with auth type
       this.client = await SogniClient.createInstance({
         appId: this.config.appId,
         network: this.config.network,
+        authType: this.config.authType,
       });
 
-      this.log('Logging in...');
-      
-      // Login and establish WebSocket connection
-      await this.client.account.login(this.config.username, this.config.password);
+      // Authentication depends on authType
+      if (this.config.authType === 'cookies') {
+        this.log('Checking authentication via cookies...');
+
+        // For cookie auth, check if already authenticated
+        const isAuthenticated = await this.client.checkAuth();
+
+        if (!isAuthenticated) {
+          // If not authenticated via cookies and credentials provided, try login
+          if (this.config.username && this.config.password) {
+            this.log('Cookie auth failed, attempting login with credentials...');
+            await this.client.account.login(this.config.username, this.config.password);
+          } else {
+            throw new SogniAuthenticationError(
+              'Cookie authentication failed and no credentials provided',
+              undefined
+            );
+          }
+        }
+      } else {
+        this.log('Logging in with credentials...');
+
+        // Token auth - login with username/password
+        await this.client.account.login(this.config.username, this.config.password);
+      }
 
       this.log('Waiting for models...');
-      
+
       // Wait for models to be available
       await this.client.projects.waitForModels();
 

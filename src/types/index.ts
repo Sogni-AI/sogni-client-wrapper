@@ -13,7 +13,6 @@ import type {
   TokenType,
   ImageOutputFormat,
   VideoOutputFormat,
-  Scheduler,
   AudioFormat,
   VideoFormat,
   VideoWorkflowType,
@@ -34,7 +33,6 @@ export type {
   TokenType,
   ImageOutputFormat,
   VideoOutputFormat,
-  Scheduler,
   AudioFormat,
   VideoFormat,
   VideoWorkflowType,
@@ -44,36 +42,73 @@ export type {
 };
 
 /**
- * Configuration for the Sogni Client Wrapper
+ * Authentication type for the Sogni client
+ * - 'token': Uses username/password login with token-based auth (default, for Node.js apps)
+ * - 'cookies': Uses httpOnly cookie auth (for browser apps on .sogni.ai subdomains)
  */
-export interface SogniClientConfig {
-  /** Sogni account username */
-  username: string;
-  
-  /** Sogni account password */
-  password: string;
-  
+export type AuthType = 'token' | 'cookies';
+
+/**
+ * Base configuration fields shared by all auth types
+ */
+interface BaseClientConfig {
   /** Unique application identifier (auto-generated if not provided) */
   appId?: string;
-  
+
   /** Network type to use */
   network?: SupernetType;
-  
+
   /** Automatically connect on client creation */
   autoConnect?: boolean;
-  
+
   /** Automatically reconnect on connection loss */
   reconnect?: boolean;
-  
+
   /** Interval between reconnection attempts in milliseconds */
   reconnectInterval?: number;
-  
+
   /** Default timeout for operations in milliseconds */
   timeout?: number;
-  
+
   /** Enable debug logging */
   debug?: boolean;
 }
+
+/**
+ * Configuration for token-based authentication (default)
+ * Requires username and password
+ */
+export interface TokenAuthConfig extends BaseClientConfig {
+  /** Authentication type - 'token' for username/password login */
+  authType?: 'token';
+
+  /** Sogni account username */
+  username: string;
+
+  /** Sogni account password */
+  password: string;
+}
+
+/**
+ * Configuration for cookie-based authentication
+ * Username and password are not required - uses existing browser session
+ */
+export interface CookieAuthConfig extends BaseClientConfig {
+  /** Authentication type - 'cookies' for browser session auth */
+  authType: 'cookies';
+
+  /** Username is optional with cookie auth */
+  username?: string;
+
+  /** Password is optional with cookie auth */
+  password?: string;
+}
+
+/**
+ * Configuration for the Sogni Client Wrapper
+ * Supports both token-based (Node.js) and cookie-based (browser) authentication
+ */
+export type SogniClientConfig = TokenAuthConfig | CookieAuthConfig;
 
 /**
  * Base project configuration with additional options
@@ -256,7 +291,7 @@ export interface ModelInfo extends AvailableModel {
   recommendedSettings?: {
     steps?: number;
     guidance?: number;
-    scheduler?: Scheduler;
+    scheduler?: string;
     frames?: number; // For video models
     fps?: number; // For video models
   };

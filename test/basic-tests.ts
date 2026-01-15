@@ -12,9 +12,15 @@ import {
   generateAppId,
   isImageProjectConfig,
   isVideoProjectConfig,
+  isCookieAuth,
   validateProjectConfig,
+  validateClientConfig,
   type ImageProjectConfig,
   type VideoProjectConfig,
+  type SogniClientConfig,
+  type TokenAuthConfig,
+  type CookieAuthConfig,
+  type AuthType,
 } from '../src';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
@@ -405,6 +411,136 @@ async function runTests() {
         throw new Error('Wrong error type for missing type');
       }
     }
+  })();
+
+  // Test 25: Cookie auth config without credentials
+  await test('Should allow cookie auth without username/password', () => {
+    const config: CookieAuthConfig = {
+      authType: 'cookies',
+      autoConnect: false,
+    };
+
+    // Should not throw - username/password are optional for cookie auth
+    validateClientConfig(config);
+  })();
+
+  // Test 26: Cookie auth client creation
+  await test('Should create client with cookie auth config', () => {
+    const client = new SogniClientWrapper({
+      authType: 'cookies',
+      autoConnect: false,
+    });
+    if (!client) throw new Error('Client not created with cookie auth');
+    if (!client.isConnected) throw new Error('isConnected method not available');
+  })();
+
+  // Test 27: isCookieAuth helper returns true for cookie auth
+  await test('Should identify cookie auth config', () => {
+    const cookieConfig: CookieAuthConfig = {
+      authType: 'cookies',
+    };
+
+    if (!isCookieAuth(cookieConfig)) {
+      throw new Error('isCookieAuth should return true for cookies auth');
+    }
+  })();
+
+  // Test 28: isCookieAuth helper returns false for token auth
+  await test('Should identify token auth config', () => {
+    const tokenConfig: TokenAuthConfig = {
+      authType: 'token',
+      username: 'test',
+      password: 'test',
+    };
+
+    if (isCookieAuth(tokenConfig)) {
+      throw new Error('isCookieAuth should return false for token auth');
+    }
+  })();
+
+  // Test 29: isCookieAuth helper returns false when authType is undefined
+  await test('Should default to token auth when authType is undefined', () => {
+    const config: SogniClientConfig = {
+      username: 'test',
+      password: 'test',
+      // authType not set - defaults to token
+    };
+
+    if (isCookieAuth(config)) {
+      throw new Error('isCookieAuth should return false when authType is undefined');
+    }
+  })();
+
+  // Test 30: Token auth requires username
+  await test('Should require username for token auth', () => {
+    const config = {
+      authType: 'token' as const,
+      password: 'test-pass',
+    };
+
+    try {
+      validateClientConfig(config as any);
+      throw new Error('Should have required username for token auth');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type');
+      }
+    }
+  })();
+
+  // Test 31: Token auth requires password
+  await test('Should require password for token auth', () => {
+    const config = {
+      authType: 'token' as const,
+      username: 'test-user',
+    };
+
+    try {
+      validateClientConfig(config as any);
+      throw new Error('Should have required password for token auth');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type');
+      }
+    }
+  })();
+
+  // Test 32: Cookie auth with optional credentials
+  await test('Should allow cookie auth with optional credentials', () => {
+    const config: CookieAuthConfig = {
+      authType: 'cookies',
+      username: 'optional-user',
+      password: 'optional-pass',
+    };
+
+    // Should not throw - credentials are optional for cookie auth
+    validateClientConfig(config);
+  })();
+
+  // Test 33: Invalid authType validation
+  await test('Should reject invalid authType', () => {
+    const config = {
+      authType: 'invalid' as any,
+      username: 'test',
+      password: 'test',
+    };
+
+    try {
+      validateClientConfig(config as any);
+      throw new Error('Should have rejected invalid authType');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type');
+      }
+    }
+  })();
+
+  // Test 34: AuthType type export
+  await test('Should export AuthType type', () => {
+    // TypeScript validates at compile time
+    const tokenAuth: AuthType = 'token';
+    const cookieAuth: AuthType = 'cookies';
+    if (!tokenAuth || !cookieAuth) throw new Error('AuthType not working');
   })();
 
   // Summary

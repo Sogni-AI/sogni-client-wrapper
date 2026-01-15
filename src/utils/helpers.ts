@@ -28,15 +28,40 @@ export function isVideoProjectConfig(config: ProjectConfig): config is VideoProj
 }
 
 /**
+ * Check if using cookie-based authentication
+ */
+export function isCookieAuth(config: SogniClientConfig): boolean {
+  return config.authType === 'cookies';
+}
+
+/**
  * Validate client configuration
  */
 export function validateClientConfig(config: SogniClientConfig): void {
-  if (!config.username || typeof config.username !== 'string') {
-    throw new SogniValidationError('Username is required and must be a string');
+  // Validate authType if provided
+  if (config.authType !== undefined && !['token', 'cookies'].includes(config.authType)) {
+    throw new SogniValidationError('authType must be either "token" or "cookies"');
   }
 
-  if (!config.password || typeof config.password !== 'string') {
-    throw new SogniValidationError('Password is required and must be a string');
+  // For token auth (default), username and password are required
+  if (!isCookieAuth(config)) {
+    if (!config.username || typeof config.username !== 'string') {
+      throw new SogniValidationError('Username is required and must be a string');
+    }
+
+    if (!config.password || typeof config.password !== 'string') {
+      throw new SogniValidationError('Password is required and must be a string');
+    }
+  }
+
+  // For cookie auth, username/password are optional but must be strings if provided
+  if (isCookieAuth(config)) {
+    if (config.username !== undefined && typeof config.username !== 'string') {
+      throw new SogniValidationError('Username must be a string if provided');
+    }
+    if (config.password !== undefined && typeof config.password !== 'string') {
+      throw new SogniValidationError('Password must be a string if provided');
+    }
   }
 
   if (config.network && !['fast', 'relaxed'].includes(config.network)) {

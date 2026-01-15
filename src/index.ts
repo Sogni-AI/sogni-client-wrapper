@@ -9,6 +9,9 @@ export { SogniClientWrapper } from './client/SogniClientWrapper';
 // Types
 export type {
   SogniClientConfig,
+  AuthType,
+  TokenAuthConfig,
+  CookieAuthConfig,
   ProjectConfig,
   ImageProjectConfig,
   VideoProjectConfig,
@@ -32,7 +35,6 @@ export type {
   TokenType,
   ImageOutputFormat,
   VideoOutputFormat,
-  Scheduler,
   AudioFormat,
   VideoFormat,
   VideoWorkflowType,
@@ -65,6 +67,7 @@ export {
   validateProjectConfig,
   isImageProjectConfig,
   isVideoProjectConfig,
+  isCookieAuth,
   sleep,
   retry,
   formatBytes,

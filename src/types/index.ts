@@ -24,6 +24,8 @@ import type {
   ControlNetMode,
 } from '@sogni-ai/sogni-client/dist/Projects/types/ControlNetParams';
 
+import type { InputMedia } from '@sogni-ai/sogni-client/dist/Projects/types';
+
 // Re-export types from Sogni SDK
 export type {
   Project,
@@ -39,6 +41,7 @@ export type {
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
+  InputMedia,
 };
 
 /**
@@ -424,3 +427,16 @@ export type CreateProjectOptions = ProjectConfig & {
   /** Delay between retries in milliseconds */
   retryDelay?: number;
 };
+
+/**
+ * Configuration for Qwen Image Edit models.
+ * These models support up to 3 context images for multi-reference editing.
+ *
+ * Supported models:
+ * - qwen_image_edit_2511_fp8 (standard, 20 steps recommended)
+ * - qwen_image_edit_2511_fp8_lightning (fast, 4 steps recommended)
+ */
+export interface QwenImageEditConfig extends Omit<ImageProjectConfig, 'type'> {
+  /** Context images for the edit operation (max 3 for Qwen models) */
+  contextImages?: InputMedia[];
+}

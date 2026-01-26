@@ -58,6 +58,7 @@ The library follows a clear separation of concerns:
    - Async utilities (retry, waitFor, debounce, throttle)
    - Formatting helpers (bytes, duration)
    - Security utilities (sanitizeForLog for credentials)
+   - Context image helpers (getMaxContextImages, supportsContextImages)
 
 ### Connection Management Strategy
 
@@ -82,9 +83,18 @@ When creating image generation projects:
 ### Model Recommendation System
 
 The wrapper includes intelligent defaults based on model type:
+- **Qwen Image Edit models**: 20 steps, 7.5 guidance (lightning variant: 4 steps, 3.5 guidance)
 - **Flux models**: 4 steps, 3.5 guidance
 - **Lightning/Turbo/LCM models**: 4 steps, 1.0 guidance
 - **Standard models**: 20 steps, 7.5 guidance
+
+### Context Images Support
+
+The wrapper supports context images for models that accept reference images (Qwen, Flux, Kontext):
+- **Qwen Image Edit models**: Up to 3 context images
+- **Kontext models**: Up to 2 context images
+- **Flux models**: Up to 6 context images
+- Helper functions: `getMaxContextImages(modelId)`, `supportsContextImages(modelId)`
 
 ## Key Implementation Details
 
@@ -101,7 +111,7 @@ All async operations return promises and support async/await. The wrapper conver
 Extends Node.js EventEmitter with type-safe events via the ClientEvent enum. Events cover connection lifecycle, model updates, balance changes, and project progress.
 
 ### Configuration Validation
-Strict validation of client and project configurations with detailed error messages. Validates numeric ranges (steps: 1-100, guidance: 0-30, dimensions: 256-2048) and required fields.
+Strict validation of client and project configurations with detailed error messages. Validates numeric ranges (steps: 1-100, guidance: 0-30, dimensions: 256-2048), required fields, and contextImages arrays (type validation, max 6 images globally, model-specific limits enforced in createImageEditProject).
 
 ## Testing Approach
 

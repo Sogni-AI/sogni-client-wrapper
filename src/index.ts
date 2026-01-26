@@ -27,6 +27,7 @@ export type {
   ErrorData,
   JobCompletedData,
   JobFailedData,
+  QwenImageEditConfig,
   // Re-exported from Sogni SDK
   Project,
   Job,
@@ -38,6 +39,7 @@ export type {
   AudioFormat,
   VideoFormat,
   VideoWorkflowType,
+  InputMedia,
   // ControlNet types
   ControlNetParams,
   ControlNetName,
@@ -72,6 +74,8 @@ export {
   retry,
   formatBytes,
   formatDuration,
+  getMaxContextImages,
+  supportsContextImages,
 } from './utils/helpers';
 
 // Default export

@@ -22,6 +22,7 @@ import type {
   ClientEventCallbacks,
   JobCompletedData,
   JobFailedData,
+  QwenImageEditConfig,
 } from '../types';
 import { ClientEvent } from '../types';
 import {
@@ -31,6 +32,7 @@ import {
   SogniProjectError,
   SogniTimeoutError,
   SogniModelNotFoundError,
+  SogniValidationError,
 } from '../utils/errors';
 import {
   generateAppId,
@@ -41,6 +43,7 @@ import {
   isCookieAuth,
   waitFor,
   retry,
+  getMaxContextImages,
 } from '../utils/helpers';
 
 /**
@@ -540,6 +543,34 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
+   * Convenience method to create an image edit project (e.g., Qwen Image Edit)
+   *
+   * @example
+   * ```typescript
+   * const result = await client.createImageEditProject({
+   *   modelId: 'qwen_image_edit_2511_fp8',
+   *   positivePrompt: 'Transform the cat into a lion',
+   *   contextImages: [imageBuffer],
+   *   numberOfMedia: 1,
+   * });
+   * ```
+   */
+  async createImageEditProject(config: QwenImageEditConfig): Promise<ProjectResult> {
+    // Model-specific context image limit validation
+    const maxImages = getMaxContextImages(config.modelId);
+    if (config.contextImages && config.contextImages.length > maxImages) {
+      throw new SogniValidationError(
+        `Model ${config.modelId} supports a maximum of ${maxImages} context images, got ${config.contextImages.length}`
+      );
+    }
+
+    return this.createProject({
+      ...config,
+      type: 'image',
+    } as ImageProjectConfig);
+  }
+
+  /**
    * Ensure client is connected, connect if not
    */
   private async ensureConnected(): Promise<void> {
@@ -629,6 +660,14 @@ export class SogniClientWrapper extends EventEmitter {
    * Get recommended settings for a model
    */
   private getRecommendedSettings(modelId: string): ModelInfo['recommendedSettings'] {
+    // Qwen Image Edit models
+    if (modelId.includes('qwen_image_edit')) {
+      if (modelId.includes('lightning')) {
+        return { steps: 4, guidance: 3.5 };
+      }
+      return { steps: 20, guidance: 7.5 };
+    }
+
     // Provide sensible defaults based on model type
     if (modelId.includes('flux')) {
       return { steps: 4, guidance: 3.5 };

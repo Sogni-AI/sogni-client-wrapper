@@ -28,6 +28,29 @@ export function isVideoProjectConfig(config: ProjectConfig): config is VideoProj
 }
 
 /**
+ * Get the maximum number of context images supported by a model
+ */
+export function getMaxContextImages(modelId: string): number {
+  if (modelId.includes('qwen_image_edit')) {
+    return 3;
+  }
+  if (modelId.includes('kontext')) {
+    return 2;
+  }
+  if (modelId.includes('flux')) {
+    return 6;
+  }
+  return 0; // Model doesn't support context images
+}
+
+/**
+ * Check if a model supports context images
+ */
+export function supportsContextImages(modelId: string): boolean {
+  return getMaxContextImages(modelId) > 0;
+}
+
+/**
  * Check if using cookie-based authentication
  */
 export function isCookieAuth(config: SogniClientConfig): boolean {
@@ -137,6 +160,33 @@ export function validateProjectConfig(config: ProjectConfig): void {
     if (config.startingImageStrength !== undefined) {
       if (typeof config.startingImageStrength !== 'number' || config.startingImageStrength < 0 || config.startingImageStrength > 1) {
         throw new SogniValidationError('Starting image strength must be between 0 and 1');
+      }
+    }
+
+    // Context images validation
+    if (config.contextImages !== undefined) {
+      if (!Array.isArray(config.contextImages)) {
+        throw new SogniValidationError('contextImages must be an array');
+      }
+
+      const maxImages = 6; // Maximum across all models
+      if (config.contextImages.length > maxImages) {
+        throw new SogniValidationError(
+          `contextImages can have at most ${maxImages} images`
+        );
+      }
+
+      // Validate each item is valid InputMedia type
+      for (let i = 0; i < config.contextImages.length; i++) {
+        const img = config.contextImages[i];
+        const isValid = img === true ||
+                        Buffer.isBuffer(img) ||
+                        (typeof Blob !== 'undefined' && img instanceof Blob);
+        if (!isValid && img !== undefined) {
+          throw new SogniValidationError(
+            `contextImages[${i}] must be a Buffer, Blob, or true (for pre-uploaded)`
+          );
+        }
       }
     }
   }

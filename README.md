@@ -11,6 +11,7 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 - **Promise-Based API**: Modern `async/await` support for all core operations.
 - **Connection Management**: Automatic connection and reconnection handling.
 - **Video Rendering Support**: Generate videos using WAN models (t2v, i2v, s2v, animate workflows).
+- **Image Editing Support**: Edit images using Qwen models with context images for multi-reference editing.
 - **Simplified Configuration**: Sensible defaults and clear configuration options.
 - **Enhanced Error Handling**: Custom error classes for better error diagnosis.
 - **Type-Safe**: Written entirely in TypeScript with full type definitions.
@@ -194,6 +195,87 @@ const videoResult = await client.createVideoProject({
 });
 ```
 
+## Image Editing with Context Images
+
+The wrapper supports image editing using Qwen models that accept context images for multi-reference editing. This allows you to transform, combine, or edit images based on reference inputs.
+
+### Supported Models
+
+| Model ID | Type | Recommended Steps | Max Context Images |
+|----------|------|-------------------|-------------------|
+| `qwen_image_edit_2511_fp8` | Standard | 20 | 3 |
+| `qwen_image_edit_2511_fp8_lightning` | Fast | 4 | 3 |
+
+### Image Edit Example
+
+```typescript
+import { readFileSync } from 'fs';
+
+// Load your reference image(s)
+const referenceImage = readFileSync('./my-image.png');
+
+// Create an image edit project
+const result = await client.createImageEditProject({
+  modelId: 'qwen_image_edit_2511_fp8',
+  positivePrompt: 'Transform the cat into a majestic lion',
+  contextImages: [referenceImage],
+  numberOfMedia: 1,
+  steps: 20,
+  guidance: 7.5,
+});
+
+console.log('Edited image URLs:', result.imageUrls);
+```
+
+### Using Multiple Context Images
+
+Qwen models support up to 3 context images for complex editing operations:
+
+```typescript
+const image1 = readFileSync('./subject.png');
+const image2 = readFileSync('./style-reference.png');
+const image3 = readFileSync('./background.png');
+
+const result = await client.createImageEditProject({
+  modelId: 'qwen_image_edit_2511_fp8_lightning', // Fast variant
+  positivePrompt: 'Combine the subject with the style and background',
+  contextImages: [image1, image2, image3],
+  numberOfMedia: 1,
+  steps: 4,  // Optimized for lightning variant
+  guidance: 3.5,
+});
+```
+
+### Context Image Types
+
+The `contextImages` parameter accepts an array of `InputMedia` types:
+
+- `Buffer` - Node.js Buffer containing image data
+- `Blob` - Browser Blob object
+- `File` - Browser File object
+- `true` - Boolean indicating a pre-uploaded image
+
+### Helper Functions
+
+The wrapper provides helper functions for working with context images:
+
+```typescript
+import { getMaxContextImages, supportsContextImages } from '@sogni-ai/sogni-client-wrapper';
+
+// Check if a model supports context images
+if (supportsContextImages('qwen_image_edit_2511_fp8')) {
+  console.log('Model supports context images!');
+}
+
+// Get the maximum number of context images for a model
+const maxImages = getMaxContextImages('qwen_image_edit_2511_fp8'); // Returns 3
+
+// Other models have different limits:
+getMaxContextImages('flux-1-schnell');  // Returns 6
+getMaxContextImages('kontext-model');   // Returns 2
+getMaxContextImages('sd-xl-base');      // Returns 0 (not supported)
+```
+
 ## API Reference
 
 ### `new SogniClientWrapper(config)`
@@ -229,6 +311,7 @@ Creates a new client instance.
   - For videos: returns `videoUrls` in result
 - `createImageProject(config)`: Convenience method for image generation (automatically sets `type: 'image'`).
 - `createVideoProject(config)`: Convenience method for video generation (automatically sets `type: 'video'`).
+- `createImageEditProject(config: QwenImageEditConfig)`: Convenience method for image editing with context images (validates model-specific limits).
 - `getAvailableModels(options?: GetModelsOptions): Promise<ModelInfo[]>`: Retrieves a list of available models.
 - `getModel(modelId: string): Promise<ModelInfo>`: Retrieves details for a specific model.
 - `getMostPopularModel(): Promise<ModelInfo>`: A helper to get the model with the most active workers.
@@ -385,6 +468,8 @@ This library is written in TypeScript and exports all necessary types for a full
 - `ProjectConfig`: Parameters for creating a project (union of `ImageProjectConfig` and `VideoProjectConfig`).
 - `ImageProjectConfig`: Parameters specific to image generation.
 - `VideoProjectConfig`: Parameters specific to video generation.
+- `QwenImageEditConfig`: Parameters for image editing with context images.
+- `InputMedia`: Type for media inputs (`File | Buffer | Blob | boolean`).
 - `ProjectResult`: The return type for a completed project.
 - `ModelInfo`: Detailed information about an available model.
 - `BalanceInfo`: Your token balance.

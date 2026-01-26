@@ -15,12 +15,16 @@ import {
   isCookieAuth,
   validateProjectConfig,
   validateClientConfig,
+  getMaxContextImages,
+  supportsContextImages,
   type ImageProjectConfig,
   type VideoProjectConfig,
   type SogniClientConfig,
   type TokenAuthConfig,
   type CookieAuthConfig,
   type AuthType,
+  type QwenImageEditConfig,
+  type InputMedia,
 } from '../src';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
@@ -541,6 +545,143 @@ async function runTests() {
     const tokenAuth: AuthType = 'token';
     const cookieAuth: AuthType = 'cookies';
     if (!tokenAuth || !cookieAuth) throw new Error('AuthType not working');
+  })();
+
+  // Test 35: Context images validation - valid array with true values
+  await test('Should accept valid contextImages array with boolean true', () => {
+    const config: ImageProjectConfig = {
+      type: 'image',
+      modelId: 'qwen_image_edit_2511_fp8',
+      positivePrompt: 'Transform the image',
+      numberOfMedia: 1,
+      contextImages: [true, true, true],
+    };
+    validateProjectConfig(config);
+  })();
+
+  // Test 36: Context images validation - exceeds maximum
+  await test('Should reject contextImages exceeding maximum of 6', () => {
+    const config = {
+      type: 'image' as const,
+      modelId: 'qwen_image_edit_2511_fp8',
+      positivePrompt: 'Transform the image',
+      numberOfMedia: 1,
+      contextImages: [true, true, true, true, true, true, true], // 7 images
+    };
+
+    try {
+      validateProjectConfig(config as ImageProjectConfig);
+      throw new Error('Should have thrown');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Expected SogniValidationError');
+      }
+    }
+  })();
+
+  // Test 37: Context images validation - not an array
+  await test('Should reject non-array contextImages', () => {
+    const config = {
+      type: 'image' as const,
+      modelId: 'qwen_image_edit_2511_fp8',
+      positivePrompt: 'Transform the image',
+      numberOfMedia: 1,
+      contextImages: 'not-an-array',
+    };
+
+    try {
+      validateProjectConfig(config as any);
+      throw new Error('Should have thrown');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Expected SogniValidationError');
+      }
+    }
+  })();
+
+  // Test 38: getMaxContextImages helper
+  await test('getMaxContextImages returns correct values for Qwen models', () => {
+    if (getMaxContextImages('qwen_image_edit_2511_fp8') !== 3) {
+      throw new Error('Qwen should support 3 context images');
+    }
+    if (getMaxContextImages('qwen_image_edit_2511_fp8_lightning') !== 3) {
+      throw new Error('Qwen lightning should support 3 context images');
+    }
+  })();
+
+  // Test 39: getMaxContextImages for other models
+  await test('getMaxContextImages returns correct values for other models', () => {
+    if (getMaxContextImages('flux-1-schnell') !== 6) {
+      throw new Error('Flux should support 6 context images');
+    }
+    if (getMaxContextImages('kontext-model') !== 2) {
+      throw new Error('Kontext should support 2 context images');
+    }
+    if (getMaxContextImages('sd-xl-base') !== 0) {
+      throw new Error('SD-XL should return 0 for context images');
+    }
+  })();
+
+  // Test 40: supportsContextImages helper
+  await test('supportsContextImages returns correct values', () => {
+    if (!supportsContextImages('qwen_image_edit_2511_fp8')) {
+      throw new Error('Qwen should support context images');
+    }
+    if (!supportsContextImages('flux-1-schnell')) {
+      throw new Error('Flux should support context images');
+    }
+    if (supportsContextImages('sd-xl-base')) {
+      throw new Error('SD-XL should not support context images');
+    }
+  })();
+
+  // Test 41: createImageEditProject method exists
+  await test('Should have createImageEditProject method', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    if (typeof client.createImageEditProject !== 'function') {
+      throw new Error('createImageEditProject method not found');
+    }
+  })();
+
+  // Test 42: QwenImageEditConfig type is exported
+  await test('Should export QwenImageEditConfig and InputMedia types', () => {
+    // TypeScript validates at compile time
+    const config: QwenImageEditConfig = {
+      modelId: 'qwen_image_edit_2511_fp8',
+      positivePrompt: 'Transform the image',
+      numberOfMedia: 1,
+      contextImages: [true],
+    };
+    if (!config) throw new Error('QwenImageEditConfig type not working');
+  })();
+
+  // Test 43: Context images validation - valid Buffer
+  await test('Should accept valid contextImages with Buffer', () => {
+    const config: ImageProjectConfig = {
+      type: 'image',
+      modelId: 'qwen_image_edit_2511_fp8',
+      positivePrompt: 'Transform the image',
+      numberOfMedia: 1,
+      contextImages: [Buffer.from('test')],
+    };
+    validateProjectConfig(config);
+  })();
+
+  // Test 44: Context images validation - empty array is valid
+  await test('Should accept empty contextImages array', () => {
+    const config: ImageProjectConfig = {
+      type: 'image',
+      modelId: 'qwen_image_edit_2511_fp8',
+      positivePrompt: 'Transform the image',
+      numberOfMedia: 1,
+      contextImages: [],
+    };
+    validateProjectConfig(config);
   })();
 
   // Summary

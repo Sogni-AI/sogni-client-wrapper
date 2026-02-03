@@ -28,7 +28,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sogni-ai/sogni-client-wrapper.git"
+    "url": "git+https://github.com/sogni-ai/sogni-client-wrapper.git"
   },
   "bugs": {
     "url": "https://github.com/sogni-ai/sogni-client-wrapper/issues"

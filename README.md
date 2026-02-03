@@ -238,7 +238,7 @@ const result = await client.createImageEditProject({
   contextImages: [referenceImage],
   numberOfMedia: 1,
   steps: 20,
-  guidance: 7.5,
+  guidance: 4.0,
 });
 
 console.log('Edited image URLs:', result.imageUrls);
@@ -259,8 +259,32 @@ const result = await client.createImageEditProject({
   contextImages: [image1, image2, image3],
   numberOfMedia: 1,
   steps: 4,  // Optimized for lightning variant
-  guidance: 3.5,
+  guidance: 1.0,
 });
+```
+
+### Multiple Angles LoRA (Qwen Image Edit)
+
+```typescript
+import { readFileSync } from 'fs';
+
+const referenceImage = readFileSync('./subject.png');
+
+const result = await client.createImageEditProject({
+  modelId: 'qwen_image_edit_2511_fp8_lightning',
+  positivePrompt: '<sks> front view eye-level shot medium shot',
+  contextImages: [referenceImage],
+  numberOfMedia: 1,
+  steps: 4,
+  guidance: 1.0,
+  sampler: 'euler',
+  scheduler: 'simple',
+  outputFormat: 'jpg',
+  loras: ['multiple_angles'],
+  loraStrengths: [0.9],
+});
+
+console.log('Generated images:', result.imageUrls);
 ```
 
 ### Context Image Types

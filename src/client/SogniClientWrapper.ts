@@ -1000,9 +1000,9 @@ export class SogniClientWrapper extends EventEmitter {
     // Qwen Image Edit models
     if (modelId.includes('qwen_image_edit')) {
       if (modelId.includes('lightning')) {
-        return { steps: 4, guidance: 3.5 };
+        return { steps: 4, guidance: 1.0 };
       }
-      return { steps: 20, guidance: 7.5 };
+      return { steps: 20, guidance: 4.0 };
     }
 
     // Provide sensible defaults based on model type

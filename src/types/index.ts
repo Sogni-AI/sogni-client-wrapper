@@ -25,6 +25,7 @@ import type {
 } from '@sogni-ai/sogni-client/dist/Projects/types/ControlNetParams';
 
 import type { InputMedia } from '@sogni-ai/sogni-client/dist/Projects/types';
+import type { ProjectEvent, JobEvent } from '@sogni-ai/sogni-client/dist/Projects/types/events';
 
 // Re-export types from Sogni SDK
 export type {
@@ -42,6 +43,8 @@ export type {
   ControlNetName,
   ControlNetMode,
   InputMedia,
+  ProjectEvent,
+  JobEvent,
 };
 
 /**
@@ -60,6 +63,21 @@ interface BaseClientConfig {
 
   /** Network type to use */
   network?: SupernetType;
+
+  /** Connect to testnet (optional) */
+  testnet?: boolean;
+
+  /** Override the default WebSocket API endpoint */
+  socketEndpoint?: string;
+
+  /** Override the default REST API endpoint */
+  restEndpoint?: string;
+
+  /** Disable WebSocket connection (advanced/testing) */
+  disableSocket?: boolean;
+
+  /** Allow insecure TLS (e.g., testnet with self-signed certs) */
+  allowInsecureTLS?: boolean;
 
   /** Automatically connect on client creation */
   autoConnect?: boolean;
@@ -140,6 +158,9 @@ interface BaseProjectConfig {
 
   /** Job failed callback */
   onJobFailed?: (job: Job) => void;
+
+  /** Auto-resize video reference assets to supported dimensions (video only) */
+  autoResizeVideoAssets?: boolean;
 }
 
 /**
@@ -184,6 +205,55 @@ export interface ProjectResult {
 
   /** Error information if project failed */
   error?: ErrorData;
+}
+
+/**
+ * Video cost estimate parameters
+ */
+export interface VideoCostEstimateParams {
+  /** Model ID to use */
+  modelId: string;
+
+  /** Output video width */
+  width: number;
+
+  /** Output video height */
+  height: number;
+
+  /** Frames per second */
+  fps: number;
+
+  /** Inference steps */
+  steps: number;
+
+  /** Number of frames (optional, prefer duration) */
+  frames?: number;
+
+  /** Duration in seconds (1-10). If omitted, derived from frames and fps */
+  duration?: number;
+
+  /** Number of videos to generate */
+  numberOfMedia?: number;
+
+  /** Token type for estimate */
+  tokenType?: TokenType;
+}
+
+/**
+ * Cost estimate response
+ */
+export interface CostEstimate {
+  /** Cost in selected token type */
+  token: string;
+
+  /** Cost in USD */
+  usd: string;
+
+  /** Cost in Spark Points */
+  spark: string;
+
+  /** Cost in Sogni tokens */
+  sogni: string;
 }
 
 /**
@@ -334,6 +404,8 @@ export const ClientEvent = {
   PROJECT_FAILED: 'projectFailed',
   JOB_COMPLETED: 'jobCompleted',
   JOB_FAILED: 'jobFailed',
+  PROJECT_EVENT: 'projectEvent',
+  JOB_EVENT: 'jobEvent',
 } as const;
 
 export type ClientEvent = typeof ClientEvent[keyof typeof ClientEvent];
@@ -398,6 +470,8 @@ export interface ClientEventCallbacks {
   [ClientEvent.PROJECT_FAILED]: (error: ErrorData) => void;
   [ClientEvent.JOB_COMPLETED]: (data: JobCompletedData) => void;
   [ClientEvent.JOB_FAILED]: (data: JobFailedData) => void;
+  [ClientEvent.PROJECT_EVENT]: (event: ProjectEvent) => void;
+  [ClientEvent.JOB_EVENT]: (event: JobEvent) => void;
 }
 
 /**

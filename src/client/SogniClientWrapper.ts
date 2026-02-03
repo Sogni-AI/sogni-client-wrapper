@@ -23,6 +23,11 @@ import type {
   JobCompletedData,
   JobFailedData,
   QwenImageEditConfig,
+  ProjectEvent,
+  JobEvent,
+  InputMedia,
+  VideoCostEstimateParams,
+  CostEstimate,
 } from '../types';
 import { ClientEvent } from '../types';
 import {
@@ -46,6 +51,10 @@ import {
   getMaxContextImages,
 } from '../utils/helpers';
 
+const MIN_VIDEO_DIMENSION = 480;
+const MAX_VIDEO_DIMENSION = 1536;
+const VIDEO_DIMENSION_MULTIPLE = 16;
+
 /**
  * Internal configuration type with resolved defaults
  */
@@ -54,6 +63,11 @@ interface InternalConfig {
   password: string;
   appId: string;
   network: 'fast' | 'relaxed';
+  testnet?: boolean;
+  socketEndpoint?: string;
+  restEndpoint?: string;
+  disableSocket?: boolean;
+  allowInsecureTLS?: boolean;
   autoConnect: boolean;
   reconnect: boolean;
   reconnectInterval: number;
@@ -71,6 +85,9 @@ export class SogniClientWrapper extends EventEmitter {
   private connectionState: ConnectionState;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isReconnecting: boolean = false;
+  private projectEventHandler: ((event: ProjectEvent) => void) | null = null;
+  private jobEventHandler: ((event: JobEvent) => void) | null = null;
+  private projectEtaSeconds = new Map<string, number>();
 
   constructor(config: SogniClientConfig) {
     super();
@@ -88,6 +105,11 @@ export class SogniClientWrapper extends EventEmitter {
       password: config.password || '',
       appId: config.appId || generateAppId(),
       network: config.network || 'fast',
+      testnet: config.testnet,
+      socketEndpoint: config.socketEndpoint,
+      restEndpoint: config.restEndpoint,
+      disableSocket: config.disableSocket,
+      allowInsecureTLS: config.allowInsecureTLS,
       autoConnect: config.autoConnect !== false,
       reconnect: config.reconnect !== false,
       reconnectInterval: config.reconnectInterval || 5000,
@@ -136,11 +158,20 @@ export class SogniClientWrapper extends EventEmitter {
     try {
       this.log('Creating Sogni client...');
 
+      if (this.config.allowInsecureTLS) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        this.log('TLS verification disabled (allowInsecureTLS=true)');
+      }
+
       // Create client instance with auth type
       this.client = await SogniClient.createInstance({
         appId: this.config.appId,
         network: this.config.network,
         authType: this.config.authType,
+        testnet: this.config.testnet,
+        socketEndpoint: this.config.socketEndpoint,
+        restEndpoint: this.config.restEndpoint,
+        disableSocket: this.config.disableSocket,
       });
 
       // Authentication depends on authType
@@ -227,6 +258,13 @@ export class SogniClientWrapper extends EventEmitter {
 
     if (this.client) {
       try {
+        if (this.projectEventHandler) {
+          this.client.projects.off('project', this.projectEventHandler);
+        }
+        if (this.jobEventHandler) {
+          this.client.projects.off('job', this.jobEventHandler);
+        }
+
         // Properly disconnect WebSocket to avoid connection leaks
         if (this.client.apiClient && this.client.apiClient.socket) {
           this.client.apiClient.socket.disconnect();
@@ -237,6 +275,7 @@ export class SogniClientWrapper extends EventEmitter {
       }
       this.client = null;
     }
+    this.projectEtaSeconds.clear();
 
     this.updateConnectionState({
       status: 'disconnected' as ConnectionStatus,
@@ -355,13 +394,64 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
+   * Estimate video project cost
+   */
+  async estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate> {
+    await this.ensureConnected();
+
+    if (!params.modelId || typeof params.modelId !== 'string') {
+      throw new SogniValidationError('Model ID is required and must be a string');
+    }
+    if (typeof params.width !== 'number' || typeof params.height !== 'number') {
+      throw new SogniValidationError('Width and height are required and must be numbers');
+    }
+    if (typeof params.fps !== 'number' || params.fps <= 0) {
+      throw new SogniValidationError('FPS is required and must be a positive number');
+    }
+    if (typeof params.steps !== 'number' || params.steps <= 0) {
+      throw new SogniValidationError('Steps is required and must be a positive number');
+    }
+
+    const tokenType = params.tokenType || 'spark';
+    const numberOfMedia = params.numberOfMedia || 1;
+
+    let duration = params.duration;
+    if (duration === undefined || duration === null) {
+      if (params.frames !== undefined && params.frames > 0) {
+        duration = Math.max(1, Math.round((params.frames - 1) / params.fps));
+      } else {
+        duration = 1;
+      }
+    }
+
+    if (duration < 1 || duration > 10) {
+      throw new SogniValidationError('Duration must be between 1 and 10 seconds');
+    }
+
+    return this.client!.projects.estimateVideoCost({
+      tokenType,
+      model: params.modelId,
+      width: params.width,
+      height: params.height,
+      duration,
+      frames: params.frames,
+      fps: params.fps,
+      steps: params.steps,
+      numberOfMedia,
+    });
+  }
+
+  /**
    * Create a project and optionally wait for completion
    */
   async createProject(config: ProjectConfig): Promise<ProjectResult> {
     await this.ensureConnected();
 
+    // Prepare config (video asset normalization, etc.)
+    const preparedConfig = await this.prepareProjectConfig(config);
+
     // Validate project configuration
-    validateProjectConfig(config);
+    validateProjectConfig(preparedConfig);
 
     const {
       waitForCompletion = true,
@@ -369,11 +459,12 @@ export class SogniClientWrapper extends EventEmitter {
       onProgress,
       onJobCompleted,
       onJobFailed,
+      autoResizeVideoAssets: _autoResizeVideoAssets,
       ...projectParams
-    } = config;
+    } = preparedConfig;
 
     try {
-      this.log('Creating project with config:', this.sanitizeConfig(config));
+      this.log('Creating project with config:', this.sanitizeConfig(preparedConfig));
 
       // Prepare project params with defaults for required SDK fields
       const sdkParams = {
@@ -395,12 +486,23 @@ export class SogniClientWrapper extends EventEmitter {
       let failedJobCount = 0;
 
       project.on('progress', (progress: number) => {
+        let safeProgress = Number.isFinite(progress) ? progress : 0;
+        if (!Number.isFinite(progress)) {
+          this.log('Received non-finite progress value, coercing to 0:', progress);
+        }
+        if (safeProgress < 0) safeProgress = 0;
+        if (safeProgress > 100) safeProgress = 100;
+
         const progressData: ProjectProgress = {
           projectId: project.id,
-          percentage: progress,
+          percentage: safeProgress,
           completedJobs: completedJobCount,
           totalJobs,
         };
+        const etaSeconds = this.projectEtaSeconds.get(project.id);
+        if (etaSeconds !== undefined) {
+          progressData.estimatedTimeRemaining = etaSeconds * 1000;
+        }
 
         if (onProgress) {
           onProgress(progressData);
@@ -421,9 +523,9 @@ export class SogniClientWrapper extends EventEmitter {
         };
 
         // Add appropriate URL based on project type
-        if (isImageProjectConfig(config)) {
+        if (isImageProjectConfig(preparedConfig)) {
           jobData.imageUrl = job.resultUrl || undefined;
-        } else if (isVideoProjectConfig(config)) {
+        } else if (isVideoProjectConfig(preparedConfig)) {
           jobData.videoUrl = job.resultUrl || undefined;
         }
 
@@ -478,9 +580,9 @@ export class SogniClientWrapper extends EventEmitter {
       };
 
       // Add appropriate URLs based on project type
-      if (isImageProjectConfig(config)) {
+      if (isImageProjectConfig(preparedConfig)) {
         result.imageUrls = mediaUrls;
-      } else if (isVideoProjectConfig(config)) {
+      } else if (isVideoProjectConfig(preparedConfig)) {
         result.videoUrls = mediaUrls;
       }
 
@@ -571,6 +673,224 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
+   * Prepare project config (e.g., normalize video assets)
+   */
+  private async prepareProjectConfig(config: ProjectConfig): Promise<ProjectConfig> {
+    if (!isVideoProjectConfig(config)) {
+      return config;
+    }
+
+    if (config.autoResizeVideoAssets === false) {
+      return config;
+    }
+
+    const normalized: VideoProjectConfig = { ...config };
+
+    const hasReferenceImage = this.isProcessableMedia(config.referenceImage);
+    const hasReferenceImageEnd = this.isProcessableMedia(config.referenceImageEnd);
+
+    let baseKey: 'referenceImage' | 'referenceImageEnd' | null = null;
+    if (hasReferenceImage) {
+      baseKey = 'referenceImage';
+    } else if (hasReferenceImageEnd) {
+      baseKey = 'referenceImageEnd';
+    }
+
+    let baseBuffer: Buffer | null = null;
+    if (baseKey) {
+      baseBuffer = await this.mediaToBuffer(config[baseKey] as InputMedia);
+    }
+
+    let width = config.width;
+    let height = config.height;
+
+    if ((!width || !height) && baseBuffer) {
+      const meta = await this.getImageMetadata(baseBuffer);
+      if (meta) {
+        width = width || meta.width;
+        height = height || meta.height;
+      }
+    }
+
+    if (width && height) {
+      const originalWidth = width;
+      const originalHeight = height;
+      const normalizedDims = this.normalizeVideoDimensions(width, height);
+      if (normalizedDims.adjusted) {
+        console.log(
+          `[SogniClientWrapper] Adjusted video dimensions from ${originalWidth}x${originalHeight} to ${normalizedDims.width}x${normalizedDims.height} to meet video requirements.`
+        );
+      }
+      width = normalizedDims.width;
+      height = normalizedDims.height;
+    }
+
+    if (baseBuffer && width && height) {
+      const baseFit: 'inside' | 'cover' =
+        baseKey === 'referenceImageEnd' && !!config.referenceImage ? 'cover' : 'inside';
+      const resizedBase = await this.resizeImageBuffer(baseBuffer, width, height, baseFit);
+      if (resizedBase.wasResized) {
+        console.log(
+          `[SogniClientWrapper] Resized ${baseKey} from ${resizedBase.originalWidth}x${resizedBase.originalHeight} to ${resizedBase.width}x${resizedBase.height} to meet video requirements.`
+        );
+      }
+      width = resizedBase.width;
+      height = resizedBase.height;
+      if (baseKey === 'referenceImage') {
+        normalized.referenceImage = resizedBase.buffer;
+      } else if (baseKey === 'referenceImageEnd') {
+        normalized.referenceImageEnd = resizedBase.buffer;
+      }
+    }
+
+    if (width && height) {
+      normalized.width = width;
+      normalized.height = height;
+    }
+
+    // If both start and end images are provided, ensure end matches start dimensions
+    if (config.referenceImage && config.referenceImageEnd && hasReferenceImageEnd && width && height && baseKey === 'referenceImage') {
+      const endBuffer = await this.mediaToBuffer(config.referenceImageEnd as InputMedia);
+      if (endBuffer) {
+        const resizedEnd = await this.resizeImageBuffer(endBuffer, width, height, 'cover');
+        if (resizedEnd.wasResized || resizedEnd.width !== width || resizedEnd.height !== height) {
+          console.log(
+            `[SogniClientWrapper] Resized referenceImageEnd from ${resizedEnd.originalWidth}x${resizedEnd.originalHeight} to ${resizedEnd.width}x${resizedEnd.height} to match referenceImage.`
+          );
+        }
+        normalized.referenceImageEnd = resizedEnd.buffer;
+      }
+    }
+
+    return normalized;
+  }
+
+  private normalizeVideoDimensions(width: number, height: number): {
+    width: number;
+    height: number;
+    adjusted: boolean;
+  } {
+    let targetWidth = width;
+    let targetHeight = height;
+    let adjusted = false;
+
+    if (targetWidth > MAX_VIDEO_DIMENSION || targetHeight > MAX_VIDEO_DIMENSION) {
+      const scaleFactor = Math.min(
+        MAX_VIDEO_DIMENSION / targetWidth,
+        MAX_VIDEO_DIMENSION / targetHeight
+      );
+      targetWidth = Math.floor(targetWidth * scaleFactor);
+      targetHeight = Math.floor(targetHeight * scaleFactor);
+      adjusted = true;
+    }
+
+    if (targetWidth < MIN_VIDEO_DIMENSION || targetHeight < MIN_VIDEO_DIMENSION) {
+      const scaleFactor = Math.max(
+        MIN_VIDEO_DIMENSION / targetWidth,
+        MIN_VIDEO_DIMENSION / targetHeight
+      );
+      targetWidth = Math.floor(targetWidth * scaleFactor);
+      targetHeight = Math.floor(targetHeight * scaleFactor);
+      adjusted = true;
+
+      if (targetWidth > MAX_VIDEO_DIMENSION || targetHeight > MAX_VIDEO_DIMENSION) {
+        const downscaleFactor = Math.min(
+          MAX_VIDEO_DIMENSION / targetWidth,
+          MAX_VIDEO_DIMENSION / targetHeight
+        );
+        targetWidth = Math.floor(targetWidth * downscaleFactor);
+        targetHeight = Math.floor(targetHeight * downscaleFactor);
+      }
+    }
+
+    const roundedWidth = Math.floor(targetWidth / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+    const roundedHeight = Math.floor(targetHeight / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+
+    if (roundedWidth !== targetWidth || roundedHeight !== targetHeight) {
+      adjusted = true;
+    }
+
+    targetWidth = roundedWidth;
+    targetHeight = roundedHeight;
+
+    if (targetWidth < MIN_VIDEO_DIMENSION) {
+      targetWidth = Math.ceil(MIN_VIDEO_DIMENSION / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+      adjusted = true;
+    }
+    if (targetHeight < MIN_VIDEO_DIMENSION) {
+      targetHeight = Math.ceil(MIN_VIDEO_DIMENSION / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+      adjusted = true;
+    }
+
+    return { width: targetWidth, height: targetHeight, adjusted };
+  }
+
+  private isProcessableMedia(media: InputMedia | undefined): media is Buffer | Blob {
+    if (!media) return false;
+    if (Buffer.isBuffer(media)) return true;
+    return typeof Blob !== 'undefined' && media instanceof Blob;
+  }
+
+  private async mediaToBuffer(media: InputMedia): Promise<Buffer | null> {
+    if (Buffer.isBuffer(media)) {
+      return media;
+    }
+    if (typeof Blob !== 'undefined' && media instanceof Blob) {
+      const arrayBuffer = await media.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    }
+    return null;
+  }
+
+  private async getImageMetadata(buffer: Buffer): Promise<{ width: number; height: number } | null> {
+    const sharp = await this.loadSharp();
+    const meta = await sharp(buffer).metadata();
+    if (!meta.width || !meta.height) {
+      return null;
+    }
+    return { width: meta.width, height: meta.height };
+  }
+
+  private async resizeImageBuffer(
+    buffer: Buffer,
+    width: number,
+    height: number,
+    fit: 'inside' | 'cover'
+  ): Promise<{ buffer: Buffer; width: number; height: number; wasResized: boolean; originalWidth: number; originalHeight: number }> {
+    const sharp = await this.loadSharp();
+    const meta = await sharp(buffer).metadata();
+    const originalWidth = meta.width || width;
+    const originalHeight = meta.height || height;
+
+    if (meta.width === width && meta.height === height) {
+      return { buffer, width: originalWidth, height: originalHeight, wasResized: false, originalWidth, originalHeight };
+    }
+
+    const resizedBuffer = await sharp(buffer)
+      .resize(width, height, {
+        fit,
+        position: 'center',
+        withoutEnlargement: false,
+      })
+      .toBuffer();
+
+    const resizedMeta = await sharp(resizedBuffer).metadata();
+    return {
+      buffer: resizedBuffer,
+      width: resizedMeta.width || width,
+      height: resizedMeta.height || height,
+      wasResized: true,
+      originalWidth,
+      originalHeight,
+    };
+  }
+
+  private async loadSharp(): Promise<typeof import('sharp')> {
+    const sharpModule = await import('sharp');
+    return ((sharpModule as unknown as { default?: typeof import('sharp') }).default || sharpModule) as typeof import('sharp');
+  }
+
+  /**
    * Ensure client is connected, connect if not
    */
   private async ensureConnected(): Promise<void> {
@@ -585,9 +905,26 @@ export class SogniClientWrapper extends EventEmitter {
   private setupEventListeners(): void {
     if (!this.client) return;
 
-    // Monitor connection health
-    // Note: Sogni SDK doesn't expose connection events directly
-    // We would need to monitor WebSocket state if exposed
+    if (!this.projectEventHandler) {
+      this.projectEventHandler = (event: ProjectEvent) => {
+        if (event.type === 'completed' || event.type === 'error') {
+          this.projectEtaSeconds.delete(event.projectId);
+        }
+        this.emit(ClientEvent.PROJECT_EVENT, event);
+      };
+    }
+
+    if (!this.jobEventHandler) {
+      this.jobEventHandler = (event: JobEvent) => {
+        if (event.type === 'jobETA') {
+          this.projectEtaSeconds.set(event.projectId, event.etaSeconds);
+        }
+        this.emit(ClientEvent.JOB_EVENT, event);
+      };
+    }
+
+    this.client.projects.on('project', this.projectEventHandler);
+    this.client.projects.on('job', this.jobEventHandler);
   }
 
   /**

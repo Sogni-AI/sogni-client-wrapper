@@ -91,6 +91,26 @@ export function validateClientConfig(config: SogniClientConfig): void {
     throw new SogniValidationError('Network must be either "fast" or "relaxed"');
   }
 
+  if (config.testnet !== undefined && typeof config.testnet !== 'boolean') {
+    throw new SogniValidationError('testnet must be a boolean');
+  }
+
+  if (config.socketEndpoint !== undefined && typeof config.socketEndpoint !== 'string') {
+    throw new SogniValidationError('socketEndpoint must be a string');
+  }
+
+  if (config.restEndpoint !== undefined && typeof config.restEndpoint !== 'string') {
+    throw new SogniValidationError('restEndpoint must be a string');
+  }
+
+  if (config.disableSocket !== undefined && typeof config.disableSocket !== 'boolean') {
+    throw new SogniValidationError('disableSocket must be a boolean');
+  }
+
+  if (config.allowInsecureTLS !== undefined && typeof config.allowInsecureTLS !== 'boolean') {
+    throw new SogniValidationError('allowInsecureTLS must be a boolean');
+  }
+
   if (config.timeout !== undefined && (typeof config.timeout !== 'number' || config.timeout <= 0)) {
     throw new SogniValidationError('Timeout must be a positive number');
   }
@@ -108,7 +128,7 @@ export function validateProjectConfig(config: ProjectConfig): void {
     throw new SogniValidationError('Model ID is required and must be a string');
   }
 
-  if (!config.positivePrompt || typeof config.positivePrompt !== 'string') {
+  if (config.positivePrompt === undefined || config.positivePrompt === null || typeof config.positivePrompt !== 'string') {
     throw new SogniValidationError('Positive prompt is required and must be a string');
   }
 
@@ -431,4 +451,3 @@ export function throttle<T extends (...args: any[]) => any>(
     }
   };
 }
-

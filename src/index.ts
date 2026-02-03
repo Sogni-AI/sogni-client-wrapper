@@ -17,6 +17,8 @@ export type {
   VideoProjectConfig,
   ProjectResult,
   ProjectProgress,
+  VideoCostEstimateParams,
+  CostEstimate,
   ConnectionStatus,
   ConnectionState,
   ModelInfo,
@@ -40,6 +42,8 @@ export type {
   VideoFormat,
   VideoWorkflowType,
   InputMedia,
+  ProjectEvent,
+  JobEvent,
   // ControlNet types
   ControlNetParams,
   ControlNetName,
@@ -80,4 +84,3 @@ export {
 
 // Default export
 export { SogniClientWrapper as default } from './client/SogniClientWrapper';
-

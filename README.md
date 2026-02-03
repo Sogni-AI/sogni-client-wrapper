@@ -138,6 +138,22 @@ const videoResult = await client.createVideoProject({
 console.log('Video URLs:', videoResult.videoUrls);
 ```
 
+### Video Cost Estimate
+
+```typescript
+const estimate = await client.estimateVideoCost({
+  modelId: 'wan_v2.2-14b-fp8_i2v_lightx2v',
+  width: 512,
+  height: 512,
+  frames: 81,
+  fps: 16,
+  steps: 4,
+  tokenType: 'spark',
+});
+
+console.log('Estimated USD cost:', estimate.usd);
+```
+
 ### Video Workflows
 
 The wrapper supports multiple video generation workflows:
@@ -160,6 +176,7 @@ const i2vResult = await client.createVideoProject({
   frames: 81,
   fps: 16,
   steps: 4,
+  autoResizeVideoAssets: true,          // Auto-resize reference images (default: true)
 });
 
 // Animate with motion transfer
@@ -290,6 +307,11 @@ Creates a new client instance.
 | `password` | `string` | **Required** | Your Sogni account password. |
 | `appId` | `string` | Auto-generated UUID | Unique ID for your application. |
 | `network` | `'fast' \| 'relaxed'` | `'fast'` | The Sogni network to use. |
+| `testnet` | `boolean` | `false` | Connect to the testnet network. |
+| `socketEndpoint` | `string` | `undefined` | Override the default WebSocket API endpoint. |
+| `restEndpoint` | `string` | `undefined` | Override the default REST API endpoint. |
+| `disableSocket` | `boolean` | `false` | Disable WebSocket connection (advanced/testing). |
+| `allowInsecureTLS` | `boolean` | `false` | Allow insecure TLS (useful for testnet with self-signed certs). |
 | `autoConnect` | `boolean` | `true` | Connect automatically on the first operation. |
 | `reconnect` | `boolean` | `true` | Attempt to reconnect if the connection is lost. |
 | `reconnectInterval` | `number` | `5000` | Time in ms between reconnect attempts. |
@@ -317,6 +339,7 @@ Creates a new client instance.
 - `getMostPopularModel(): Promise<ModelInfo>`: A helper to get the model with the most active workers.
 - `getBalance(): Promise<BalanceInfo>`: Fetches your current SOGNI and Spark token balances using the `account.refreshBalance()` method.
 - `getSizePresets(network: 'fast' \| 'relaxed', modelId: string): Promise<SizePreset[]>`: Gets available output size presets for a model.
+- `estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate>`: Estimates video generation costs (frames/duration, fps, steps, size).
 
 ### Event Handling
 
@@ -331,6 +354,9 @@ client.on(ClientEvent.CONNECTED, () => {
 
 client.on(ClientEvent.PROJECT_PROGRESS, (progress) => {
   console.log(`Project ${progress.projectId} is ${progress.percentage}% complete.`);
+  if (progress.estimatedTimeRemaining) {
+    console.log(`ETA: ${Math.round(progress.estimatedTimeRemaining / 1000)}s`);
+  }
 });
 
 client.on(ClientEvent.ERROR, (error) => {
@@ -362,6 +388,8 @@ client.on(ClientEvent.JOB_FAILED, (data) => {
 | `projectFailed` | `ErrorData` | Fired when a project fails. |
 | **`jobCompleted`** | **`JobCompletedData`** | **Fired when each individual image finishes - get images as they're ready!** |
 | **`jobFailed`** | **`JobFailedData`** | **Fired when an individual image fails.** |
+| `projectEvent` | `ProjectEvent` | Raw project events from the SDK (`queued`, `completed`, `error`). |
+| `jobEvent` | `JobEvent` | Raw job events from the SDK (includes `jobETA`, `started`, `progress`, etc). |
 
 #### Per-Image Event Example
 
@@ -471,12 +499,16 @@ This library is written in TypeScript and exports all necessary types for a full
 - `QwenImageEditConfig`: Parameters for image editing with context images.
 - `InputMedia`: Type for media inputs (`File | Buffer | Blob | boolean`).
 - `ProjectResult`: The return type for a completed project.
+- `VideoCostEstimateParams`: Parameters for estimating video cost.
+- `CostEstimate`: Cost estimate response shape.
 - `ModelInfo`: Detailed information about an available model.
 - `BalanceInfo`: Your token balance.
 - `ErrorData`: The structure of error objects.
 - `VideoWorkflowType`: Video generation workflow types ('t2v' | 'i2v' | 's2v' | 'animate-move' | 'animate-replace').
 - `JobCompletedData`: Data emitted when an individual image completes.
 - `JobFailedData`: Data emitted when an individual image fails.
+- `ProjectEvent`: Raw project events from the SDK.
+- `JobEvent`: Raw job events from the SDK (includes ETA updates).
 
 ## License
 

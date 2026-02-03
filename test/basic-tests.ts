@@ -312,6 +312,22 @@ async function runTests() {
     validateProjectConfig(videoConfig);
   })();
 
+  // Test 18b: Empty positive prompt allowed
+  await test('Should allow empty positive prompt', () => {
+    const videoConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      positivePrompt: '',
+      numberOfMedia: 1,
+      frames: 30,
+      fps: 15,
+      outputFormat: 'mp4',
+    };
+
+    // Should not throw
+    validateProjectConfig(videoConfig);
+  })();
+
   // Test 19: Invalid video FPS validation
   await test('Should reject invalid video FPS', () => {
     const videoConfig: VideoProjectConfig = {

@@ -48,6 +48,8 @@ export type {
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
+  VideoControlNetName,
+  VideoControlNetParams,
 } from './types';
 
 export { ClientEvent } from './types';

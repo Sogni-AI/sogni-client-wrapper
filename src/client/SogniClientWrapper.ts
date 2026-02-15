@@ -54,6 +54,7 @@ import {
 const MIN_VIDEO_DIMENSION = 480;
 const MAX_VIDEO_DIMENSION = 1536;
 const VIDEO_DIMENSION_MULTIPLE = 16;
+const LTX2_FRAME_STEP = 8;
 
 /**
  * Internal configuration type with resolved defaults
@@ -418,7 +419,8 @@ export class SogniClientWrapper extends EventEmitter {
     let duration = params.duration;
     if (duration === undefined || duration === null) {
       if (params.frames !== undefined && params.frames > 0) {
-        duration = Math.max(1, Math.round((params.frames - 1) / params.fps));
+        const durationFps = this.isWanModel(params.modelId) ? 16 : params.fps;
+        duration = Math.max(1, Math.round((params.frames - 1) / durationFps));
       } else {
         duration = 1;
       }
@@ -428,13 +430,18 @@ export class SogniClientWrapper extends EventEmitter {
       throw new SogniValidationError('Duration must be between 1 and 10 seconds');
     }
 
+    const frames =
+      params.frames !== undefined
+        ? params.frames
+        : this.calculateVideoFrames(params.modelId, duration, params.fps);
+
     return this.client!.projects.estimateVideoCost({
       tokenType,
       model: params.modelId,
       width: params.width,
       height: params.height,
       duration,
-      frames: params.frames,
+      frames,
       fps: params.fps,
       steps: params.steps,
       numberOfMedia,
@@ -469,8 +476,6 @@ export class SogniClientWrapper extends EventEmitter {
       // Prepare project params with defaults for required SDK fields
       const sdkParams = {
         ...projectParams,
-        negativePrompt: projectParams.negativePrompt || '',
-        stylePrompt: projectParams.stylePrompt || '',
         tokenType: projectParams.tokenType || 'spark',
         network: projectParams.network || 'fast',
       };
@@ -1013,6 +1018,27 @@ export class SogniClientWrapper extends EventEmitter {
       return { steps: 4, guidance: 1.0 };
     }
     return { steps: 20, guidance: 7.5 };
+  }
+
+  private isWanModel(modelId: string): boolean {
+    return modelId.startsWith('wan_');
+  }
+
+  private isLtx2Model(modelId: string): boolean {
+    return modelId.startsWith('ltx2-');
+  }
+
+  private calculateVideoFrames(modelId: string, duration: number, fps: number): number {
+    if (this.isWanModel(modelId)) {
+      return Math.round(duration * 16) + 1;
+    }
+
+    let frames = Math.round(duration * fps) + 1;
+    if (this.isLtx2Model(modelId)) {
+      const n = Math.round((frames - 1) / LTX2_FRAME_STEP);
+      frames = n * LTX2_FRAME_STEP + 1;
+    }
+    return frames;
   }
 
   /**

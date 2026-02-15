@@ -25,6 +25,8 @@ import {
   type AuthType,
   type QwenImageEditConfig,
   type InputMedia,
+  type VideoControlNetName,
+  type VideoControlNetParams,
 } from '../src';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
@@ -698,6 +700,175 @@ async function runTests() {
       contextImages: [],
     };
     validateProjectConfig(config);
+  })();
+
+  // Test 45: Video ControlNet types are exported
+  await test('Should export VideoControlNetName and VideoControlNetParams types', () => {
+    const controlName: VideoControlNetName = 'pose';
+    const controlParams: VideoControlNetParams = {
+      name: controlName,
+      strength: 0.7,
+    };
+    if (!controlParams) throw new Error('VideoControlNetParams type not working');
+  })();
+
+  // Test 46: Video project config accepts new video workflow fields
+  await test('Should accept v2v/sam2/trim/keyframe video fields', () => {
+    const v2vConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'ltx2-19b-fp8_v2v_distilled',
+      positivePrompt: 'Cinematic motion with consistent style',
+      numberOfMedia: 1,
+      referenceVideo: true,
+      controlNet: { name: 'pose', strength: 0.8 },
+      trimEndFrame: true,
+      firstFrameStrength: 0.6,
+      lastFrameStrength: 0.6,
+      fps: 24,
+      duration: 5,
+    };
+
+    const animateReplaceConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'wan_v2.2-14b-fp8_animate_replace',
+      positivePrompt: 'Replace subject while preserving movement',
+      numberOfMedia: 1,
+      referenceImage: true,
+      referenceVideo: true,
+      sam2Coordinates: [{ x: 0.5, y: 0.5 }],
+      fps: 16,
+      duration: 5,
+    };
+
+    validateProjectConfig(v2vConfig);
+    validateProjectConfig(animateReplaceConfig);
+  })();
+
+  // Test 47: createProject should not inject empty prompts
+  await test('Should not inject empty negative/style prompts when omitted', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedParams: any = null;
+    const projectStub = {
+      id: 'project-test',
+      on: () => {},
+      waitForCompletion: async () => [],
+    };
+
+    (client as any).client = {
+      projects: {
+        create: async (params: any) => {
+          capturedParams = params;
+          return projectStub;
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.createProject({
+      type: 'image',
+      modelId: 'flux-1-schnell',
+      positivePrompt: 'A simple test image',
+      numberOfMedia: 1,
+      waitForCompletion: false,
+    });
+
+    if (!capturedParams) {
+      throw new Error('Did not capture SDK create params');
+    }
+    if ('negativePrompt' in capturedParams) {
+      throw new Error('negativePrompt should not be injected when omitted');
+    }
+    if ('stylePrompt' in capturedParams) {
+      throw new Error('stylePrompt should not be injected when omitted');
+    }
+  })();
+
+  // Test 48: estimateVideoCost frame calculation for WAN
+  await test('Should calculate WAN frames from duration using fixed 16fps generation', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateVideoCost({
+      modelId: 'wan_v2.2-14b-fp8_t2v',
+      width: 768,
+      height: 768,
+      duration: 5,
+      fps: 32,
+      steps: 20,
+      numberOfMedia: 1,
+    });
+
+    if (!capturedEstimateParams) {
+      throw new Error('Did not capture estimate params');
+    }
+    if (capturedEstimateParams.frames !== 81) {
+      throw new Error(`Expected WAN frames=81, got ${capturedEstimateParams.frames}`);
+    }
+  })();
+
+  // Test 49: estimateVideoCost frame calculation for LTX-2
+  await test('Should calculate LTX-2 frames from duration and fps with frame-step snapping', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateVideoCost({
+      modelId: 'ltx2-19b-fp8_t2v',
+      width: 768,
+      height: 768,
+      duration: 5,
+      fps: 23,
+      steps: 20,
+      numberOfMedia: 1,
+    });
+
+    if (!capturedEstimateParams) {
+      throw new Error('Did not capture estimate params');
+    }
+    if (capturedEstimateParams.frames !== 113) {
+      throw new Error(`Expected LTX-2 frames=113, got ${capturedEstimateParams.frames}`);
+    }
   })();
 
   // Summary

@@ -52,6 +52,9 @@ function test(name: string, fn: () => void | Promise<void>) {
 async function runTests() {
   let client: SogniClientWrapper | null = null;
   let catImageUrl: string | undefined; // Store the cat image URL for video test
+  let catImageBuffer: Buffer | undefined;
+  let referenceVideoUrl: string | undefined;
+  let availableModelIds: string[] = [];
 
   try {
     // Test 1: Create client
@@ -97,6 +100,7 @@ async function runTests() {
       if (!client) throw new Error('Client not initialized');
       
       const models = await client.getAvailableModels({ sortByWorkers: true });
+      availableModelIds = models.map((m) => m.id);
       console.log(`   Found ${models.length} models`);
       
       if (models.length === 0) {
@@ -262,6 +266,7 @@ async function runTests() {
       // Convert to Buffer for the SDK
       const arrayBuffer = await imageResponse.arrayBuffer();
       const imageBuffer = Buffer.from(arrayBuffer);
+      catImageBuffer = imageBuffer;
       console.log(`   Reference image fetched: ${(imageBuffer.length / 1024).toFixed(2)} KB`);
 
       console.log('   Generating video...');
@@ -298,6 +303,7 @@ async function runTests() {
       if (result.videoUrls && result.videoUrls.length > 0) {
         console.log(`   Video URL: ${result.videoUrls[0]}`);
         console.log(`   Video duration: ~5 seconds (81 frames @ 16fps)`);
+        referenceVideoUrl = result.videoUrls[0];
       }
 
       if (!result.completed) {
@@ -354,6 +360,9 @@ async function runTests() {
       if (result.videoUrls && result.videoUrls.length > 0) {
         console.log(`   Video URL: ${result.videoUrls[0]}`);
         console.log(`   Video duration: ~5 seconds (81 frames @ 16fps)`);
+        if (!referenceVideoUrl) {
+          referenceVideoUrl = result.videoUrls[0];
+        }
       }
 
       if (!result.completed) {
@@ -365,7 +374,152 @@ async function runTests() {
       }
     })();
 
-    // Test 11: Disconnect
+    // Test 11: Generate LTX-2 video-to-video with ControlNet
+    await test('Should generate LTX-2 v2v video with pose ControlNet', async () => {
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      const v2vModelId = availableModelIds.find(
+        (id) => id.startsWith('ltx2-') && id.includes('_v2v')
+      );
+      if (!v2vModelId) {
+        console.log('   ⚠️ No LTX-2 v2v model currently available, skipping test');
+        return;
+      }
+      if (!referenceVideoUrl) {
+        console.log('   ⚠️ No reference video URL available from earlier tests, skipping test');
+        return;
+      }
+
+      console.log(`   Using model: ${v2vModelId}`);
+      console.log('   Workflow: referenceVideo + pose ControlNet');
+      console.log('   Fetching reference video...');
+
+      const videoResponse = await fetch(referenceVideoUrl);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to fetch reference video: ${videoResponse.statusText}`);
+      }
+      const videoArrayBuffer = await videoResponse.arrayBuffer();
+      const referenceVideoBuffer = Buffer.from(videoArrayBuffer);
+      console.log(`   Reference video fetched: ${(referenceVideoBuffer.length / 1024).toFixed(2)} KB`);
+      console.log('   Generating v2v video...');
+
+      let progressCount = 0;
+      const result = await client.createProject({
+        type: 'video',
+        modelId: v2vModelId,
+        positivePrompt: 'A cinematic sequence with smooth character motion and stable composition',
+        negativePrompt: 'blurry, low quality, distorted',
+        referenceVideo: referenceVideoBuffer,
+        ...(catImageBuffer ? { referenceImage: catImageBuffer } : {}),
+        controlNet: { name: 'pose', strength: 0.8 },
+        width: 768,
+        height: 768,
+        fps: 24,
+        duration: 4,
+        steps: 20,
+        numberOfMedia: 1,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 420000,
+        onProgress: (progress) => {
+          progressCount++;
+          if (progressCount % 5 === 0) {
+            console.log(`   Progress: ${progress.percentage}%`);
+          }
+        },
+      });
+
+      console.log(`   V2V generation completed: ${result.completed}`);
+      console.log(`   Project ID: ${result.project.id}`);
+      console.log(`   Videos generated: ${result.videoUrls?.length || 0}`);
+      if (result.videoUrls && result.videoUrls.length > 0) {
+        console.log(`   Video URL: ${result.videoUrls[0]}`);
+        referenceVideoUrl = result.videoUrls[0];
+      }
+
+      if (!result.completed) {
+        throw new Error('V2V generation did not complete');
+      }
+      if (!result.videoUrls || result.videoUrls.length === 0) {
+        throw new Error('No video URLs returned from v2v generation');
+      }
+    })();
+
+    // Test 12: Generate animate-replace with sam2Coordinates
+    await test('Should generate animate-replace video with sam2Coordinates', async () => {
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      const animateReplaceModelId = availableModelIds.find(
+        (id) => id.startsWith('wan_') && id.includes('animate') && id.includes('replace')
+      );
+      if (!animateReplaceModelId) {
+        console.log('   ⚠️ No WAN animate-replace model currently available, skipping test');
+        return;
+      }
+      if (!referenceVideoUrl || !catImageBuffer) {
+        console.log('   ⚠️ Missing reference assets for animate-replace, skipping test');
+        return;
+      }
+
+      console.log(`   Using model: ${animateReplaceModelId}`);
+      console.log('   Workflow: animate-replace with sam2Coordinates');
+      console.log('   Fetching reference video...');
+
+      const videoResponse = await fetch(referenceVideoUrl);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to fetch reference video: ${videoResponse.statusText}`);
+      }
+      const videoArrayBuffer = await videoResponse.arrayBuffer();
+      const referenceVideoBuffer = Buffer.from(videoArrayBuffer);
+      console.log(`   Reference video fetched: ${(referenceVideoBuffer.length / 1024).toFixed(2)} KB`);
+      console.log('   Generating animate-replace video...');
+
+      let progressCount = 0;
+      const result = await client.createProject({
+        type: 'video',
+        modelId: animateReplaceModelId,
+        positivePrompt: 'Keep motion from the source video and replace the subject with the reference character',
+        negativePrompt: 'blurry, low quality, artifacts',
+        referenceImage: catImageBuffer,
+        referenceVideo: referenceVideoBuffer,
+        sam2Coordinates: [{ x: 0.5, y: 0.5 }],
+        width: 512,
+        height: 512,
+        fps: 16,
+        frames: 81,
+        steps: 20,
+        numberOfMedia: 1,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 420000,
+        onProgress: (progress) => {
+          progressCount++;
+          if (progressCount % 5 === 0) {
+            console.log(`   Progress: ${progress.percentage}%`);
+          }
+        },
+      });
+
+      console.log(`   Animate-replace generation completed: ${result.completed}`);
+      console.log(`   Project ID: ${result.project.id}`);
+      console.log(`   Videos generated: ${result.videoUrls?.length || 0}`);
+      if (result.videoUrls && result.videoUrls.length > 0) {
+        console.log(`   Video URL: ${result.videoUrls[0]}`);
+      }
+
+      if (!result.completed) {
+        throw new Error('Animate-replace generation did not complete');
+      }
+      if (!result.videoUrls || result.videoUrls.length === 0) {
+        throw new Error('No video URLs returned from animate-replace generation');
+      }
+    })();
+
+    // Test 13: Disconnect
     await test('Should disconnect cleanly', async () => {
       if (!client) throw new Error('Client not initialized');
       

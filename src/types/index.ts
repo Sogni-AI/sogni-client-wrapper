@@ -22,6 +22,8 @@ import type {
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
+  VideoControlNetName,
+  VideoControlNetParams,
 } from '@sogni-ai/sogni-client/dist/Projects/types/ControlNetParams';
 
 import type { InputMedia } from '@sogni-ai/sogni-client/dist/Projects/types';
@@ -42,6 +44,8 @@ export type {
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
+  VideoControlNetName,
+  VideoControlNetParams,
   InputMedia,
   ProjectEvent,
   JobEvent,
@@ -229,7 +233,7 @@ export interface VideoCostEstimateParams {
   /** Number of frames (optional, prefer duration) */
   frames?: number;
 
-  /** Duration in seconds (1-10). If omitted, derived from frames and fps */
+  /** Duration in seconds. If omitted, derived from frames and fps */
   duration?: number;
 
   /** Number of videos to generate */

@@ -6,16 +6,27 @@ import type {
   Project,
   Job,
   AvailableModel,
-  ProjectParams as SogniProjectParams,
   ImageProjectParams as SogniImageProjectParams,
   VideoProjectParams as SogniVideoProjectParams,
+  AudioProjectParams as SogniAudioProjectParams,
   SupernetType,
   TokenType,
   ImageOutputFormat,
   VideoOutputFormat,
+  AudioOutputFormat,
   AudioFormat,
   VideoFormat,
   VideoWorkflowType,
+  ChatMessage,
+  ChatCompletionParams,
+  ChatCompletionChunk,
+  ChatCompletionResult,
+  ChatJobStateEvent,
+  ChatTokenUsage,
+  LLMCostEstimation,
+  LLMJobCost,
+  LLMModelInfo,
+  LLMParamConstraint,
 } from '@sogni-ai/sogni-client';
 
 import type {
@@ -38,9 +49,21 @@ export type {
   TokenType,
   ImageOutputFormat,
   VideoOutputFormat,
+  AudioOutputFormat,
   AudioFormat,
   VideoFormat,
   VideoWorkflowType,
+  SogniAudioProjectParams as AudioProjectParams,
+  ChatMessage,
+  ChatCompletionParams,
+  ChatCompletionChunk,
+  ChatCompletionResult,
+  ChatJobStateEvent,
+  ChatTokenUsage,
+  LLMCostEstimation,
+  LLMJobCost,
+  LLMModelInfo,
+  LLMParamConstraint,
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
@@ -55,8 +78,9 @@ export type {
  * Authentication type for the Sogni client
  * - 'token': Uses username/password login with token-based auth (default, for Node.js apps)
  * - 'cookies': Uses httpOnly cookie auth (for browser apps on .sogni.ai subdomains)
+ * - 'apiKey': Uses API key authentication
  */
-export type AuthType = 'token' | 'cookies';
+export type AuthType = 'token' | 'cookies' | 'apiKey';
 
 /**
  * Base configuration fields shared by all auth types
@@ -64,6 +88,9 @@ export type AuthType = 'token' | 'cookies';
 interface BaseClientConfig {
   /** Unique application identifier (auto-generated if not provided) */
   appId?: string;
+
+  /** API key for API key authentication mode */
+  apiKey?: string;
 
   /** Network type to use */
   network?: SupernetType;
@@ -130,10 +157,27 @@ export interface CookieAuthConfig extends BaseClientConfig {
 }
 
 /**
- * Configuration for the Sogni Client Wrapper
- * Supports both token-based (Node.js) and cookie-based (browser) authentication
+ * Configuration for API key authentication
  */
-export type SogniClientConfig = TokenAuthConfig | CookieAuthConfig;
+export interface ApiKeyAuthConfig extends BaseClientConfig {
+  /** Authentication type - 'apiKey' for API key auth */
+  authType?: 'apiKey';
+
+  /** Sogni API key */
+  apiKey: string;
+
+  /** Username is optional with API key auth */
+  username?: string;
+
+  /** Password is optional with API key auth */
+  password?: string;
+}
+
+/**
+ * Configuration for the Sogni Client Wrapper
+ * Supports token, cookie, and API key authentication
+ */
+export type SogniClientConfig = TokenAuthConfig | CookieAuthConfig | ApiKeyAuthConfig;
 
 /**
  * Base project configuration with additional options
@@ -184,9 +228,17 @@ export interface VideoProjectConfig extends
 }
 
 /**
+ * Audio project configuration
+ */
+export interface AudioProjectConfig extends
+  Omit<SogniAudioProjectParams, 'modelId' | 'negativePrompt' | 'stylePrompt'>,
+  BaseProjectConfig {
+}
+
+/**
  * Enhanced project configuration with additional options
  */
-export type ProjectConfig = ImageProjectConfig | VideoProjectConfig;
+export type ProjectConfig = ImageProjectConfig | VideoProjectConfig | AudioProjectConfig;
 
 /**
  * Project creation result
@@ -200,6 +252,9 @@ export interface ProjectResult {
 
   /** Array of generated video URLs (if waitForCompletion is true and project is video type) */
   videoUrls?: string[];
+
+  /** Array of generated audio URLs (if waitForCompletion is true and project is audio type) */
+  audioUrls?: string[];
 
   /** Array of completed jobs */
   jobs?: Job[];
@@ -237,6 +292,26 @@ export interface VideoCostEstimateParams {
   duration?: number;
 
   /** Number of videos to generate */
+  numberOfMedia?: number;
+
+  /** Token type for estimate */
+  tokenType?: TokenType;
+}
+
+/**
+ * Audio cost estimate parameters
+ */
+export interface AudioCostEstimateParams {
+  /** Model ID to use */
+  modelId: string;
+
+  /** Duration in seconds */
+  duration: number;
+
+  /** Inference steps */
+  steps: number;
+
+  /** Number of audio tracks to generate */
   numberOfMedia?: number;
 
   /** Token type for estimate */
@@ -410,6 +485,11 @@ export const ClientEvent = {
   JOB_FAILED: 'jobFailed',
   PROJECT_EVENT: 'projectEvent',
   JOB_EVENT: 'jobEvent',
+  CHAT_TOKEN: 'chatToken',
+  CHAT_COMPLETED: 'chatCompleted',
+  CHAT_ERROR: 'chatError',
+  CHAT_JOB_STATE: 'chatJobState',
+  CHAT_MODELS_UPDATED: 'chatModelsUpdated',
 } as const;
 
 export type ClientEvent = typeof ClientEvent[keyof typeof ClientEvent];
@@ -429,6 +509,9 @@ export interface JobCompletedData {
 
   /** Video URL (if available for video projects) */
   videoUrl?: string;
+
+  /** Audio URL (if available for audio projects) */
+  audioUrl?: string;
 
   /** Job index in the batch */
   jobIndex: number;
@@ -458,6 +541,16 @@ export interface JobFailedData {
 }
 
 /**
+ * Chat error event data
+ */
+export interface ChatErrorData {
+  jobID: string;
+  error: string;
+  message: string;
+  workerName?: string;
+}
+
+/**
  * Event listener callback types
  */
 export interface ClientEventCallbacks {
@@ -476,6 +569,11 @@ export interface ClientEventCallbacks {
   [ClientEvent.JOB_FAILED]: (data: JobFailedData) => void;
   [ClientEvent.PROJECT_EVENT]: (event: ProjectEvent) => void;
   [ClientEvent.JOB_EVENT]: (event: JobEvent) => void;
+  [ClientEvent.CHAT_TOKEN]: (chunk: ChatCompletionChunk) => void;
+  [ClientEvent.CHAT_COMPLETED]: (result: ChatCompletionResult) => void;
+  [ClientEvent.CHAT_ERROR]: (error: ChatErrorData) => void;
+  [ClientEvent.CHAT_JOB_STATE]: (state: ChatJobStateEvent) => void;
+  [ClientEvent.CHAT_MODELS_UPDATED]: (models: Record<string, LLMModelInfo>) => void;
 }
 
 /**

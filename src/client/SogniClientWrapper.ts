@@ -4,13 +4,14 @@
  */
 
 import { EventEmitter } from 'events';
-import { SogniClient, Project, Job, AvailableModel } from '@sogni-ai/sogni-client';
+import { SogniClient, Project, Job, ChatStream } from '@sogni-ai/sogni-client';
 import type {
   SogniClientConfig,
   AuthType,
   ProjectConfig,
   ImageProjectConfig,
   VideoProjectConfig,
+  AudioProjectConfig,
   ProjectResult,
   ProjectProgress,
   ConnectionStatus,
@@ -27,7 +28,16 @@ import type {
   JobEvent,
   InputMedia,
   VideoCostEstimateParams,
+  AudioCostEstimateParams,
   CostEstimate,
+  ChatMessage,
+  ChatCompletionParams,
+  ChatCompletionChunk,
+  ChatCompletionResult,
+  ChatJobStateEvent,
+  LLMCostEstimation,
+  LLMModelInfo,
+  ChatErrorData,
 } from '../types';
 import { ClientEvent } from '../types';
 import {
@@ -45,7 +55,7 @@ import {
   validateProjectConfig,
   isImageProjectConfig,
   isVideoProjectConfig,
-  isCookieAuth,
+  isAudioProjectConfig,
   waitFor,
   retry,
   getMaxContextImages,
@@ -62,6 +72,7 @@ const LTX2_FRAME_STEP = 8;
 interface InternalConfig {
   username: string;
   password: string;
+  apiKey?: string;
   appId: string;
   network: 'fast' | 'relaxed';
   testnet?: boolean;
@@ -88,6 +99,11 @@ export class SogniClientWrapper extends EventEmitter {
   private isReconnecting: boolean = false;
   private projectEventHandler: ((event: ProjectEvent) => void) | null = null;
   private jobEventHandler: ((event: JobEvent) => void) | null = null;
+  private chatTokenEventHandler: ((chunk: ChatCompletionChunk) => void) | null = null;
+  private chatCompletedEventHandler: ((result: ChatCompletionResult) => void) | null = null;
+  private chatErrorEventHandler: ((error: ChatErrorData) => void) | null = null;
+  private chatJobStateEventHandler: ((state: ChatJobStateEvent) => void) | null = null;
+  private chatModelsUpdatedEventHandler: ((models: Record<string, LLMModelInfo>) => void) | null = null;
   private projectEtaSeconds = new Map<string, number>();
 
   constructor(config: SogniClientConfig) {
@@ -104,6 +120,7 @@ export class SogniClientWrapper extends EventEmitter {
     this.config = {
       username: config.username || '',
       password: config.password || '',
+      apiKey: config.apiKey,
       appId: config.appId || generateAppId(),
       network: config.network || 'fast',
       testnet: config.testnet,
@@ -116,7 +133,7 @@ export class SogniClientWrapper extends EventEmitter {
       reconnectInterval: config.reconnectInterval || 5000,
       timeout: config.timeout || 300000, // 5 minutes default
       debug: config.debug || false,
-      authType: config.authType || 'token',
+      authType: config.authType || (config.apiKey ? 'apiKey' : 'token'),
     };
 
     // Initialize connection state
@@ -169,6 +186,7 @@ export class SogniClientWrapper extends EventEmitter {
         appId: this.config.appId,
         network: this.config.network,
         authType: this.config.authType,
+        apiKey: this.config.apiKey,
         testnet: this.config.testnet,
         socketEndpoint: this.config.socketEndpoint,
         restEndpoint: this.config.restEndpoint,
@@ -194,6 +212,8 @@ export class SogniClientWrapper extends EventEmitter {
             );
           }
         }
+      } else if (this.config.authType === 'apiKey') {
+        this.log('Using API key authentication...');
       } else {
         this.log('Logging in with credentials...');
 
@@ -264,6 +284,21 @@ export class SogniClientWrapper extends EventEmitter {
         }
         if (this.jobEventHandler) {
           this.client.projects.off('job', this.jobEventHandler);
+        }
+        if (this.chatTokenEventHandler) {
+          this.client.chat.off('token', this.chatTokenEventHandler);
+        }
+        if (this.chatCompletedEventHandler) {
+          this.client.chat.off('completed', this.chatCompletedEventHandler);
+        }
+        if (this.chatErrorEventHandler) {
+          this.client.chat.off('error', this.chatErrorEventHandler);
+        }
+        if (this.chatJobStateEventHandler) {
+          this.client.chat.off('jobState', this.chatJobStateEventHandler);
+        }
+        if (this.chatModelsUpdatedEventHandler) {
+          this.client.chat.off('modelsUpdated', this.chatModelsUpdatedEventHandler);
         }
 
         // Properly disconnect WebSocket to avoid connection leaks
@@ -362,6 +397,51 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
+   * Get available chat/LLM models
+   */
+  async getAvailableChatModels(): Promise<Record<string, LLMModelInfo>> {
+    await this.ensureConnected();
+    return this.client!.chat.models;
+  }
+
+  /**
+   * Wait for chat/LLM models from the network
+   */
+  async waitForChatModels(timeout: number = 10000): Promise<Record<string, LLMModelInfo>> {
+    await this.ensureConnected();
+    return this.client!.chat.waitForModels(timeout);
+  }
+
+  /**
+   * Estimate chat completion cost
+   */
+  async estimateChatCost(params: {
+    model: string;
+    messages: ChatMessage[];
+    max_tokens?: number;
+    tokenType?: 'sogni' | 'spark';
+  }): Promise<LLMCostEstimation> {
+    await this.ensureConnected();
+    return this.client!.chat.estimateCost(params);
+  }
+
+  /**
+   * Create a chat completion request
+   */
+  async createChatCompletion(
+    params: ChatCompletionParams & { stream: true }
+  ): Promise<ChatStream>;
+  async createChatCompletion(
+    params: ChatCompletionParams & { stream?: false }
+  ): Promise<ChatCompletionResult>;
+  async createChatCompletion(
+    params: ChatCompletionParams
+  ): Promise<ChatStream | ChatCompletionResult> {
+    await this.ensureConnected();
+    return this.client!.chat.completions.create(params as any) as Promise<ChatStream | ChatCompletionResult>;
+  }
+
+  /**
    * Get account balance
    */
   async getBalance(): Promise<BalanceInfo> {
@@ -426,8 +506,9 @@ export class SogniClientWrapper extends EventEmitter {
       }
     }
 
-    if (duration < 1 || duration > 10) {
-      throw new SogniValidationError('Duration must be between 1 and 10 seconds');
+    const maxDuration = this.isLtx2Model(params.modelId) ? 20 : 10;
+    if (duration < 1 || duration > maxDuration) {
+      throw new SogniValidationError(`Duration must be between 1 and ${maxDuration} seconds`);
     }
 
     const frames =
@@ -443,6 +524,34 @@ export class SogniClientWrapper extends EventEmitter {
       duration,
       frames,
       fps: params.fps,
+      steps: params.steps,
+      numberOfMedia,
+    });
+  }
+
+  /**
+   * Estimate audio project cost
+   */
+  async estimateAudioCost(params: AudioCostEstimateParams): Promise<CostEstimate> {
+    await this.ensureConnected();
+
+    if (!params.modelId || typeof params.modelId !== 'string') {
+      throw new SogniValidationError('Model ID is required and must be a string');
+    }
+    if (typeof params.duration !== 'number' || params.duration < 10 || params.duration > 600) {
+      throw new SogniValidationError('Duration is required and must be between 10 and 600 seconds');
+    }
+    if (typeof params.steps !== 'number' || params.steps <= 0) {
+      throw new SogniValidationError('Steps is required and must be a positive number');
+    }
+
+    const tokenType = params.tokenType || 'spark';
+    const numberOfMedia = params.numberOfMedia || 1;
+
+    return this.client!.projects.estimateAudioCost({
+      tokenType,
+      model: params.modelId,
+      duration: params.duration,
       steps: params.steps,
       numberOfMedia,
     });
@@ -532,6 +641,8 @@ export class SogniClientWrapper extends EventEmitter {
           jobData.imageUrl = job.resultUrl || undefined;
         } else if (isVideoProjectConfig(preparedConfig)) {
           jobData.videoUrl = job.resultUrl || undefined;
+        } else if (isAudioProjectConfig(preparedConfig)) {
+          jobData.audioUrl = job.resultUrl || undefined;
         }
 
         // Emit wrapper event
@@ -589,6 +700,8 @@ export class SogniClientWrapper extends EventEmitter {
         result.imageUrls = mediaUrls;
       } else if (isVideoProjectConfig(preparedConfig)) {
         result.videoUrls = mediaUrls;
+      } else if (isAudioProjectConfig(preparedConfig)) {
+        result.audioUrls = mediaUrls;
       }
 
       this.emit(ClientEvent.PROJECT_COMPLETED, result);
@@ -647,6 +760,16 @@ export class SogniClientWrapper extends EventEmitter {
       ...config,
       type: 'video',
     } as VideoProjectConfig);
+  }
+
+  /**
+   * Convenience method to create an audio project
+   */
+  async createAudioProject(config: Omit<AudioProjectConfig, 'type'>): Promise<ProjectResult> {
+    return this.createProject({
+      ...config,
+      type: 'audio',
+    } as AudioProjectConfig);
   }
 
   /**
@@ -928,8 +1051,43 @@ export class SogniClientWrapper extends EventEmitter {
       };
     }
 
+    if (!this.chatTokenEventHandler) {
+      this.chatTokenEventHandler = (chunk: ChatCompletionChunk) => {
+        this.emit(ClientEvent.CHAT_TOKEN, chunk);
+      };
+    }
+
+    if (!this.chatCompletedEventHandler) {
+      this.chatCompletedEventHandler = (result: ChatCompletionResult) => {
+        this.emit(ClientEvent.CHAT_COMPLETED, result);
+      };
+    }
+
+    if (!this.chatErrorEventHandler) {
+      this.chatErrorEventHandler = (error: ChatErrorData) => {
+        this.emit(ClientEvent.CHAT_ERROR, error);
+      };
+    }
+
+    if (!this.chatJobStateEventHandler) {
+      this.chatJobStateEventHandler = (state: ChatJobStateEvent) => {
+        this.emit(ClientEvent.CHAT_JOB_STATE, state);
+      };
+    }
+
+    if (!this.chatModelsUpdatedEventHandler) {
+      this.chatModelsUpdatedEventHandler = (models: Record<string, LLMModelInfo>) => {
+        this.emit(ClientEvent.CHAT_MODELS_UPDATED, models);
+      };
+    }
+
     this.client.projects.on('project', this.projectEventHandler);
     this.client.projects.on('job', this.jobEventHandler);
+    this.client.chat.on('token', this.chatTokenEventHandler);
+    this.client.chat.on('completed', this.chatCompletedEventHandler);
+    this.client.chat.on('error', this.chatErrorEventHandler);
+    this.client.chat.on('jobState', this.chatJobStateEventHandler);
+    this.client.chat.on('modelsUpdated', this.chatModelsUpdatedEventHandler);
   }
 
   /**
@@ -1016,6 +1174,9 @@ export class SogniClientWrapper extends EventEmitter {
     }
     if (modelId.includes('lightning') || modelId.includes('turbo') || modelId.includes('lcm')) {
       return { steps: 4, guidance: 1.0 };
+    }
+    if (modelId.includes('ace-step')) {
+      return { steps: 20 };
     }
     return { steps: 20, guidance: 7.5 };
   }

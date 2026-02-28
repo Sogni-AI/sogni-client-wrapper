@@ -12,6 +12,7 @@ import {
   generateAppId,
   isImageProjectConfig,
   isVideoProjectConfig,
+  isAudioProjectConfig,
   isCookieAuth,
   validateProjectConfig,
   validateClientConfig,
@@ -19,15 +20,18 @@ import {
   supportsContextImages,
   type ImageProjectConfig,
   type VideoProjectConfig,
+  type AudioProjectConfig,
   type SogniClientConfig,
   type TokenAuthConfig,
   type CookieAuthConfig,
+  type ApiKeyAuthConfig,
   type AuthType,
   type QwenImageEditConfig,
   type InputMedia,
   type VideoControlNetName,
   type VideoControlNetParams,
 } from '../src';
+import { SogniClient } from '@sogni-ai/sogni-client';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -194,7 +198,8 @@ async function runTests() {
     const requiredEvents = [
       'connected', 'disconnected', 'reconnecting', 'reconnected',
       'error', 'modelsUpdated', 'balanceUpdated',
-      'projectCreated', 'projectProgress', 'projectCompleted', 'projectFailed'
+      'projectCreated', 'projectProgress', 'projectCompleted', 'projectFailed',
+      'chatToken', 'chatCompleted', 'chatError', 'chatJobState', 'chatModelsUpdated'
     ];
 
     const eventValues = Object.values(ClientEvent) as string[];
@@ -298,6 +303,25 @@ async function runTests() {
     }
   })();
 
+  // Test 17b: Audio project type guard
+  await test('Should identify audio project config', () => {
+    const audioConfig: AudioProjectConfig = {
+      type: 'audio',
+      modelId: 'ace-step-v1',
+      positivePrompt: 'Upbeat electronic track',
+      numberOfMedia: 1,
+      duration: 30,
+      outputFormat: 'mp3',
+    };
+
+    if (!isAudioProjectConfig(audioConfig)) {
+      throw new Error('Audio config not identified correctly');
+    }
+    if (isImageProjectConfig(audioConfig) || isVideoProjectConfig(audioConfig)) {
+      throw new Error('Audio config misidentified as image/video config');
+    }
+  })();
+
   // Test 18: Video project validation
   await test('Should validate video project parameters', () => {
     const videoConfig: VideoProjectConfig = {
@@ -357,7 +381,7 @@ async function runTests() {
       modelId: 'wan_v2.2-14b-fp8_t2v',
       positivePrompt: 'A beautiful sunset',
       numberOfMedia: 1,
-      frames: 500, // Invalid: too many
+      frames: 0, // Invalid: too low
     };
 
     try {
@@ -390,6 +414,41 @@ async function runTests() {
     }
   })();
 
+  // Test 21b: Audio project validation
+  await test('Should validate audio project parameters', () => {
+    const audioConfig: AudioProjectConfig = {
+      type: 'audio',
+      modelId: 'ace-step-v1',
+      positivePrompt: 'Ambient cinematic score',
+      numberOfMedia: 1,
+      duration: 30,
+      bpm: 120,
+      outputFormat: 'wav',
+    };
+
+    validateProjectConfig(audioConfig);
+  })();
+
+  // Test 21c: Audio output format validation
+  await test('Should reject invalid audio output format', () => {
+    const audioConfig = {
+      type: 'audio' as const,
+      modelId: 'ace-step-v1',
+      positivePrompt: 'Ambient cinematic score',
+      numberOfMedia: 1,
+      outputFormat: 'aac',
+    };
+
+    try {
+      validateProjectConfig(audioConfig as any);
+      throw new Error('Should have rejected invalid audio format');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type for invalid audio format');
+      }
+    }
+  })();
+
   // Test 22: createImageProject method exists
   await test('Should have createImageProject method', () => {
     const client = new SogniClientWrapper({
@@ -413,6 +472,38 @@ async function runTests() {
 
     if (typeof client.createVideoProject !== 'function') {
       throw new Error('createVideoProject method not found');
+    }
+  })();
+
+  // Test 23b: createAudioProject method exists
+  await test('Should have createAudioProject method', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    if (typeof client.createAudioProject !== 'function') {
+      throw new Error('createAudioProject method not found');
+    }
+  })();
+
+  // Test 23c: Chat methods exist
+  await test('Should have chat helper methods', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    if (typeof client.createChatCompletion !== 'function') {
+      throw new Error('createChatCompletion method not found');
+    }
+    if (typeof client.estimateChatCost !== 'function') {
+      throw new Error('estimateChatCost method not found');
+    }
+    if (typeof client.getAvailableChatModels !== 'function') {
+      throw new Error('getAvailableChatModels method not found');
     }
   })();
 
@@ -453,6 +544,17 @@ async function runTests() {
       autoConnect: false,
     });
     if (!client) throw new Error('Client not created with cookie auth');
+    if (!client.isConnected) throw new Error('isConnected method not available');
+  })();
+
+  // Test 26b: API key auth client creation
+  await test('Should create client with apiKey auth config', () => {
+    const client = new SogniClientWrapper({
+      authType: 'apiKey',
+      apiKey: 'test-api-key',
+      autoConnect: false,
+    });
+    if (!client) throw new Error('Client not created with apiKey auth');
     if (!client.isConnected) throw new Error('isConnected method not available');
   })();
 
@@ -557,12 +659,40 @@ async function runTests() {
     }
   })();
 
+  // Test 33b: API key auth config validation
+  await test('Should allow apiKey auth config', () => {
+    const config: ApiKeyAuthConfig = {
+      authType: 'apiKey',
+      apiKey: 'test-api-key',
+      autoConnect: false,
+    };
+    validateClientConfig(config);
+  })();
+
+  // Test 33c: API key auth requires apiKey
+  await test('Should require apiKey for apiKey auth', () => {
+    const config = {
+      authType: 'apiKey' as const,
+      autoConnect: false,
+    };
+
+    try {
+      validateClientConfig(config as any);
+      throw new Error('Should have required apiKey');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type');
+      }
+    }
+  })();
+
   // Test 34: AuthType type export
   await test('Should export AuthType type', () => {
     // TypeScript validates at compile time
     const tokenAuth: AuthType = 'token';
     const cookieAuth: AuthType = 'cookies';
-    if (!tokenAuth || !cookieAuth) throw new Error('AuthType not working');
+    const apiKeyAuth: AuthType = 'apiKey';
+    if (!tokenAuth || !cookieAuth || !apiKeyAuth) throw new Error('AuthType not working');
   })();
 
   // Test 35: Context images validation - valid array with true values
@@ -868,6 +998,390 @@ async function runTests() {
     }
     if (capturedEstimateParams.frames !== 113) {
       throw new Error(`Expected LTX-2 frames=113, got ${capturedEstimateParams.frames}`);
+    }
+  })();
+
+  // Test 50: estimateVideoCost allows LTX-2 duration up to 20s
+  await test('Should allow 20-second LTX-2 duration for estimateVideoCost', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateVideoCost({
+      modelId: 'ltx2-19b-fp8_t2v',
+      width: 768,
+      height: 768,
+      duration: 20,
+      fps: 24,
+      steps: 20,
+      numberOfMedia: 1,
+    });
+
+    if (!capturedEstimateParams) {
+      throw new Error('Did not capture estimate params');
+    }
+    if (capturedEstimateParams.duration !== 20) {
+      throw new Error(`Expected duration=20, got ${capturedEstimateParams.duration}`);
+    }
+  })();
+
+  // Test 51: estimateAudioCost call mapping
+  await test('Should map estimateAudioCost params to SDK', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateAudioCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateAudioCost({
+      modelId: 'ace-step-v1',
+      duration: 30,
+      steps: 20,
+      numberOfMedia: 2,
+      tokenType: 'spark',
+    });
+
+    if (!capturedEstimateParams) {
+      throw new Error('Did not capture audio estimate params');
+    }
+    if (capturedEstimateParams.model !== 'ace-step-v1') {
+      throw new Error(`Unexpected model param: ${capturedEstimateParams.model}`);
+    }
+  })();
+
+  // Test 52: createAudioProject returns audio URLs
+  await test('Should return audioUrls for completed audio projects', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    const projectStub = {
+      id: 'audio-project-test',
+      on: () => {},
+      waitForCompletion: async () => ['https://example.com/audio-result.mp3'],
+    };
+
+    (client as any).client = {
+      projects: {
+        create: async () => projectStub,
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    const result = await client.createAudioProject({
+      modelId: 'ace-step-v1',
+      positivePrompt: 'A calm ambient song',
+      numberOfMedia: 1,
+      duration: 30,
+      steps: 20,
+    });
+
+    if (!result.completed) {
+      throw new Error('Audio project should be completed');
+    }
+    if (!result.audioUrls || result.audioUrls[0] !== 'https://example.com/audio-result.mp3') {
+      throw new Error('audioUrls were not mapped correctly');
+    }
+  })();
+
+  // Test 53: jobCompleted event for audio includes audioUrl
+  await test('Should emit audioUrl on JOB_COMPLETED for audio projects', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    const handlers: Record<string, (payload: any) => void> = {};
+    const projectStub = {
+      id: 'audio-project-events',
+      on: (event: string, handler: (payload: any) => void) => {
+        handlers[event] = handler;
+      },
+      waitForCompletion: async () => [],
+    };
+
+    (client as any).client = {
+      projects: {
+        create: async () => projectStub,
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    let completedData: any = null;
+    client.on(ClientEvent.JOB_COMPLETED, (data) => {
+      completedData = data;
+    });
+
+    await client.createAudioProject({
+      modelId: 'ace-step-v1',
+      positivePrompt: 'A calm ambient song',
+      numberOfMedia: 1,
+      duration: 30,
+      steps: 20,
+      waitForCompletion: false,
+    });
+
+    if (!handlers.jobCompleted) {
+      throw new Error('Missing jobCompleted handler');
+    }
+
+    handlers.jobCompleted({
+      resultUrl: 'https://example.com/audio-item.mp3',
+    });
+
+    if (!completedData || completedData.audioUrl !== 'https://example.com/audio-item.mp3') {
+      throw new Error('audioUrl missing from JOB_COMPLETED event payload');
+    }
+  })();
+
+  // Test 54: chat method mapping to SDK
+  await test('Should map chat helper methods to SDK chat API', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedCompletionParams: any = null;
+    let capturedEstimateParams: any = null;
+    let capturedWaitTimeout: number | undefined;
+
+    const llmModels = {
+      'qwen3-30b-a3b-gptq-int4': { workers: 2 },
+    };
+
+    const completionResult = {
+      jobID: 'chat-job-1',
+      content: 'Hello from chat',
+      role: 'assistant',
+      finishReason: 'stop',
+      usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 },
+      timeTaken: 123,
+    };
+
+    (client as any).client = {
+      chat: {
+        models: llmModels,
+        waitForModels: async (timeout: number) => {
+          capturedWaitTimeout = timeout;
+          return llmModels;
+        },
+        estimateCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return {
+            costInUSD: 0.001,
+            costInSogni: 0.01,
+            costInSpark: 1,
+            costInToken: 1,
+            inputTokens: 5,
+            outputTokens: 16,
+          };
+        },
+        completions: {
+          create: async (params: any) => {
+            capturedCompletionParams = params;
+            return completionResult;
+          },
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    const models = await client.getAvailableChatModels();
+    if (!models['qwen3-30b-a3b-gptq-int4']) {
+      throw new Error('getAvailableChatModels did not return expected model');
+    }
+
+    await client.waitForChatModels(2500);
+    if (capturedWaitTimeout !== 2500) {
+      throw new Error(`waitForChatModels timeout not passed through (got ${capturedWaitTimeout})`);
+    }
+
+    await client.estimateChatCost({
+      model: 'qwen3-30b-a3b-gptq-int4',
+      messages: [{ role: 'user', content: 'Hello' }],
+      max_tokens: 16,
+    });
+
+    if (!capturedEstimateParams || capturedEstimateParams.model !== 'qwen3-30b-a3b-gptq-int4') {
+      throw new Error('estimateChatCost params were not mapped correctly');
+    }
+
+    const chatResult = await client.createChatCompletion({
+      model: 'qwen3-30b-a3b-gptq-int4',
+      messages: [{ role: 'user', content: 'Hello' }],
+    });
+
+    if (!capturedCompletionParams || capturedCompletionParams.model !== 'qwen3-30b-a3b-gptq-int4') {
+      throw new Error('createChatCompletion params were not mapped correctly');
+    }
+    if ((chatResult as any).content !== 'Hello from chat') {
+      throw new Error('createChatCompletion did not return expected chat result');
+    }
+  })();
+
+  // Test 55: chat event forwarding
+  await test('Should forward chat events from SDK to wrapper events', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    const projectHandlers: Record<string, (...args: any[]) => void> = {};
+    const chatHandlers: Record<string, (...args: any[]) => void> = {};
+
+    (client as any).client = {
+      projects: {
+        on: (event: string, handler: (...args: any[]) => void) => {
+          projectHandlers[event] = handler;
+        },
+        off: () => {},
+      },
+      chat: {
+        on: (event: string, handler: (...args: any[]) => void) => {
+          chatHandlers[event] = handler;
+        },
+        off: () => {},
+      },
+    };
+
+    (client as any).setupEventListeners();
+
+    let tokenSeen = false;
+    let completedSeen = false;
+    let errorSeen = false;
+    let stateSeen = false;
+    let modelsSeen = false;
+
+    client.on(ClientEvent.CHAT_TOKEN, () => { tokenSeen = true; });
+    client.on(ClientEvent.CHAT_COMPLETED, () => { completedSeen = true; });
+    client.on(ClientEvent.CHAT_ERROR, () => { errorSeen = true; });
+    client.on(ClientEvent.CHAT_JOB_STATE, () => { stateSeen = true; });
+    client.on(ClientEvent.CHAT_MODELS_UPDATED, () => { modelsSeen = true; });
+
+    chatHandlers.token?.({ jobID: 'j1', content: 'hel' });
+    chatHandlers.completed?.({
+      jobID: 'j1',
+      content: 'hello',
+      role: 'assistant',
+      finishReason: 'stop',
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      timeTaken: 10,
+    });
+    chatHandlers.error?.({ jobID: 'j1', error: 'failed', message: 'failed' });
+    chatHandlers.jobState?.({ jobID: 'j1', type: 'queued' });
+    chatHandlers.modelsUpdated?.({ 'qwen3-30b-a3b-gptq-int4': { workers: 1 } });
+
+    if (!tokenSeen || !completedSeen || !errorSeen || !stateSeen || !modelsSeen) {
+      throw new Error('Not all chat events were forwarded');
+    }
+  })();
+
+  // Test 56: apiKey auth connect path
+  await test('Should connect with apiKey auth without account.login', async () => {
+    const originalCreateInstance = (SogniClient as any).createInstance;
+
+    let createConfig: any = null;
+    let loginCalled = false;
+    let checkAuthCalled = false;
+
+    try {
+      (SogniClient as any).createInstance = async (config: any) => {
+        createConfig = config;
+        return {
+          checkAuth: async () => {
+            checkAuthCalled = true;
+            return true;
+          },
+          account: {
+            login: async () => {
+              loginCalled = true;
+            },
+          },
+          projects: {
+            waitForModels: async () => {},
+            on: () => {},
+            off: () => {},
+          },
+          chat: {
+            on: () => {},
+            off: () => {},
+          },
+          apiClient: {
+            socket: {
+              disconnect: () => {},
+            },
+          },
+        };
+      };
+
+      const client = new SogniClientWrapper({
+        authType: 'apiKey',
+        apiKey: 'test-api-key',
+        autoConnect: false,
+      });
+
+      await client.connect();
+
+      if (!createConfig) {
+        throw new Error('createInstance was not called');
+      }
+      if (createConfig.authType !== 'apiKey' || createConfig.apiKey !== 'test-api-key') {
+        throw new Error('apiKey auth config was not passed to SDK createInstance');
+      }
+      if (loginCalled) {
+        throw new Error('account.login should not be called for apiKey auth');
+      }
+      if (checkAuthCalled) {
+        throw new Error('checkAuth should not be called for apiKey auth');
+      }
+
+      await client.disconnect();
+    } finally {
+      (SogniClient as any).createInstance = originalCreateInstance;
     }
   })();
 

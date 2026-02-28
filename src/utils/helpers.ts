@@ -3,7 +3,13 @@
  */
 
 import { randomUUID } from 'crypto';
-import type { ProjectConfig, SogniClientConfig, ImageProjectConfig, VideoProjectConfig } from '../types';
+import type {
+  ProjectConfig,
+  SogniClientConfig,
+  ImageProjectConfig,
+  VideoProjectConfig,
+  AudioProjectConfig,
+} from '../types';
 import { SogniValidationError } from './errors';
 
 /**
@@ -25,6 +31,13 @@ export function isImageProjectConfig(config: ProjectConfig): config is ImageProj
  */
 export function isVideoProjectConfig(config: ProjectConfig): config is VideoProjectConfig {
   return config.type === 'video';
+}
+
+/**
+ * Type guard to check if config is for an audio project
+ */
+export function isAudioProjectConfig(config: ProjectConfig): config is AudioProjectConfig {
+  return config.type === 'audio';
 }
 
 /**
@@ -62,12 +75,25 @@ export function isCookieAuth(config: SogniClientConfig): boolean {
  */
 export function validateClientConfig(config: SogniClientConfig): void {
   // Validate authType if provided
-  if (config.authType !== undefined && !['token', 'cookies'].includes(config.authType)) {
-    throw new SogniValidationError('authType must be either "token" or "cookies"');
+  if (config.authType !== undefined && !['token', 'cookies', 'apiKey'].includes(config.authType)) {
+    throw new SogniValidationError('authType must be one of: "token", "cookies", "apiKey"');
   }
 
-  // For token auth (default), username and password are required
-  if (!isCookieAuth(config)) {
+  const authType = config.authType ?? (config.apiKey ? 'apiKey' : 'token');
+
+  if (authType === 'apiKey') {
+    if (!config.apiKey || typeof config.apiKey !== 'string') {
+      throw new SogniValidationError('apiKey is required and must be a string for apiKey auth');
+    }
+
+    if (config.username !== undefined && typeof config.username !== 'string') {
+      throw new SogniValidationError('Username must be a string if provided');
+    }
+    if (config.password !== undefined && typeof config.password !== 'string') {
+      throw new SogniValidationError('Password must be a string if provided');
+    }
+  } else if (authType !== 'cookies') {
+    // For token auth (default), username and password are required
     if (!config.username || typeof config.username !== 'string') {
       throw new SogniValidationError('Username is required and must be a string');
     }
@@ -78,7 +104,7 @@ export function validateClientConfig(config: SogniClientConfig): void {
   }
 
   // For cookie auth, username/password are optional but must be strings if provided
-  if (isCookieAuth(config)) {
+  if (authType === 'cookies') {
     if (config.username !== undefined && typeof config.username !== 'string') {
       throw new SogniValidationError('Username must be a string if provided');
     }
@@ -132,14 +158,13 @@ export function validateProjectConfig(config: ProjectConfig): void {
     throw new SogniValidationError('Positive prompt is required and must be a string');
   }
 
-  if (!config.type || !['image', 'video'].includes(config.type)) {
-    throw new SogniValidationError('Project type must be either "image" or "video"');
+  if (!config.type || !['image', 'video', 'audio'].includes(config.type)) {
+    throw new SogniValidationError('Project type must be one of: "image", "video", "audio"');
   }
 
   if (config.numberOfMedia !== undefined) {
-    const maxMedia = config.type === 'video' ? 4 : 10; // Videos typically have lower limit
-    if (typeof config.numberOfMedia !== 'number' || config.numberOfMedia < 1 || config.numberOfMedia > maxMedia) {
-      throw new SogniValidationError(`Number of ${config.type}s must be between 1 and ${maxMedia}`);
+    if (typeof config.numberOfMedia !== 'number' || config.numberOfMedia < 1) {
+      throw new SogniValidationError(`Number of ${config.type}s must be at least 1`);
     }
   }
 
@@ -155,15 +180,17 @@ export function validateProjectConfig(config: ProjectConfig): void {
     }
   }
 
-  if (config.width !== undefined) {
-    if (typeof config.width !== 'number' || config.width < 256 || config.width > 2048) {
-      throw new SogniValidationError('Width must be between 256 and 2048');
+  if (isImageProjectConfig(config) || isVideoProjectConfig(config)) {
+    if (config.width !== undefined) {
+      if (typeof config.width !== 'number' || config.width < 256 || config.width > 2048) {
+        throw new SogniValidationError('Width must be between 256 and 2048');
+      }
     }
-  }
 
-  if (config.height !== undefined) {
-    if (typeof config.height !== 'number' || config.height < 256 || config.height > 2048) {
-      throw new SogniValidationError('Height must be between 256 and 2048');
+    if (config.height !== undefined) {
+      if (typeof config.height !== 'number' || config.height < 256 || config.height > 2048) {
+        throw new SogniValidationError('Height must be between 256 and 2048');
+      }
     }
   }
 
@@ -217,8 +244,8 @@ export function validateProjectConfig(config: ProjectConfig): void {
     }
 
     if (config.frames !== undefined) {
-      if (typeof config.frames !== 'number' || config.frames < 1 || config.frames > 240) {
-        throw new SogniValidationError('Frames must be between 1 and 240');
+      if (typeof config.frames !== 'number' || config.frames < 1 || config.frames > 2001) {
+        throw new SogniValidationError('Frames must be between 1 and 2001');
       }
     }
 
@@ -231,6 +258,42 @@ export function validateProjectConfig(config: ProjectConfig): void {
     if (config.shift !== undefined) {
       if (typeof config.shift !== 'number' || config.shift < 0 || config.shift > 10) {
         throw new SogniValidationError('Shift must be between 0 and 10');
+      }
+    }
+
+    if (config.detailerStrength !== undefined) {
+      if (typeof config.detailerStrength !== 'number' || config.detailerStrength < 0 || config.detailerStrength > 1) {
+        throw new SogniValidationError('detailerStrength must be between 0 and 1');
+      }
+    }
+  }
+
+  if (isAudioProjectConfig(config)) {
+    if (config.outputFormat && !['mp3', 'flac', 'wav'].includes(config.outputFormat)) {
+      throw new SogniValidationError('Audio output format must be one of: "mp3", "flac", "wav"');
+    }
+
+    if (config.duration !== undefined) {
+      if (typeof config.duration !== 'number' || config.duration < 10 || config.duration > 600) {
+        throw new SogniValidationError('Audio duration must be between 10 and 600 seconds');
+      }
+    }
+
+    if (config.bpm !== undefined) {
+      if (typeof config.bpm !== 'number' || config.bpm < 30 || config.bpm > 300) {
+        throw new SogniValidationError('Audio BPM must be between 30 and 300');
+      }
+    }
+
+    if (config.promptStrength !== undefined) {
+      if (typeof config.promptStrength !== 'number' || config.promptStrength < 0 || config.promptStrength > 10) {
+        throw new SogniValidationError('promptStrength must be between 0 and 10');
+      }
+    }
+
+    if (config.creativity !== undefined) {
+      if (typeof config.creativity !== 'number' || config.creativity < 0 || config.creativity > 2) {
+        throw new SogniValidationError('creativity must be between 0 and 2');
       }
     }
   }

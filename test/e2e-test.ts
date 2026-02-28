@@ -24,6 +24,12 @@ const CREDENTIALS = {
   password: process.env.SOGNI_PASSWORD,
 };
 
+// Optional LLM e2e controls:
+// - SOGNI_LLM_MODEL: preferred LLM model id
+// - SOGNI_REQUIRE_LLM_E2E=true: fail if LLM models are unavailable
+const PREFERRED_LLM_MODEL = process.env.SOGNI_LLM_MODEL;
+const REQUIRE_LLM_E2E = process.env.SOGNI_REQUIRE_LLM_E2E === 'true';
+
 let testsPassed = 0;
 let testsFailed = 0;
 
@@ -55,6 +61,7 @@ async function runTests() {
   let catImageBuffer: Buffer | undefined;
   let referenceVideoUrl: string | undefined;
   let availableModelIds: string[] = [];
+  let selectedLlmModelId: string | undefined;
 
   try {
     // Test 1: Create client
@@ -520,6 +527,151 @@ async function runTests() {
     })();
 
     // Test 13: Disconnect
+    await test('Should retrieve available LLM chat models', async () => {
+      await sleep(5000);
+      if (!client) throw new Error('Client not initialized');
+
+      console.log('   Waiting for LLM models...');
+      let llmModels: Record<string, { workers?: number }>;
+      try {
+        llmModels = await client.waitForChatModels(15000);
+      } catch (error) {
+        if (REQUIRE_LLM_E2E) {
+          throw error;
+        }
+        console.log('   ⚠️ LLM models unavailable right now, skipping LLM e2e tests');
+        return;
+      }
+
+      const entries = Object.entries(llmModels);
+      console.log(`   Found ${entries.length} LLM model(s)`);
+      if (entries.length === 0) {
+        if (REQUIRE_LLM_E2E) {
+          throw new Error('No LLM models available');
+        }
+        console.log('   ⚠️ No LLM models available, skipping LLM e2e tests');
+        return;
+      }
+
+      const preferred = PREFERRED_LLM_MODEL
+        ? entries.find(([id, info]) => id === PREFERRED_LLM_MODEL && (info.workers || 0) > 0)
+        : undefined;
+      const firstAvailable = entries.find(([, info]) => (info.workers || 0) > 0);
+      const fallback = entries[0];
+
+      selectedLlmModelId = (preferred || firstAvailable || fallback)[0];
+      const workers = (preferred || firstAvailable || fallback)[1]?.workers ?? 0;
+      console.log(`   Selected LLM model: ${selectedLlmModelId} (${workers} workers)`);
+    })();
+
+    await test('Should estimate LLM chat completion cost', async () => {
+      await sleep(2000);
+      if (!client) throw new Error('Client not initialized');
+      if (!selectedLlmModelId) {
+        if (REQUIRE_LLM_E2E) {
+          throw new Error('No selected LLM model for chat cost estimation');
+        }
+        console.log('   ⚠️ Skipping LLM cost estimate (no selected model)');
+        return;
+      }
+
+      const estimate = await client.estimateChatCost({
+        model: selectedLlmModelId,
+        messages: [{ role: 'user', content: 'Hello, please reply with one short sentence.' }],
+        max_tokens: 64,
+        tokenType: 'spark',
+      });
+
+      console.log(`   Estimated tokens: in=${estimate.inputTokens}, out=${estimate.outputTokens}`);
+      console.log(`   Estimated cost (spark): ${estimate.costInSpark}`);
+
+      if (estimate.outputTokens <= 0) {
+        throw new Error('Invalid LLM cost estimate output tokens');
+      }
+    })();
+
+    await test('Should generate non-streaming LLM chat completion', async () => {
+      await sleep(4000);
+      if (!client) throw new Error('Client not initialized');
+      if (!selectedLlmModelId) {
+        if (REQUIRE_LLM_E2E) {
+          throw new Error('No selected LLM model for non-streaming chat');
+        }
+        console.log('   ⚠️ Skipping non-streaming LLM chat (no selected model)');
+        return;
+      }
+
+      const result = await client.createChatCompletion({
+        model: selectedLlmModelId,
+        messages: [
+          { role: 'system', content: 'You are concise.' },
+          { role: 'user', content: 'Reply with exactly three words about Sogni.' },
+        ],
+        max_tokens: 32,
+        tokenType: 'spark',
+      });
+
+      console.log(`   Chat job: ${result.jobID}`);
+      console.log(`   Finish reason: ${result.finishReason}`);
+      console.log(`   Content: ${result.content}`);
+
+      if (!result.content || result.content.trim().length === 0) {
+        throw new Error('Empty non-streaming chat response');
+      }
+    })();
+
+    await test('Should generate streaming LLM chat completion and emit chat events', async () => {
+      await sleep(4000);
+      if (!client) throw new Error('Client not initialized');
+      if (!selectedLlmModelId) {
+        if (REQUIRE_LLM_E2E) {
+          throw new Error('No selected LLM model for streaming chat');
+        }
+        console.log('   ⚠️ Skipping streaming LLM chat (no selected model)');
+        return;
+      }
+
+      let tokenEvents = 0;
+      let completedEvents = 0;
+      let stateEvents = 0;
+
+      const onToken = () => { tokenEvents++; };
+      const onCompleted = () => { completedEvents++; };
+      const onState = () => { stateEvents++; };
+
+      client.on(ClientEvent.CHAT_TOKEN, onToken);
+      client.on(ClientEvent.CHAT_COMPLETED, onCompleted);
+      client.on(ClientEvent.CHAT_JOB_STATE, onState);
+
+      const stream = await client.createChatCompletion({
+        model: selectedLlmModelId,
+        messages: [{ role: 'user', content: 'Tell me one short fact about image generation.' }],
+        max_tokens: 96,
+        stream: true,
+        tokenType: 'spark',
+      });
+
+      let streamedContent = '';
+      for await (const chunk of stream) {
+        streamedContent += chunk.content || '';
+      }
+
+      console.log(`   Streamed content length: ${streamedContent.length}`);
+      console.log(`   Chat events: token=${tokenEvents}, completed=${completedEvents}, state=${stateEvents}`);
+
+      client.off(ClientEvent.CHAT_TOKEN, onToken);
+      client.off(ClientEvent.CHAT_COMPLETED, onCompleted);
+      client.off(ClientEvent.CHAT_JOB_STATE, onState);
+
+      if (!streamedContent.trim()) {
+        throw new Error('Streaming chat returned empty content');
+      }
+      if (tokenEvents === 0 && completedEvents === 0) {
+        throw new Error('No chat token/completed events observed for streaming chat');
+      }
+    })();
+
+    // Test 17: Disconnect
     await test('Should disconnect cleanly', async () => {
       if (!client) throw new Error('Client not initialized');
       

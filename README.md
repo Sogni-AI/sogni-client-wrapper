@@ -10,8 +10,11 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 
 - **Promise-Based API**: Modern `async/await` support for all core operations.
 - **Connection Management**: Automatic connection and reconnection handling.
-- **Video Rendering Support**: Generate videos using WAN models (t2v, i2v, s2v, animate workflows).
+- **Video Rendering Support**: Generate videos using WAN and LTX-2 models (t2v, i2v, s2v, ia2v, a2v, v2v, animate workflows).
+- **Audio Generation Support**: Generate music/audio tracks with audio models and estimate audio costs.
 - **Image Editing Support**: Edit images using Qwen models with context images for multi-reference editing.
+- **LLM Chat Support**: Use chat completions through Sogni's LLM worker network (streaming and non-streaming).
+- **Flexible Authentication**: Token, cookies, or API key authentication.
 - **Simplified Configuration**: Sensible defaults and clear configuration options.
 - **Enhanced Error Handling**: Custom error classes for better error diagnosis.
 - **Type-Safe**: Written entirely in TypeScript with full type definitions.
@@ -115,7 +118,7 @@ node your-script.js
 
 ## Video Rendering Support
 
-The wrapper now supports video generation using Sogni's WAN models. Generate stunning videos from text prompts, images, audio, or even other videos!
+The wrapper supports video generation with Sogni WAN and LTX-2 models. Generate videos from text prompts, images, audio, or other videos.
 
 ### Video Generation Example
 
@@ -160,7 +163,9 @@ The wrapper supports multiple video generation workflows:
 
 1. **Text-to-Video (t2v)**: Generate videos from text prompts
 2. **Image-to-Video (i2v)**: Animate static images or interpolate between two images
-3. **Animate Workflows**: Create character animations or motion transfers
+3. **Sound-to-Video (s2v / ia2v / a2v)**: Drive generation with audio references
+4. **Video-to-Video (v2v)**: Control motion/style from a reference video
+5. **Animate Workflows**: Create character animations or motion transfers
 
 ### Advanced Video Examples
 
@@ -210,6 +215,51 @@ const videoResult = await client.createVideoProject({
   frames: 60,
   fps: 30,
 });
+
+// For audio
+const audioResult = await client.createAudioProject({
+  modelId: 'ace-step-v1',
+  positivePrompt: 'An uplifting cinematic ambient track',
+  numberOfMedia: 1,
+  duration: 30,
+  steps: 20,
+  outputFormat: 'mp3',
+});
+```
+
+## Audio Generation
+
+```typescript
+const audioEstimate = await client.estimateAudioCost({
+  modelId: 'ace-step-v1',
+  duration: 30,
+  steps: 20,
+  numberOfMedia: 1,
+  tokenType: 'spark',
+});
+
+console.log('Estimated audio cost (USD):', audioEstimate.usd);
+```
+
+## Chat Completions
+
+```typescript
+// Non-streaming
+const completion = await client.createChatCompletion({
+  model: 'qwen3-30b-a3b-gptq-int4',
+  messages: [{ role: 'user', content: 'Write a haiku about sunsets.' }],
+});
+console.log(completion.content);
+
+// Streaming
+const stream = await client.createChatCompletion({
+  model: 'qwen3-30b-a3b-gptq-int4',
+  messages: [{ role: 'user', content: 'Explain diffusion models simply.' }],
+  stream: true,
+});
+for await (const chunk of stream) {
+  process.stdout.write(chunk.content);
+}
 ```
 
 ## Image Editing with Context Images
@@ -327,8 +377,10 @@ Creates a new client instance.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `username` | `string` | **Required** | Your Sogni account username. |
-| `password` | `string` | **Required** | Your Sogni account password. |
+| `authType` | `'token' \| 'cookies' \| 'apiKey'` | `'token'` | Authentication mode. |
+| `username` | `string` | Conditionally required | Required for `token` auth; optional for `cookies`/`apiKey`. |
+| `password` | `string` | Conditionally required | Required for `token` auth; optional for `cookies`/`apiKey`. |
+| `apiKey` | `string` | Conditionally required | Required for `apiKey` auth. |
 | `appId` | `string` | Auto-generated UUID | Unique ID for your application. |
 | `network` | `'fast' \| 'relaxed'` | `'fast'` | The Sogni network to use. |
 | `testnet` | `boolean` | `false` | Connect to the testnet network. |
@@ -342,6 +394,16 @@ Creates a new client instance.
 | `timeout` | `number` | `300000` | Default timeout in ms for operations. |
 | `debug` | `boolean` | `false` | Enable detailed console logging. |
 
+#### API Key Authentication Example
+
+```typescript
+const client = new SogniClientWrapper({
+  authType: 'apiKey',
+  apiKey: process.env.SOGNI_API_KEY!,
+  network: 'fast',
+});
+```
+
 ### Core Methods
 
 - `connect(): Promise<void>`: Manually initiates the connection to Sogni.
@@ -351,12 +413,14 @@ Creates a new client instance.
 
 ### Main Operations
 
-- `createProject(config: ProjectConfig): Promise<ProjectResult>`: Creates a new image or video generation project.
+- `createProject(config: ProjectConfig): Promise<ProjectResult>`: Creates a new image, video, or audio generation project.
   - `waitForCompletion` (default: `true`): If true, the promise resolves only when the media is ready.
   - For images: returns `imageUrls` in result
   - For videos: returns `videoUrls` in result
+  - For audio: returns `audioUrls` in result
 - `createImageProject(config)`: Convenience method for image generation (automatically sets `type: 'image'`).
 - `createVideoProject(config)`: Convenience method for video generation (automatically sets `type: 'video'`).
+- `createAudioProject(config)`: Convenience method for audio generation (automatically sets `type: 'audio'`).
 - `createImageEditProject(config: QwenImageEditConfig)`: Convenience method for image editing with context images (validates model-specific limits).
 - `getAvailableModels(options?: GetModelsOptions): Promise<ModelInfo[]>`: Retrieves a list of available models.
 - `getModel(modelId: string): Promise<ModelInfo>`: Retrieves details for a specific model.
@@ -364,6 +428,11 @@ Creates a new client instance.
 - `getBalance(): Promise<BalanceInfo>`: Fetches your current SOGNI and Spark token balances using the `account.refreshBalance()` method.
 - `getSizePresets(network: 'fast' \| 'relaxed', modelId: string): Promise<SizePreset[]>`: Gets available output size presets for a model.
 - `estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate>`: Estimates video generation costs (frames/duration, fps, steps, size).
+- `estimateAudioCost(params: AudioCostEstimateParams): Promise<CostEstimate>`: Estimates audio generation costs (duration, steps, count).
+- `createChatCompletion(params)`: Creates chat completions (streaming or non-streaming).
+- `estimateChatCost(params)`: Estimates chat completion cost.
+- `getAvailableChatModels()`: Returns available chat/LLM models.
+- `waitForChatModels(timeout?)`: Waits until chat/LLM models are available.
 
 ### Event Handling
 
@@ -387,15 +456,15 @@ client.on(ClientEvent.ERROR, (error) => {
   console.error('A client error occurred:', error.message);
 });
 
-// Per-image events - Display images as soon as they're ready!
+// Per-media events - Display outputs as soon as they're ready!
 client.on(ClientEvent.JOB_COMPLETED, (data) => {
-  console.log(`Image ${data.jobIndex + 1}/${data.totalJobs} completed!`);
-  console.log(`URL: ${data.imageUrl}`);
-  // You can now display this individual image without waiting for the entire batch
+  console.log(`Job ${data.jobIndex + 1}/${data.totalJobs} completed!`);
+  console.log(`URL: ${data.imageUrl || data.videoUrl || data.audioUrl}`);
+  // You can now handle this individual output without waiting for the entire batch
 });
 
 client.on(ClientEvent.JOB_FAILED, (data) => {
-  console.log(`Image ${data.jobIndex + 1}/${data.totalJobs} failed:`, data.error);
+  console.log(`Job ${data.jobIndex + 1}/${data.totalJobs} failed:`, data.error);
 });
 ```
 
@@ -410,14 +479,19 @@ client.on(ClientEvent.JOB_FAILED, (data) => {
 | `projectProgress` | `ProjectProgress` | Fired with real-time progress updates for a project. |
 | `projectCompleted` | `ProjectResult` | Fired when a project successfully completes. |
 | `projectFailed` | `ErrorData` | Fired when a project fails. |
-| **`jobCompleted`** | **`JobCompletedData`** | **Fired when each individual image finishes - get images as they're ready!** |
-| **`jobFailed`** | **`JobFailedData`** | **Fired when an individual image fails.** |
+| **`jobCompleted`** | **`JobCompletedData`** | **Fired when an individual job finishes (image/video/audio).** |
+| **`jobFailed`** | **`JobFailedData`** | **Fired when an individual job fails.** |
 | `projectEvent` | `ProjectEvent` | Raw project events from the SDK (`queued`, `completed`, `error`). |
 | `jobEvent` | `JobEvent` | Raw job events from the SDK (includes `jobETA`, `started`, `progress`, etc). |
+| `chatToken` | `ChatCompletionChunk` | Fired for each streaming chat token chunk. |
+| `chatCompleted` | `ChatCompletionResult` | Fired when a chat completion finishes. |
+| `chatError` | `ChatErrorData` | Fired when a chat completion fails. |
+| `chatJobState` | `ChatJobStateEvent` | Fired on chat job state transitions. |
+| `chatModelsUpdated` | `Record<string, LLMModelInfo>` | Fired when available chat models are updated. |
 
-#### Per-Image Event Example
+#### Per-Job Event Example
 
-Perfect for displaying images immediately as they complete in a batch:
+Perfect for displaying batch outputs immediately as they complete:
 
 ```typescript
 const client = new SogniClientWrapper({
@@ -451,7 +525,7 @@ const result = await client.createProject({
 The library throws custom errors that extend `SogniError`. This allows you to catch specific types of errors.
 
 - `SogniConnectionError`: Issues with connecting to the WebSocket server.
-- `SogniAuthenticationError`: Invalid username or password.
+- `SogniAuthenticationError`: Invalid credentials (username/password, cookie session, or API key).
 - `SogniProjectError`: The image generation project failed.
 - `SogniTimeoutError`: An operation took longer than the configured timeout.
 - `SogniValidationError`: Invalid configuration or parameters.
@@ -503,6 +577,10 @@ To run the end-to-end tests, you need to provide your Sogni API credentials via 
    ```env
    SOGNI_USERNAME=your_sogni_username
    SOGNI_PASSWORD=your_sogni_password
+   # Optional: force a specific chat/LLM model for e2e tests
+   # SOGNI_LLM_MODEL=qwen3-30b-a3b-gptq-int4
+   # Optional: fail suite if LLM tests cannot run (default: skip LLM tests if unavailable)
+   # SOGNI_REQUIRE_LLM_E2E=true
    ```
 
 3. Run the e2e tests:
@@ -510,27 +588,31 @@ To run the end-to-end tests, you need to provide your Sogni API credentials via 
    npm run test:e2e
    ```
 
-**Note:** The e2e tests will make real API calls and may consume tokens from your Sogni account. They include image generation tests that will use your Spark tokens.
+**Note:** The e2e tests make real API calls and may consume tokens from your Sogni account. They include image/video generation and live LLM chat calls.
 
 ## TypeScript
 
 This library is written in TypeScript and exports all necessary types for a fully-typed experience.
 
 - `SogniClientConfig`: Configuration for the client constructor.
-- `ProjectConfig`: Parameters for creating a project (union of `ImageProjectConfig` and `VideoProjectConfig`).
+- `ProjectConfig`: Parameters for creating a project (union of `ImageProjectConfig`, `VideoProjectConfig`, and `AudioProjectConfig`).
 - `ImageProjectConfig`: Parameters specific to image generation.
 - `VideoProjectConfig`: Parameters specific to video generation.
+- `AudioProjectConfig`: Parameters specific to audio generation.
 - `QwenImageEditConfig`: Parameters for image editing with context images.
 - `InputMedia`: Type for media inputs (`File | Buffer | Blob | boolean`).
 - `ProjectResult`: The return type for a completed project.
 - `VideoCostEstimateParams`: Parameters for estimating video cost.
+- `AudioCostEstimateParams`: Parameters for estimating audio cost.
 - `CostEstimate`: Cost estimate response shape.
 - `ModelInfo`: Detailed information about an available model.
 - `BalanceInfo`: Your token balance.
 - `ErrorData`: The structure of error objects.
-- `VideoWorkflowType`: Video generation workflow types ('t2v' | 'i2v' | 's2v' | 'animate-move' | 'animate-replace').
-- `JobCompletedData`: Data emitted when an individual image completes.
-- `JobFailedData`: Data emitted when an individual image fails.
+- `VideoWorkflowType`: Video generation workflow types (`t2v`, `i2v`, `s2v`, `ia2v`, `a2v`, `v2v`, `animate-move`, `animate-replace`).
+- `JobCompletedData`: Data emitted when an individual job completes.
+- `JobFailedData`: Data emitted when an individual job fails.
+- `ChatCompletionParams` / `ChatCompletionResult` / `ChatCompletionChunk`: Types for chat completions.
+- `LLMModelInfo` / `LLMCostEstimation`: Types for chat model metadata and cost estimates.
 - `ProjectEvent`: Raw project events from the SDK.
 - `JobEvent`: Raw job events from the SDK (includes ETA updates).
 

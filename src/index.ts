@@ -57,6 +57,12 @@ export type {
   LLMJobCost,
   LLMModelInfo,
   LLMParamConstraint,
+  ToolDefinition,
+  ToolCall,
+  ToolCallDelta,
+  ToolCallFunction,
+  ToolChoice,
+  ToolFunction,
   InputMedia,
   ProjectEvent,
   JobEvent,
@@ -100,6 +106,15 @@ export {
   getMaxContextImages,
   supportsContextImages,
 } from './utils/helpers';
+
+// SDK chat tool-calling helpers
+export {
+  ChatStream,
+  SogniTools,
+  buildSogniTools,
+  isSogniToolCall,
+  parseToolCallArguments,
+} from '@sogni-ai/sogni-client';
 
 // Default export
 export { SogniClientWrapper as default } from './client/SogniClientWrapper';

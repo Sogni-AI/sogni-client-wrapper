@@ -29,9 +29,18 @@ const CREDENTIALS = {
 // - SOGNI_REQUIRE_LLM_E2E=true: fail if LLM models are unavailable
 const PREFERRED_LLM_MODEL = process.env.SOGNI_LLM_MODEL;
 const REQUIRE_LLM_E2E = process.env.SOGNI_REQUIRE_LLM_E2E === 'true';
+const REQUIRE_TOOL_CALL_E2E = process.env.SOGNI_REQUIRE_TOOL_CALL_E2E === 'true';
+const E2E_SCOPE = (process.env.SOGNI_E2E_SCOPE || 'all').toLowerCase();
+const LLM_TEST_NAME_PATTERN = /(llm|tool[- ]?call)/i;
+const LLM_SCOPE_ALWAYS_RUN = new Set([
+  'Should create client with credentials',
+  'Should connect to Sogni Supernet',
+  'Should disconnect cleanly',
+]);
 
 let testsPassed = 0;
 let testsFailed = 0;
+let testsSkipped = 0;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,6 +48,16 @@ function sleep(ms: number): Promise<void> {
 
 function test(name: string, fn: () => void | Promise<void>) {
   return async () => {
+    if (
+      E2E_SCOPE === 'llm' &&
+      !LLM_TEST_NAME_PATTERN.test(name) &&
+      !LLM_SCOPE_ALWAYS_RUN.has(name)
+    ) {
+      console.log(`\n⏭️ Skipping (LLM scope): ${name}`);
+      testsSkipped++;
+      return;
+    }
+
     try {
       console.log(`\n🔄 Running: ${name}`);
       await fn();
@@ -55,6 +74,73 @@ function test(name: string, fn: () => void | Promise<void>) {
   };
 }
 
+async function requestForcedAddNumbersToolCall(
+  client: SogniClientWrapper,
+  modelId: string,
+  a: number,
+  b: number
+): Promise<{
+  tools: Array<any>;
+  result: any | null;
+  toolCall: any | null;
+  attempts: Array<{ maxTokens: number; finishReason: string; toolCalls: number; contentPreview: string }>;
+}> {
+  const tools = [
+    {
+      type: 'function' as const,
+      function: {
+        name: 'add_numbers',
+        description: 'Add two numeric values and return their sum.',
+        parameters: {
+          type: 'object',
+          properties: {
+            a: { type: 'number' },
+            b: { type: 'number' },
+          },
+          required: ['a', 'b'],
+        },
+      },
+    },
+  ];
+
+  const attempts: Array<{ maxTokens: number; finishReason: string; toolCalls: number; contentPreview: string }> = [];
+  for (const maxTokens of [256, 512, 1024]) {
+    const result = await client.createChatCompletion({
+      model: modelId,
+      messages: [
+        {
+          role: 'system',
+          content: 'You must call the provided add_numbers tool. Do not answer directly.',
+        },
+        {
+          role: 'user',
+          content: `Call add_numbers with a=${a} and b=${b}. Return only the tool call.`,
+        },
+      ],
+      tools,
+      tool_choice: { type: 'function', function: { name: 'add_numbers' } },
+      temperature: 0,
+      max_tokens: maxTokens,
+      tokenType: 'spark',
+    });
+
+    const toolCalls = result.tool_calls || [];
+    const contentPreview = (result.content || '').slice(0, 120).replace(/\s+/g, ' ').trim();
+    attempts.push({
+      maxTokens,
+      finishReason: result.finishReason || 'unknown',
+      toolCalls: toolCalls.length,
+      contentPreview,
+    });
+
+    if (toolCalls.length > 0) {
+      return { tools, result, toolCall: toolCalls[0], attempts };
+    }
+  }
+
+  return { tools, result: null, toolCall: null, attempts };
+}
+
 async function runTests() {
   let client: SogniClientWrapper | null = null;
   let catImageUrl: string | undefined; // Store the cat image URL for video test
@@ -62,6 +148,8 @@ async function runTests() {
   let referenceVideoUrl: string | undefined;
   let availableModelIds: string[] = [];
   let selectedLlmModelId: string | undefined;
+  let availableLlmModels: Record<string, { workers?: number }> = {};
+  let selectedToolCallingModelId: string | undefined;
 
   try {
     // Test 1: Create client
@@ -543,6 +631,7 @@ async function runTests() {
         return;
       }
 
+      availableLlmModels = llmModels;
       const entries = Object.entries(llmModels);
       console.log(`   Found ${entries.length} LLM model(s)`);
       if (entries.length === 0) {
@@ -671,7 +760,138 @@ async function runTests() {
       }
     })();
 
-    // Test 17: Disconnect
+    await test('Should return tool calls for required custom tool invocation', async () => {
+      await sleep(4000);
+      if (!client) throw new Error('Client not initialized');
+      if (!selectedLlmModelId) {
+        if (REQUIRE_LLM_E2E) {
+          throw new Error('No selected LLM model for tool-calling chat');
+        }
+        console.log('   ⚠️ Skipping tool-calling LLM chat (no selected model)');
+        return;
+      }
+
+      const modelCandidates = Array.from(
+        new Set([
+          selectedLlmModelId,
+          ...Object.entries(availableLlmModels)
+            .filter(([, info]) => (info.workers || 0) > 0)
+            .map(([id]) => id)
+            .filter((id) => id.toLowerCase().includes('qwen')),
+          ...Object.entries(availableLlmModels)
+            .filter(([, info]) => (info.workers || 0) > 0)
+            .map(([id]) => id),
+        ].filter(Boolean) as string[])
+      );
+
+      let firstCall: { function: { name: string; arguments: string } } | undefined;
+      const diagnosticLines: string[] = [];
+      for (const modelId of modelCandidates) {
+        const { toolCall, attempts } = await requestForcedAddNumbersToolCall(client, modelId, 41, 1);
+        const attemptSummary = attempts
+          .map((a) => `max=${a.maxTokens} finish=${a.finishReason} toolCalls=${a.toolCalls}`)
+          .join(' | ');
+        console.log(`   Model ${modelId}: ${attemptSummary}`);
+        diagnosticLines.push(`${modelId}: ${attemptSummary}`);
+
+        if (toolCall) {
+          selectedToolCallingModelId = modelId;
+          firstCall = toolCall;
+          break;
+        }
+      }
+
+      if (!firstCall) {
+        if (REQUIRE_TOOL_CALL_E2E) {
+          throw new Error(
+            `Expected at least one tool call but none were returned by any available model. Diagnostics: ${diagnosticLines.join(' || ')}`
+          );
+        }
+        console.log('   ⚠️ No available model returned tool_calls; skipping strict tool-call assertion (set SOGNI_REQUIRE_TOOL_CALL_E2E=true to enforce)');
+        return;
+      }
+
+      if (firstCall.function.name !== 'add_numbers') {
+        throw new Error(`Unexpected tool call name: ${firstCall.function.name}`);
+      }
+      if (!firstCall.function.arguments || firstCall.function.arguments.trim().length === 0) {
+        throw new Error('Tool call arguments were empty');
+      }
+    })();
+
+    await test('Should complete a two-turn tool-calling conversation', async () => {
+      await sleep(4000);
+      if (!client) throw new Error('Client not initialized');
+      if (!selectedLlmModelId) {
+        if (REQUIRE_LLM_E2E) {
+          throw new Error('No selected LLM model for tool-calling follow-up');
+        }
+        console.log('   ⚠️ Skipping tool-calling follow-up test (no selected model)');
+        return;
+      }
+
+      const toolModelId = selectedToolCallingModelId || selectedLlmModelId;
+
+      const { tools, result: first, toolCall: firstToolCall, attempts } =
+        await requestForcedAddNumbersToolCall(client, toolModelId, 12, 8);
+
+      if (!firstToolCall) {
+        const summary = attempts
+          .map((a) => `max=${a.maxTokens} finish=${a.finishReason} toolCalls=${a.toolCalls}`)
+          .join(' | ');
+        if (REQUIRE_TOOL_CALL_E2E) {
+          throw new Error(`Expected initial tool call in two-turn conversation (model: ${toolModelId}). Diagnostics: ${summary}`);
+        }
+        console.log(`   ⚠️ Model ${toolModelId} returned no tool call for two-turn flow (${summary}); skipping`);
+        return;
+      }
+      if (!first) {
+        throw new Error(`Missing first completion result despite tool call (model: ${toolModelId})`);
+      }
+
+      let parsedArgs: Record<string, unknown> = {};
+      try {
+        parsedArgs = JSON.parse(firstToolCall.function.arguments || '{}');
+      } catch {
+        parsedArgs = {};
+      }
+
+      const a = Number(parsedArgs.a || 0);
+      const b = Number(parsedArgs.b || 0);
+      const sum = a + b;
+
+      const second = await client.createChatCompletion({
+        model: toolModelId,
+        messages: [
+          { role: 'user', content: 'Use add_numbers to add 12 and 8, then answer.' },
+          {
+            role: 'assistant',
+            content: first.content || null,
+            tool_calls: first.tool_calls,
+          },
+          {
+            role: 'tool',
+            tool_call_id: firstToolCall.id,
+            name: firstToolCall.function.name,
+            content: JSON.stringify({ a, b, sum }),
+          },
+        ],
+        tools,
+        tool_choice: 'auto',
+        temperature: 0,
+        max_tokens: 128,
+        tokenType: 'spark',
+      });
+
+      console.log(`   Follow-up finish reason: ${second.finishReason}`);
+      console.log(`   Follow-up content: ${second.content}`);
+
+      if (!second.content || second.content.trim().length === 0) {
+        throw new Error('Tool-calling follow-up returned empty assistant content');
+      }
+    })();
+
+    // Final test: Disconnect
     await test('Should disconnect cleanly', async () => {
       if (!client) throw new Error('Client not initialized');
       
@@ -693,8 +913,11 @@ async function runTests() {
   console.log('='.repeat(60));
   console.log(`✅ Tests passed: ${testsPassed}`);
   console.log(`❌ Tests failed: ${testsFailed}`);
-  console.log(`📊 Total tests: ${testsPassed + testsFailed}`);
-  console.log(`🎯 Success rate: ${((testsPassed / (testsPassed + testsFailed)) * 100).toFixed(1)}%`);
+  console.log(`⏭️ Tests skipped: ${testsSkipped}`);
+  console.log(`📊 Total tests (run): ${testsPassed + testsFailed}`);
+  const runTotal = testsPassed + testsFailed;
+  const successRate = runTotal > 0 ? ((testsPassed / runTotal) * 100).toFixed(1) : '0.0';
+  console.log(`🎯 Success rate: ${successRate}%`);
   console.log('='.repeat(60));
 
   process.exit(testsFailed > 0 ? 1 : 0);

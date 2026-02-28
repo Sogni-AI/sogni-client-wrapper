@@ -1,6 +1,6 @@
 {
   "name": "@sogni-ai/sogni-client-wrapper",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "description": "Enhanced Node.js wrapper for Sogni AI SDK with n8n compatibility and improved developer experience",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,7 +11,10 @@
     "prepublishOnly": "npm run build",
     "test": "node --import tsx test/basic-tests.ts",
     "test:e2e": "node --import tsx test/e2e-test.ts",
-    "test:all": "npm run test && npm run test:e2e"
+    "test:e2e:llm": "SOGNI_E2E_SCOPE=llm node --import tsx test/e2e-test.ts",
+    "typecheck:examples": "tsc --noEmit -p tsconfig.examples.json",
+    "test:examples": "npm run typecheck:examples",
+    "test:all": "npm run test && npm run test:examples && npm run test:e2e"
   },
   "keywords": [
     "sogni",
@@ -35,7 +38,7 @@
   },
   "homepage": "https://github.com/sogni-ai/sogni-client-wrapper#readme",
   "dependencies": {
-    "@sogni-ai/sogni-client": "4.0.0-alpha.69",
+    "@sogni-ai/sogni-client": "4.0.0-alpha.71",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

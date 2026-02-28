@@ -27,6 +27,12 @@ import type {
   LLMJobCost,
   LLMModelInfo,
   LLMParamConstraint,
+  ToolDefinition,
+  ToolCall,
+  ToolCallDelta,
+  ToolCallFunction,
+  ToolChoice,
+  ToolFunction,
 } from '@sogni-ai/sogni-client';
 
 import type {
@@ -64,6 +70,12 @@ export type {
   LLMJobCost,
   LLMModelInfo,
   LLMParamConstraint,
+  ToolDefinition,
+  ToolCall,
+  ToolCallDelta,
+  ToolCallFunction,
+  ToolChoice,
+  ToolFunction,
   ControlNetParams,
   ControlNetName,
   ControlNetMode,

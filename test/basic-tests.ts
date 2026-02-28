@@ -30,6 +30,12 @@ import {
   type InputMedia,
   type VideoControlNetName,
   type VideoControlNetParams,
+  buildSogniTools,
+  SogniTools,
+  isSogniToolCall,
+  parseToolCallArguments,
+  type ToolCall,
+  type ToolDefinition,
 } from '../src';
 import { SogniClient } from '@sogni-ai/sogni-client';
 
@@ -1249,13 +1255,39 @@ async function runTests() {
       throw new Error('estimateChatCost params were not mapped correctly');
     }
 
+    const tools: ToolDefinition[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'add_numbers',
+          description: 'Add two numbers',
+          parameters: {
+            type: 'object',
+            properties: {
+              a: { type: 'number' },
+              b: { type: 'number' },
+            },
+            required: ['a', 'b'],
+          },
+        },
+      },
+    ];
+
     const chatResult = await client.createChatCompletion({
       model: 'qwen3-30b-a3b-gptq-int4',
       messages: [{ role: 'user', content: 'Hello' }],
+      tools,
+      tool_choice: 'auto',
     });
 
     if (!capturedCompletionParams || capturedCompletionParams.model !== 'qwen3-30b-a3b-gptq-int4') {
       throw new Error('createChatCompletion params were not mapped correctly');
+    }
+    if (!capturedCompletionParams.tools || capturedCompletionParams.tools[0]?.function?.name !== 'add_numbers') {
+      throw new Error('createChatCompletion did not pass tools through to SDK');
+    }
+    if (capturedCompletionParams.tool_choice !== 'auto') {
+      throw new Error('createChatCompletion did not pass tool_choice through to SDK');
     }
     if ((chatResult as any).content !== 'Hello from chat') {
       throw new Error('createChatCompletion did not return expected chat result');
@@ -1382,6 +1414,67 @@ async function runTests() {
       await client.disconnect();
     } finally {
       (SogniClient as any).createInstance = originalCreateInstance;
+    }
+  })();
+
+  // Test 57: Sogni tool helper exports
+  await test('Should export Sogni tool helpers and definitions', () => {
+    if (!SogniTools.generateImage || !SogniTools.generateVideo || !SogniTools.generateMusic) {
+      throw new Error('Missing one or more built-in Sogni tool definitions');
+    }
+
+    const tools = buildSogniTools([
+      { id: 'flux1-schnell-fp8', media: 'image' },
+      { id: 'wan_v2.2-14b-fp8_t2v_lightx2v', media: 'video' },
+      { id: 'ace_step_1.5_turbo', media: 'audio' },
+    ]);
+    if (!Array.isArray(tools) || tools.length < 3) {
+      throw new Error('buildSogniTools did not return expected tool array');
+    }
+  })();
+
+  // Test 58: isSogniToolCall helper behavior
+  await test('Should identify Sogni tool call names', () => {
+    const sogniCall: ToolCall = {
+      id: 'tc-1',
+      type: 'function',
+      function: { name: 'sogni_generate_image', arguments: '{}' },
+    };
+    const customCall: ToolCall = {
+      id: 'tc-2',
+      type: 'function',
+      function: { name: 'get_weather', arguments: '{}' },
+    };
+
+    if (!isSogniToolCall(sogniCall)) {
+      throw new Error('Expected sogni_generate_image to be identified as Sogni tool');
+    }
+    if (isSogniToolCall(customCall)) {
+      throw new Error('Expected get_weather to not be identified as Sogni tool');
+    }
+  })();
+
+  // Test 59: parseToolCallArguments helper behavior
+  await test('Should parse tool call arguments safely', () => {
+    const validCall: ToolCall = {
+      id: 'tc-3',
+      type: 'function',
+      function: { name: 'add_numbers', arguments: '{"a":2,"b":3}' },
+    };
+    const invalidCall: ToolCall = {
+      id: 'tc-4',
+      type: 'function',
+      function: { name: 'add_numbers', arguments: '{invalid json' },
+    };
+
+    const parsedValid = parseToolCallArguments(validCall);
+    if (parsedValid.a !== 2 || parsedValid.b !== 3) {
+      throw new Error('Failed to parse valid tool call JSON arguments');
+    }
+
+    const parsedInvalid = parseToolCallArguments(invalidCall);
+    if (Object.keys(parsedInvalid).length !== 0) {
+      throw new Error('Invalid JSON should return an empty object');
     }
   })();
 

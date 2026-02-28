@@ -13,7 +13,7 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 - **Video Rendering Support**: Generate videos using WAN and LTX-2 models (t2v, i2v, s2v, ia2v, a2v, v2v, animate workflows).
 - **Audio Generation Support**: Generate music/audio tracks with audio models and estimate audio costs.
 - **Image Editing Support**: Edit images using Qwen models with context images for multi-reference editing.
-- **LLM Chat Support**: Use chat completions through Sogni's LLM worker network (streaming and non-streaming).
+- **LLM Chat + Tool Calling Support**: Use chat completions through Sogni's LLM worker network, including streaming and function/tool calling.
 - **Flexible Authentication**: Token, cookies, or API key authentication.
 - **Simplified Configuration**: Sensible defaults and clear configuration options.
 - **Enhanced Error Handling**: Custom error classes for better error diagnosis.
@@ -262,6 +262,109 @@ for await (const chunk of stream) {
 }
 ```
 
+### Tool Calling (Function Calling)
+
+`createChatCompletion()` accepts OpenAI-style `tools` and `tool_choice` parameters.
+
+```typescript
+import type { ChatMessage, ToolCall, ToolDefinition } from '@sogni-ai/sogni-client-wrapper';
+
+const tools: ToolDefinition[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'add_numbers',
+      description: 'Add two numbers',
+      parameters: {
+        type: 'object',
+        properties: {
+          a: { type: 'number' },
+          b: { type: 'number' },
+        },
+        required: ['a', 'b'],
+      },
+    },
+  },
+];
+
+const messages: ChatMessage[] = [
+  { role: 'user', content: 'Please add 17 and 25.' },
+];
+
+for (let turn = 0; turn < 4; turn++) {
+  const result = await client.createChatCompletion({
+    model: 'qwen3-30b-a3b-gptq-int4',
+    messages,
+    tools,
+    tool_choice: 'auto',
+    tokenType: 'spark',
+  });
+
+  const toolCalls = result.tool_calls || [];
+  if (toolCalls.length === 0) {
+    console.log('Final answer:', result.content);
+    break;
+  }
+
+  messages.push({
+    role: 'assistant',
+    content: result.content || null,
+    tool_calls: toolCalls,
+  });
+
+  for (const toolCall of toolCalls) {
+    const args = JSON.parse(toolCall.function.arguments || '{}');
+    let output = { error: `Unknown tool: ${toolCall.function.name}` };
+
+    if (toolCall.function.name === 'add_numbers') {
+      const a = Number(args.a || 0);
+      const b = Number(args.b || 0);
+      output = { a, b, sum: a + b };
+    }
+
+    messages.push({
+      role: 'tool',
+      tool_call_id: toolCall.id,
+      name: toolCall.function.name,
+      content: JSON.stringify(output),
+    });
+  }
+}
+```
+
+### Sogni Platform Tools (Image/Video/Audio via Chat)
+
+The wrapper re-exports the SDK helpers for Sogni platform tool calling:
+
+- `SogniTools`
+- `buildSogniTools()`
+- `isSogniToolCall()`
+- `parseToolCallArguments()`
+
+```typescript
+import { buildSogniTools } from '@sogni-ai/sogni-client-wrapper';
+
+const models = await client.getAvailableModels({ minWorkers: 1 });
+const tools = buildSogniTools(models.map((m) => ({ id: m.id, media: m.media })));
+
+const result = await client.createChatCompletion({
+  model: 'qwen3-30b-a3b-gptq-int4',
+  messages: [{ role: 'user', content: 'Create a dramatic sunset image' }],
+  tools,
+  tool_choice: 'auto',
+  tokenType: 'spark',
+});
+```
+
+### Full LLM Examples
+
+Run these scripts with `npx tsx`:
+
+- `examples/llm-chat-basic.ts`
+- `examples/llm-chat-streaming.ts`
+- `examples/llm-tool-calling-custom.ts`
+- `examples/llm-tool-calling-sogni-tools.ts` (supports `--dry-run`)
+
 ## Image Editing with Context Images
 
 The wrapper supports image editing using Qwen models that accept context images for multi-reference editing. This allows you to transform, combine, or edit images based on reference inputs.
@@ -429,10 +532,11 @@ const client = new SogniClientWrapper({
 - `getSizePresets(network: 'fast' \| 'relaxed', modelId: string): Promise<SizePreset[]>`: Gets available output size presets for a model.
 - `estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate>`: Estimates video generation costs (frames/duration, fps, steps, size).
 - `estimateAudioCost(params: AudioCostEstimateParams): Promise<CostEstimate>`: Estimates audio generation costs (duration, steps, count).
-- `createChatCompletion(params)`: Creates chat completions (streaming or non-streaming).
+- `createChatCompletion(params)`: Creates chat completions (streaming or non-streaming, including `tools` / `tool_choice` function calling).
 - `estimateChatCost(params)`: Estimates chat completion cost.
 - `getAvailableChatModels()`: Returns available chat/LLM models.
 - `waitForChatModels(timeout?)`: Waits until chat/LLM models are available.
+- SDK helper exports: `ChatStream`, `SogniTools`, `buildSogniTools`, `isSogniToolCall`, `parseToolCallArguments`.
 
 ### Event Handling
 
@@ -549,7 +653,7 @@ try {
 
 ## Testing
 
-The library includes both basic unit tests and end-to-end tests.
+The library includes basic unit tests, example type-checking, and end-to-end tests.
 
 ### Running Tests
 
@@ -557,8 +661,14 @@ The library includes both basic unit tests and end-to-end tests.
 # Run basic unit tests (no credentials required)
 npm test
 
+# Type-check all example scripts (including LLM/tool-calling examples)
+npm run test:examples
+
 # Run end-to-end tests (requires Sogni API credentials)
 npm run test:e2e
+
+# Run only LLM/tool-calling e2e tests
+npm run test:e2e:llm
 
 # Run all tests
 npm run test:all
@@ -581,6 +691,10 @@ To run the end-to-end tests, you need to provide your Sogni API credentials via 
    # SOGNI_LLM_MODEL=qwen3-30b-a3b-gptq-int4
    # Optional: fail suite if LLM tests cannot run (default: skip LLM tests if unavailable)
    # SOGNI_REQUIRE_LLM_E2E=true
+   # Optional: fail suite if tool-calling tests cannot get tool_calls
+   # SOGNI_REQUIRE_TOOL_CALL_E2E=true
+   # Optional: run only LLM/tool-calling e2e tests
+   # SOGNI_E2E_SCOPE=llm
    ```
 
 3. Run the e2e tests:
@@ -612,7 +726,9 @@ This library is written in TypeScript and exports all necessary types for a full
 - `JobCompletedData`: Data emitted when an individual job completes.
 - `JobFailedData`: Data emitted when an individual job fails.
 - `ChatCompletionParams` / `ChatCompletionResult` / `ChatCompletionChunk`: Types for chat completions.
+- `ToolDefinition` / `ToolChoice` / `ToolCall` / `ToolCallDelta`: Types for LLM tool/function calling.
 - `LLMModelInfo` / `LLMCostEstimation`: Types for chat model metadata and cost estimates.
+- `SogniTools` / `buildSogniTools` / `isSogniToolCall` / `parseToolCallArguments`: Helper exports for platform tool calling workflows.
 - `ProjectEvent`: Raw project events from the SDK.
 - `JobEvent`: Raw job events from the SDK (includes ETA updates).
 

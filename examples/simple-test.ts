@@ -53,9 +53,11 @@ async function testClient() {
     // Show top 5 models by worker count
     console.log('\nTop 5 Most Popular Models:');
     models.slice(0, 5).forEach((model, index) => {
+      const recommendedSteps = model.recommendedSettings?.steps ?? 'n/a';
+      const recommendedGuidance = model.recommendedSettings?.guidance ?? 'n/a';
       console.log(`  ${index + 1}. ${model.id}`);
       console.log(`     Workers: ${model.workerCount}`);
-      console.log(`     Recommended: ${model.recommendedSettings.steps} steps, ${model.recommendedSettings.guidance} guidance`);
+      console.log(`     Recommended: ${recommendedSteps} steps, ${recommendedGuidance} guidance`);
     });
 
   } catch (error) {
@@ -72,4 +74,3 @@ async function testClient() {
 
 // Run the test
 testClient().catch(console.error);
-

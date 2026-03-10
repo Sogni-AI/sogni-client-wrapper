@@ -1186,7 +1186,7 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   private isLtx2Model(modelId: string): boolean {
-    return modelId.startsWith('ltx2-');
+    return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
   }
 
   private calculateVideoFrames(modelId: string, duration: number, fps: number): number {

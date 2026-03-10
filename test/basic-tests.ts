@@ -1047,7 +1047,50 @@ async function runTests() {
     }
   })();
 
-  // Test 51: estimateAudioCost call mapping
+  // Test 51: estimateVideoCost treats LTX 2.3 like the LTX family
+  await test('Should apply LTX-family estimateVideoCost rules to LTX 2.3 models', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateVideoCost({
+      modelId: 'ltx23-22b-fp8_t2v_distilled',
+      width: 768,
+      height: 768,
+      duration: 20,
+      fps: 24,
+      steps: 20,
+      numberOfMedia: 1,
+    });
+
+    if (!capturedEstimateParams) {
+      throw new Error('Did not capture estimate params');
+    }
+    if (capturedEstimateParams.duration !== 20) {
+      throw new Error(`Expected duration=20, got ${capturedEstimateParams.duration}`);
+    }
+    if (capturedEstimateParams.frames !== 481) {
+      throw new Error(`Expected LTX 2.3 frames=481, got ${capturedEstimateParams.frames}`);
+    }
+  })();
+
+  // Test 52: estimateAudioCost call mapping
   await test('Should map estimateAudioCost params to SDK', async () => {
     const client = new SogniClientWrapper({
       username: 'test-user',
@@ -1085,7 +1128,7 @@ async function runTests() {
     }
   })();
 
-  // Test 52: createAudioProject returns audio URLs
+  // Test 53: createAudioProject returns audio URLs
   await test('Should return audioUrls for completed audio projects', async () => {
     const client = new SogniClientWrapper({
       username: 'test-user',

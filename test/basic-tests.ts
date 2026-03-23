@@ -26,6 +26,9 @@ import {
   type CookieAuthConfig,
   type ApiKeyAuthConfig,
   type AuthType,
+  type CurrentAccount,
+  type ContentPart,
+  type ImageUrlContentPart,
   type QwenImageEditConfig,
   type InputMedia,
   type VideoControlNetName,
@@ -36,6 +39,9 @@ import {
   parseToolCallArguments,
   type ToolCall,
   type ToolDefinition,
+  type ToolExecutionProgress,
+  type ToolExecutionResult,
+  type WalletBalanceInfo,
 } from '../src';
 import { SogniClient } from '@sogni-ai/sogni-client';
 
@@ -225,6 +231,48 @@ async function runTests() {
       password: 'test',
     };
     if (!config) throw new Error('Type not working');
+  })();
+
+  // Test 12b: latest chat/account helper type exports
+  await test('Should export latest chat and account helper types', () => {
+    const imagePart: ImageUrlContentPart = {
+      type: 'image_url',
+      image_url: {
+        url: 'https://example.com/test.png',
+        detail: 'high',
+      },
+    };
+    const content: ContentPart[] = [
+      { type: 'text', text: 'Describe this image.' },
+      imagePart,
+    ];
+    const progress: ToolExecutionProgress = {
+      status: 'creating',
+      percent: 0,
+    };
+    const result: ToolExecutionResult = {
+      toolCallId: 'tool-1',
+      toolName: 'sogni_generate_image',
+      success: true,
+      resultUrls: ['https://example.com/result.png'],
+      content: '{"ok":true}',
+    };
+    const walletBalance: WalletBalanceInfo = {
+      walletAddress: '0x123',
+      provider: 'base',
+      sogni: '1.0',
+      spark: '2.0',
+      ether: '0.01',
+      fetchedAt: new Date(),
+    };
+    const account: CurrentAccount | null = null;
+
+    if (content.length !== 2 || progress.status !== 'creating') {
+      throw new Error('Latest helper types are not behaving as expected');
+    }
+    if (!result.success || walletBalance.provider !== 'base' || account !== null) {
+      throw new Error('Latest helper types were not exported correctly');
+    }
   })();
 
   // Test 13: Disconnect without connection
@@ -1624,6 +1672,159 @@ async function runTests() {
     }
     if (a2vParams.referenceImage !== undefined) {
       throw new Error('a2v should not inject a referenceImage');
+    }
+  })();
+
+  // Test 62: current account and tracked projects passthrough
+  await test('Should expose current account and tracked projects from the SDK client', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    const currentAccount = { walletAddress: '0xabc' } as any;
+    const trackedProjects = [{ id: 'project-1' }, { id: 'project-2' }] as any;
+
+    (client as any).client = {
+      account: {
+        currentAccount,
+      },
+      projects: {
+        trackedProjects,
+      },
+    };
+
+    if (client.getCurrentAccount() !== currentAccount) {
+      throw new Error('getCurrentAccount did not return the SDK current account instance');
+    }
+    if (client.getTrackedProjects() !== trackedProjects) {
+      throw new Error('getTrackedProjects did not return the SDK tracked projects list');
+    }
+  })();
+
+  // Test 63: wallet balance passthrough
+  await test('Should fetch wallet balance using SDK walletBalance and current wallet address', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedWalletAddress: string | undefined;
+    let capturedProvider: string | undefined;
+
+    (client as any).client = {
+      account: {
+        currentAccount: {
+          walletAddress: '0xfeedface',
+        },
+        walletBalance: async (walletAddress: string, provider: 'base' | 'etherlink') => {
+          capturedWalletAddress = walletAddress;
+          capturedProvider = provider;
+          return {
+            sogni: '12.5',
+            spark: '4.0',
+            ether: '0.25',
+          };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    const balance = await client.getWalletBalance(undefined, 'etherlink');
+
+    if (capturedWalletAddress !== '0xfeedface') {
+      throw new Error(`Expected wallet address 0xfeedface, got ${capturedWalletAddress}`);
+    }
+    if (capturedProvider !== 'etherlink') {
+      throw new Error(`Expected provider etherlink, got ${capturedProvider}`);
+    }
+    if (balance.walletAddress !== '0xfeedface' || balance.provider !== 'etherlink') {
+      throw new Error('getWalletBalance did not add wrapper metadata to the SDK response');
+    }
+  })();
+
+  // Test 64: chat tool execution passthrough
+  await test('Should execute chat tools through the SDK tools API', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedSingleToolCall: ToolCall | null = null;
+    let capturedMultiToolCalls: ToolCall[] | null = null;
+
+    const singleResult = {
+      toolCallId: 'call-1',
+      toolName: 'sogni_generate_image',
+      success: true,
+      resultUrls: ['https://example.com/image.png'],
+      content: '{"ok":true}',
+    };
+    const multiResult = [
+      {
+        toolCallId: 'call-2',
+        toolName: 'custom_tool',
+        success: true,
+        resultUrls: [],
+        content: '{"custom":true}',
+      },
+    ];
+
+    (client as any).client = {
+      chat: {
+        tools: {
+          execute: async (toolCall: ToolCall) => {
+            capturedSingleToolCall = toolCall;
+            return singleResult;
+          },
+          executeAll: async (toolCalls: ToolCall[]) => {
+            capturedMultiToolCalls = toolCalls;
+            return multiResult;
+          },
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    const singleToolCall: ToolCall = {
+      id: 'call-1',
+      type: 'function',
+      function: {
+        name: 'sogni_generate_image',
+        arguments: '{"prompt":"sunset"}',
+      },
+    };
+    const multiToolCalls: ToolCall[] = [
+      {
+        id: 'call-2',
+        type: 'function',
+        function: {
+          name: 'custom_tool',
+          arguments: '{}',
+        },
+      },
+    ];
+
+    const executedSingle = await client.executeChatTool(singleToolCall);
+    const executedMultiple = await client.executeChatTools(multiToolCalls);
+
+    if (capturedSingleToolCall !== singleToolCall) {
+      throw new Error('executeChatTool did not forward the tool call to the SDK');
+    }
+    if (capturedMultiToolCalls !== multiToolCalls) {
+      throw new Error('executeChatTools did not forward the tool calls array to the SDK');
+    }
+    if (executedSingle !== singleResult || executedMultiple !== multiResult) {
+      throw new Error('Chat tool execution methods did not return SDK results');
     }
   })();
 

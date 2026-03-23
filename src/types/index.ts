@@ -6,6 +6,7 @@ import type {
   Project,
   Job,
   AvailableModel,
+  CurrentAccount as SogniCurrentAccount,
   ImageProjectParams as SogniImageProjectParams,
   VideoProjectParams as SogniVideoProjectParams,
   AudioProjectParams as SogniAudioProjectParams,
@@ -23,6 +24,9 @@ import type {
   ChatCompletionResult,
   ChatJobStateEvent,
   ChatTokenUsage,
+  ContentPart,
+  TextContentPart,
+  ImageUrlContentPart,
   LLMCostEstimation,
   LLMJobCost,
   LLMModelInfo,
@@ -33,6 +37,10 @@ import type {
   ToolCallFunction,
   ToolChoice,
   ToolFunction,
+  ToolExecutionOptions,
+  ToolExecutionProgress,
+  ToolExecutionResult,
+  ToolHistoryEntry,
 } from '@sogni-ai/sogni-client';
 
 import type {
@@ -51,6 +59,7 @@ export type {
   Project,
   Job,
   AvailableModel,
+  SogniCurrentAccount as CurrentAccount,
   SupernetType,
   TokenType,
   ImageOutputFormat,
@@ -66,6 +75,9 @@ export type {
   ChatCompletionResult,
   ChatJobStateEvent,
   ChatTokenUsage,
+  ContentPart,
+  TextContentPart,
+  ImageUrlContentPart,
   LLMCostEstimation,
   LLMJobCost,
   LLMModelInfo,
@@ -76,6 +88,10 @@ export type {
   ToolCallFunction,
   ToolChoice,
   ToolFunction,
+  ToolExecutionOptions,
+  ToolExecutionProgress,
+  ToolExecutionResult,
+  ToolHistoryEntry,
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
@@ -345,6 +361,45 @@ export interface CostEstimate {
 
   /** Cost in Sogni tokens */
   sogni: string;
+}
+
+/**
+ * Wallet balance provider
+ */
+export type WalletBalanceProvider = 'base' | 'etherlink';
+
+/**
+ * Wallet balance response
+ */
+export interface WalletBalanceInfo {
+  /** Wallet address queried */
+  walletAddress: string;
+
+  /** Blockchain provider used for the lookup */
+  provider: WalletBalanceProvider;
+
+  /** Wallet SOGNI balance */
+  sogni: string;
+
+  /** Wallet Spark balance */
+  spark: string;
+
+  /** Wallet native token balance (ETH / XTZ-equivalent string from provider API) */
+  ether: string;
+
+  /** Timestamp when the balance was fetched */
+  fetchedAt: Date;
+}
+
+/**
+ * Options for executing multiple chat tool calls
+ */
+export interface ExecuteChatToolsOptions extends ToolExecutionOptions {
+  /** Handler for non-Sogni tool calls */
+  onToolCall?: (toolCall: ToolCall) => Promise<string>;
+
+  /** Per-tool progress callback */
+  onToolProgress?: (toolCall: ToolCall, progress: ToolExecutionProgress) => void;
 }
 
 /**

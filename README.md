@@ -14,7 +14,10 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 - **Audio Generation Support**: Generate music/audio tracks with audio models and estimate audio costs.
 - **Image Editing Support**: Edit images using Qwen models with context images for multi-reference editing.
 - **LLM Chat + Tool Calling Support**: Use chat completions through Sogni's LLM worker network, including streaming and function/tool calling.
+- **Vision Chat + Thinking Controls**: Send OpenAI-style multimodal `image_url` messages and toggle reasoning with `think`.
+- **Chat Tool Execution Helpers**: Execute Sogni platform tool calls manually from the wrapper, including streaming follow-up loops.
 - **Flexible Authentication**: Token, cookies, or API key authentication.
+- **Wallet + Tracking Utilities**: Query Base/Etherlink wallet balances and inspect SDK-tracked projects/current account state.
 - **Simplified Configuration**: Sensible defaults and clear configuration options.
 - **Enhanced Error Handling**: Custom error classes for better error diagnosis.
 - **Type-Safe**: Written entirely in TypeScript with full type definitions.
@@ -381,12 +384,68 @@ const result = await client.createChatCompletion({
 });
 ```
 
+### Vision Chat and Thinking Mode
+
+```typescript
+const result = await client.createChatCompletion({
+  model: 'qwen3.5-35b-a3b-gguf-q4km',
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Describe the scene and read any visible text.' },
+        {
+          type: 'image_url',
+          image_url: {
+            url: 'https://example.com/photo.jpg',
+            detail: 'high',
+          },
+        },
+      ],
+    },
+  ],
+  think: false,
+  max_tokens: 300,
+  tokenType: 'spark',
+});
+
+console.log(result.content);
+```
+
+### Manual Chat Tool Execution
+
+Useful for streaming or custom multi-round tool loops where you want the wrapper to execute returned Sogni tool calls directly.
+
+```typescript
+const result = await client.createChatCompletion({
+  model: 'qwen3-30b-a3b-gptq-int4',
+  messages: [{ role: 'user', content: 'Generate a neon cyberpunk city image.' }],
+  tools: buildSogniTools(
+    (await client.getAvailableModels()).map((model) => ({ id: model.id, media: model.media }))
+  ),
+  tool_choice: 'auto',
+  tokenType: 'spark',
+});
+
+if (result.tool_calls?.length) {
+  const toolResults = await client.executeChatTools(result.tool_calls, {
+    tokenType: 'spark',
+    onToolProgress: (toolCall, progress) => {
+      console.log(toolCall.function.name, progress.status, progress.percent);
+    },
+  });
+
+  console.log(toolResults);
+}
+```
+
 ### Full LLM Examples
 
 Run these scripts with `npx tsx`:
 
 - `examples/llm-chat-basic.ts`
 - `examples/llm-chat-streaming.ts`
+- `examples/llm-chat-vision.ts --image ./photo.jpg`
 - `examples/llm-tool-calling-custom.ts`
 - `examples/llm-tool-calling-sogni-tools.ts` (supports `--dry-run`)
 
@@ -554,14 +613,19 @@ const client = new SogniClientWrapper({
 - `getModel(modelId: string): Promise<ModelInfo>`: Retrieves details for a specific model.
 - `getMostPopularModel(): Promise<ModelInfo>`: A helper to get the model with the most active workers.
 - `getBalance(): Promise<BalanceInfo>`: Fetches your current SOGNI and Spark token balances using the `account.refreshBalance()` method.
+- `getWalletBalance(walletAddress?, provider?): Promise<WalletBalanceInfo>`: Fetches Base or Etherlink wallet balances. When `walletAddress` is omitted, the wrapper uses the connected account wallet.
+- `getCurrentAccount(): CurrentAccount | null`: Returns the SDK's current account snapshot if the client has connected.
+- `getTrackedProjects(): Project[]`: Returns the projects currently tracked by the underlying SDK instance.
 - `getSizePresets(network: 'fast' \| 'relaxed', modelId: string): Promise<SizePreset[]>`: Gets available output size presets for a model.
 - `estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate>`: Estimates video generation costs (frames/duration, fps, steps, size).
 - `estimateAudioCost(params: AudioCostEstimateParams): Promise<CostEstimate>`: Estimates audio generation costs (duration, steps, count).
 - `createChatCompletion(params)`: Creates chat completions (streaming or non-streaming, including `tools` / `tool_choice` function calling).
+- `executeChatTool(toolCall, options?)`: Executes a single Sogni platform tool call returned by chat.
+- `executeChatTools(toolCalls, options?)`: Executes multiple tool calls, including mixed Sogni/custom tool flows.
 - `estimateChatCost(params)`: Estimates chat completion cost.
 - `getAvailableChatModels()`: Returns available chat/LLM models.
 - `waitForChatModels(timeout?)`: Waits until chat/LLM models are available.
-- SDK helper exports: `ChatStream`, `SogniTools`, `buildSogniTools`, `isSogniToolCall`, `parseToolCallArguments`.
+- SDK helper exports: `ChatStream`, `ChatToolsApi`, `CurrentAccount`, `SogniTools`, `buildSogniTools`, `isSogniToolCall`, `parseToolCallArguments`.
 
 ### Event Handling
 
@@ -751,8 +815,11 @@ This library is written in TypeScript and exports all necessary types for a full
 - `JobCompletedData`: Data emitted when an individual job completes.
 - `JobFailedData`: Data emitted when an individual job fails.
 - `ChatCompletionParams` / `ChatCompletionResult` / `ChatCompletionChunk`: Types for chat completions.
+- `ContentPart` / `ImageUrlContentPart`: Types for multimodal chat content.
 - `ToolDefinition` / `ToolChoice` / `ToolCall` / `ToolCallDelta`: Types for LLM tool/function calling.
+- `ToolExecutionOptions` / `ToolExecutionProgress` / `ToolExecutionResult` / `ToolHistoryEntry`: Types for manual or automatic chat tool execution.
 - `LLMModelInfo` / `LLMCostEstimation`: Types for chat model metadata and cost estimates.
+- `WalletBalanceInfo`: Wallet balance response shape for Base/Etherlink lookups.
 - `SogniTools` / `buildSogniTools` / `isSogniToolCall` / `parseToolCallArguments`: Helper exports for platform tool calling workflows.
 - `ProjectEvent`: Raw project events from the SDK.
 - `JobEvent`: Raw job events from the SDK (includes ETA updates).

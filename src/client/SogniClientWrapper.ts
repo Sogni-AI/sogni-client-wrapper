@@ -8,6 +8,7 @@ import { SogniClient, Project, Job, ChatStream } from '@sogni-ai/sogni-client';
 import type {
   SogniClientConfig,
   AuthType,
+  CurrentAccount,
   ProjectConfig,
   ImageProjectConfig,
   VideoProjectConfig,
@@ -35,9 +36,14 @@ import type {
   ChatCompletionChunk,
   ChatCompletionResult,
   ChatJobStateEvent,
+  ToolCall,
+  ToolExecutionOptions,
+  ToolExecutionResult,
+  ExecuteChatToolsOptions,
   LLMCostEstimation,
   LLMModelInfo,
   ChatErrorData,
+  WalletBalanceInfo,
 } from '../types';
 import { ClientEvent } from '../types';
 import {
@@ -442,6 +448,42 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
+   * Get the current tracked account snapshot, if connected
+   */
+  getCurrentAccount(): CurrentAccount | null {
+    return this.client?.account.currentAccount || null;
+  }
+
+  /**
+   * Get projects currently tracked by the underlying SDK instance
+   */
+  getTrackedProjects(): Project[] {
+    return this.client?.projects.trackedProjects || [];
+  }
+
+  /**
+   * Execute a single Sogni chat tool call
+   */
+  async executeChatTool(
+    toolCall: ToolCall,
+    options: ToolExecutionOptions = {}
+  ): Promise<ToolExecutionResult> {
+    await this.ensureConnected();
+    return this.client!.chat.tools.execute(toolCall, options);
+  }
+
+  /**
+   * Execute multiple chat tool calls, including mixed Sogni and custom tools
+   */
+  async executeChatTools(
+    toolCalls: ToolCall[],
+    options: ExecuteChatToolsOptions = {}
+  ): Promise<ToolExecutionResult[]> {
+    await this.ensureConnected();
+    return this.client!.chat.tools.executeAll(toolCalls, options);
+  }
+
+  /**
    * Get account balance
    */
   async getBalance(): Promise<BalanceInfo> {
@@ -457,6 +499,31 @@ export class SogniClientWrapper extends EventEmitter {
       sogni: parseFloat(balances.sogni.net) || 0,
       spark: parseFloat(balances.spark.net) || 0,
       lastUpdated: new Date(),
+    };
+  }
+
+  /**
+   * Get blockchain wallet balance for the current or specified wallet address
+   */
+  async getWalletBalance(
+    walletAddress?: string,
+    provider: WalletBalanceInfo['provider'] = 'base'
+  ): Promise<WalletBalanceInfo> {
+    await this.ensureConnected();
+
+    const resolvedWalletAddress = walletAddress || this.client!.account.currentAccount.walletAddress;
+    if (!resolvedWalletAddress) {
+      throw new SogniValidationError(
+        'Wallet address is required when the current account does not expose one yet'
+      );
+    }
+
+    const balance = await this.client!.account.walletBalance(resolvedWalletAddress, provider);
+    return {
+      ...balance,
+      walletAddress: resolvedWalletAddress,
+      provider,
+      fetchedAt: new Date(),
     };
   }
 

@@ -193,6 +193,31 @@ const animateResult = await client.createVideoProject({
   frames: 90,
   fps: 30,
 });
+
+// LTX image+audio-to-video (ia2v)
+const ia2vResult = await client.createVideoProject({
+  modelId: 'ltx2-13b-fp8_ia2v_distilled',
+  positivePrompt: 'A cinematic portrait delivering the spoken line naturally',
+  referenceImage: portraitBuffer,
+  referenceAudio: speechBuffer,
+  audioStart: 0,
+  audioDuration: 5,
+  fps: 24,
+  duration: 5,
+  numberOfMedia: 1,
+});
+
+// LTX audio-to-video (a2v)
+const a2vResult = await client.createVideoProject({
+  modelId: 'ltx23-22b-fp8_a2v_distilled',
+  positivePrompt: 'Abstract visuals that pulse with the soundtrack',
+  referenceAudio: soundtrackBuffer,
+  audioStart: 2,
+  audioDuration: 6,
+  fps: 24,
+  duration: 6,
+  numberOfMedia: 1,
+});
 ```
 
 ### Convenience Methods

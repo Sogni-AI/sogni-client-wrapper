@@ -1521,6 +1521,112 @@ async function runTests() {
     }
   })();
 
+  // Test 60: validate LTX audio-driven video workflow fields
+  await test('Should accept ia2v and a2v video workflow audio fields', () => {
+    const ia2vConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'ltx2-13b-fp8_ia2v_distilled',
+      positivePrompt: 'Lip synced cinematic close-up',
+      numberOfMedia: 1,
+      referenceImage: true,
+      referenceAudio: true,
+      audioStart: 1.5,
+      audioDuration: 4,
+      fps: 24,
+      duration: 5,
+    };
+
+    const a2vConfig: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'ltx23-22b-fp8_a2v_distilled',
+      positivePrompt: 'Abstract reactive visuals matching the beat',
+      numberOfMedia: 1,
+      referenceAudio: true,
+      audioStart: 0,
+      audioDuration: 6,
+      fps: 24,
+      duration: 5,
+    };
+
+    validateProjectConfig(ia2vConfig);
+    validateProjectConfig(a2vConfig);
+  })();
+
+  // Test 61: audio-driven LTX workflows should forward reference audio fields
+  await test('Should forward ia2v and a2v referenceAudio params to SDK create', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    const capturedParams: any[] = [];
+    const projectStub = {
+      id: 'project-audio-driven-video',
+      on: () => {},
+      waitForCompletion: async () => [],
+    };
+
+    (client as any).client = {
+      projects: {
+        create: async (params: any) => {
+          capturedParams.push(params);
+          return projectStub;
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.createVideoProject({
+      modelId: 'ltx2-13b-fp8_ia2v_distilled',
+      positivePrompt: 'A person singing in sync with the audio',
+      numberOfMedia: 1,
+      referenceImage: true,
+      referenceAudio: true,
+      audioStart: 2,
+      audioDuration: 5,
+      fps: 24,
+      duration: 5,
+      waitForCompletion: false,
+    });
+
+    await client.createVideoProject({
+      modelId: 'ltx23-22b-fp8_a2v_distilled',
+      positivePrompt: 'Colorful motion graphics reacting to narration',
+      numberOfMedia: 1,
+      referenceAudio: true,
+      audioStart: 0.5,
+      audioDuration: 3,
+      fps: 24,
+      duration: 5,
+      waitForCompletion: false,
+    });
+
+    if (capturedParams.length !== 2) {
+      throw new Error(`Expected 2 SDK create calls, got ${capturedParams.length}`);
+    }
+
+    const [ia2vParams, a2vParams] = capturedParams;
+    if (ia2vParams.referenceImage !== true || ia2vParams.referenceAudio !== true) {
+      throw new Error('ia2v reference media was not forwarded to the SDK');
+    }
+    if (ia2vParams.audioStart !== 2 || ia2vParams.audioDuration !== 5) {
+      throw new Error('ia2v audio timing fields were not forwarded to the SDK');
+    }
+    if (a2vParams.referenceAudio !== true) {
+      throw new Error('a2v referenceAudio was not forwarded to the SDK');
+    }
+    if (a2vParams.audioStart !== 0.5 || a2vParams.audioDuration !== 3) {
+      throw new Error('a2v audio timing fields were not forwarded to the SDK');
+    }
+    if (a2vParams.referenceImage !== undefined) {
+      throw new Error('a2v should not inject a referenceImage');
+    }
+  })();
+
   // Summary
   console.log('\n' + '='.repeat(50));
   console.log(`✅ Tests passed: ${testsPassed}`);

@@ -46,6 +46,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function fetchMediaBuffer(url: string, label: string): Promise<Buffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${label}: ${response.status} ${response.statusText}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 function test(name: string, fn: () => void | Promise<void>) {
   return async () => {
     if (
@@ -145,8 +155,11 @@ async function runTests() {
   let client: SogniClientWrapper | null = null;
   let catImageUrl: string | undefined; // Store the cat image URL for video test
   let catImageBuffer: Buffer | undefined;
+  let referenceAudioUrl: string | undefined;
+  let referenceAudioBuffer: Buffer | undefined;
   let referenceVideoUrl: string | undefined;
   let availableModelIds: string[] = [];
+  let availableModels: Array<{ id: string; media?: string; recommendedSettings?: { steps?: number } }> = [];
   let selectedLlmModelId: string | undefined;
   let availableLlmModels: Record<string, { workers?: number }> = {};
   let selectedToolCallingModelId: string | undefined;
@@ -195,6 +208,7 @@ async function runTests() {
       if (!client) throw new Error('Client not initialized');
       
       const models = await client.getAvailableModels({ sortByWorkers: true });
+      availableModels = models;
       availableModelIds = models.map((m) => m.id);
       console.log(`   Found ${models.length} models`);
       
@@ -353,14 +367,7 @@ async function runTests() {
       console.log('   Fetching reference image...');
 
       // Fetch the image from the URL
-      const imageResponse = await fetch(catImageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch reference image: ${imageResponse.statusText}`);
-      }
-
-      // Convert to Buffer for the SDK
-      const arrayBuffer = await imageResponse.arrayBuffer();
-      const imageBuffer = Buffer.from(arrayBuffer);
+      const imageBuffer = await fetchMediaBuffer(catImageUrl, 'reference image');
       catImageBuffer = imageBuffer;
       console.log(`   Reference image fetched: ${(imageBuffer.length / 1024).toFixed(2)} KB`);
 
@@ -490,12 +497,7 @@ async function runTests() {
       console.log('   Workflow: referenceVideo + pose ControlNet');
       console.log('   Fetching reference video...');
 
-      const videoResponse = await fetch(referenceVideoUrl);
-      if (!videoResponse.ok) {
-        throw new Error(`Failed to fetch reference video: ${videoResponse.statusText}`);
-      }
-      const videoArrayBuffer = await videoResponse.arrayBuffer();
-      const referenceVideoBuffer = Buffer.from(videoArrayBuffer);
+      const referenceVideoBuffer = await fetchMediaBuffer(referenceVideoUrl, 'reference video');
       console.log(`   Reference video fetched: ${(referenceVideoBuffer.length / 1024).toFixed(2)} KB`);
       console.log('   Generating v2v video...');
 
@@ -563,12 +565,7 @@ async function runTests() {
       console.log('   Workflow: animate-replace with sam2Coordinates');
       console.log('   Fetching reference video...');
 
-      const videoResponse = await fetch(referenceVideoUrl);
-      if (!videoResponse.ok) {
-        throw new Error(`Failed to fetch reference video: ${videoResponse.statusText}`);
-      }
-      const videoArrayBuffer = await videoResponse.arrayBuffer();
-      const referenceVideoBuffer = Buffer.from(videoArrayBuffer);
+      const referenceVideoBuffer = await fetchMediaBuffer(referenceVideoUrl, 'reference video');
       console.log(`   Reference video fetched: ${(referenceVideoBuffer.length / 1024).toFixed(2)} KB`);
       console.log('   Generating animate-replace video...');
 
@@ -611,6 +608,176 @@ async function runTests() {
       }
       if (!result.videoUrls || result.videoUrls.length === 0) {
         throw new Error('No video URLs returned from animate-replace generation');
+      }
+    })();
+
+    await test('Should generate audio for LTX audio-driven video workflows', async () => {
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      const audioDrivenModelAvailable = availableModelIds.some(
+        (id) => (id.startsWith('ltx2-') || id.startsWith('ltx23-')) && (id.includes('_ia2v') || id.includes('_a2v'))
+      );
+      if (!audioDrivenModelAvailable) {
+        console.log('   ⚠️ No LTX ia2v/a2v model currently available, skipping audio reference generation');
+        return;
+      }
+
+      const audioModel = availableModels.find(
+        (model) => model.media === 'audio' || model.id.toLowerCase().includes('ace-step')
+      );
+      if (!audioModel) {
+        console.log('   ⚠️ No audio generation model currently available, skipping audio reference generation');
+        return;
+      }
+
+      console.log(`   Using audio model: ${audioModel.id}`);
+      console.log('   Generating short speech-like reference audio...');
+
+      const result = await client.createAudioProject({
+        modelId: audioModel.id,
+        positivePrompt: 'A clean spoken-word style vocal counting one two three four over a light metronome',
+        numberOfMedia: 1,
+        duration: 10,
+        steps: audioModel.recommendedSettings?.steps || 20,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 300000,
+      });
+
+      console.log(`   Audio generation completed: ${result.completed}`);
+      console.log(`   Audio files generated: ${result.audioUrls?.length || 0}`);
+      if (!result.audioUrls || result.audioUrls.length === 0) {
+        throw new Error('No audio URLs returned from audio generation');
+      }
+
+      referenceAudioUrl = result.audioUrls[0];
+      console.log(`   Audio URL: ${referenceAudioUrl}`);
+      referenceAudioBuffer = await fetchMediaBuffer(referenceAudioUrl, 'reference audio');
+      console.log(`   Reference audio fetched: ${(referenceAudioBuffer.length / 1024).toFixed(2)} KB`);
+    })();
+
+    await test('Should generate LTX ia2v video with reference image and audio', async () => {
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      const ia2vModelId = availableModelIds.find(
+        (id) => (id.startsWith('ltx2-') || id.startsWith('ltx23-')) && id.includes('_ia2v')
+      );
+      if (!ia2vModelId) {
+        console.log('   ⚠️ No LTX ia2v model currently available, skipping test');
+        return;
+      }
+      if (!catImageBuffer || !referenceAudioBuffer) {
+        console.log('   ⚠️ Missing reference image or audio asset for ia2v, skipping test');
+        return;
+      }
+
+      console.log(`   Using model: ${ia2vModelId}`);
+      console.log('   Workflow: referenceImage + referenceAudio');
+      console.log('   Generating ia2v video...');
+
+      let progressCount = 0;
+      const result = await client.createVideoProject({
+        modelId: ia2vModelId,
+        positivePrompt: 'A cinematic portrait speaking naturally in sync with the audio, subtle head movement',
+        negativePrompt: 'blurry, low quality, distorted face, broken lip sync',
+        referenceImage: catImageBuffer,
+        referenceAudio: referenceAudioBuffer,
+        audioStart: 0,
+        audioDuration: 5,
+        width: 768,
+        height: 768,
+        fps: 24,
+        duration: 5,
+        steps: 20,
+        numberOfMedia: 1,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 420000,
+        onProgress: (progress) => {
+          progressCount++;
+          if (progressCount % 5 === 0) {
+            console.log(`   Progress: ${progress.percentage}%`);
+          }
+        },
+      });
+
+      console.log(`   ia2v generation completed: ${result.completed}`);
+      console.log(`   Project ID: ${result.project.id}`);
+      console.log(`   Videos generated: ${result.videoUrls?.length || 0}`);
+      if (result.videoUrls && result.videoUrls.length > 0) {
+        console.log(`   Video URL: ${result.videoUrls[0]}`);
+      }
+
+      if (!result.completed) {
+        throw new Error('ia2v generation did not complete');
+      }
+      if (!result.videoUrls || result.videoUrls.length === 0) {
+        throw new Error('No video URLs returned from ia2v generation');
+      }
+    })();
+
+    await test('Should generate LTX a2v video with reference audio only', async () => {
+      await sleep(10000);
+      if (!client) throw new Error('Client not initialized');
+
+      const a2vModelId = availableModelIds.find(
+        (id) => (id.startsWith('ltx2-') || id.startsWith('ltx23-')) && id.includes('_a2v') && !id.includes('_ia2v')
+      );
+      if (!a2vModelId) {
+        console.log('   ⚠️ No LTX a2v model currently available, skipping test');
+        return;
+      }
+      if (!referenceAudioBuffer) {
+        console.log('   ⚠️ Missing reference audio asset for a2v, skipping test');
+        return;
+      }
+
+      console.log(`   Using model: ${a2vModelId}`);
+      console.log('   Workflow: referenceAudio only');
+      console.log('   Generating a2v video...');
+
+      let progressCount = 0;
+      const result = await client.createVideoProject({
+        modelId: a2vModelId,
+        positivePrompt: 'Reactive abstract visuals pulsing in sync with the speech rhythm',
+        negativePrompt: 'blurry, low quality, visual noise, glitchy artifacts',
+        referenceAudio: referenceAudioBuffer,
+        audioStart: 0,
+        audioDuration: 5,
+        width: 768,
+        height: 768,
+        fps: 24,
+        duration: 5,
+        steps: 20,
+        numberOfMedia: 1,
+        network: 'fast',
+        tokenType: 'spark',
+        waitForCompletion: true,
+        timeout: 420000,
+        onProgress: (progress) => {
+          progressCount++;
+          if (progressCount % 5 === 0) {
+            console.log(`   Progress: ${progress.percentage}%`);
+          }
+        },
+      });
+
+      console.log(`   a2v generation completed: ${result.completed}`);
+      console.log(`   Project ID: ${result.project.id}`);
+      console.log(`   Videos generated: ${result.videoUrls?.length || 0}`);
+      if (result.videoUrls && result.videoUrls.length > 0) {
+        console.log(`   Video URL: ${result.videoUrls[0]}`);
+      }
+
+      if (!result.completed) {
+        throw new Error('a2v generation did not complete');
+      }
+      if (!result.videoUrls || result.videoUrls.length === 0) {
+        throw new Error('No video URLs returned from a2v generation');
       }
     })();
 

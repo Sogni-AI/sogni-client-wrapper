@@ -82,6 +82,16 @@ function findPreferredModel(
     .sort((a, b) => b.workerCount - a.workerCount)[0];
 }
 
+function findPreferredModelById(models: ModelInfo[], modelIds: string[]): ModelInfo | undefined {
+  for (const modelId of modelIds) {
+    const model = models.find((candidate) => candidate.id === modelId);
+    if (model) {
+      return model;
+    }
+  }
+  return undefined;
+}
+
 async function ensureVisionImageUrl(
   client: SogniClientWrapper,
   options: {
@@ -296,10 +306,15 @@ async function runTests() {
           exclude: [/edit/i, /img2img/i],
         }) ||
         findPreferredModel(models, { media: 'image' });
-      selectedI2vModelId = findPreferredModel(models, {
-        media: 'video',
-        include: [/_i2v_lightx2v/i, /_i2v/i],
-      })?.id;
+      selectedI2vModelId =
+        findPreferredModelById(models, [
+          'ltx23-22b-fp8_i2v_distilled',
+          'ltx2-19b-fp8_i2v_distilled',
+        ])?.id ||
+        findPreferredModel(models, {
+          media: 'video',
+          include: [/_i2v_lightx2v/i, /_i2v/i],
+        })?.id;
       selectedT2vModelId = findPreferredModel(models, {
         media: 'video',
         include: [/_t2v_lightx2v/i, /_t2v/i],

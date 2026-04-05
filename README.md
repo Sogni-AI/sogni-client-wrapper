@@ -445,7 +445,7 @@ Run these scripts with `npx tsx`:
 
 - `examples/llm-chat-basic.ts`
 - `examples/llm-chat-streaming.ts`
-- `examples/llm-chat-vision.ts --image ./photo.jpg`
+- `examples/llm-chat-vision.ts --image https://<sogni-hosted-image-url>`
 - `examples/llm-tool-calling-custom.ts`
 - `examples/llm-tool-calling-sogni-tools.ts` (supports `--dry-run`)
 
@@ -778,8 +778,14 @@ To run the end-to-end tests, you need to provide your Sogni API credentials via 
    SOGNI_PASSWORD=your_sogni_password
    # Optional: force a specific chat/LLM model for e2e tests
    # SOGNI_LLM_MODEL=qwen3-30b-a3b-gptq-int4
+   # Optional: force a specific vision-capable LLM model for the vision example/e2e test
+   # SOGNI_VISION_MODEL=qwen2.5-vl-72b-instruct
+   # Optional: use an existing Sogni-hosted image URL for the vision e2e test
+   # SOGNI_VISION_IMAGE_URL=https://complete-images-production.s3-accelerate.amazonaws.com/...
    # Optional: fail suite if LLM tests cannot run (default: skip LLM tests if unavailable)
    # SOGNI_REQUIRE_LLM_E2E=true
+   # Optional: fail suite if no vision-capable LLM is available for multimodal chat
+   # SOGNI_REQUIRE_VISION_E2E=true
    # Optional: fail suite if tool-calling tests cannot get tool_calls
    # SOGNI_REQUIRE_TOOL_CALL_E2E=true
    # Optional: run only LLM/tool-calling e2e tests

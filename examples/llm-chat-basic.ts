@@ -1,30 +1,11 @@
 import { config } from 'dotenv';
 import { SogniClientWrapper } from '../src';
+import { resolveChatModel } from './llm-example-utils';
 
 config();
 
 function resolvePrompt(): string {
   return process.argv.slice(2).join(' ').trim() || 'Explain the Sogni Supernet in one short paragraph.';
-}
-
-async function resolveChatModel(client: SogniClientWrapper): Promise<string> {
-  const models = await client.waitForChatModels(15000);
-  const preferred = process.env.SOGNI_LLM_MODEL;
-  if (preferred && models[preferred] && (models[preferred].workers || 0) > 0) {
-    return preferred;
-  }
-
-  for (const [modelId, modelInfo] of Object.entries(models)) {
-    if ((modelInfo.workers || 0) > 0) {
-      return modelId;
-    }
-  }
-
-  const first = Object.keys(models)[0];
-  if (!first) {
-    throw new Error('No LLM models are currently available.');
-  }
-  return first;
 }
 
 async function main() {

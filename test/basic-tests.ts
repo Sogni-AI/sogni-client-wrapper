@@ -44,6 +44,9 @@ import {
   type WalletBalanceInfo,
 } from '../src';
 import { SogniClient } from '@sogni-ai/sogni-client';
+import {
+  isLikelyVisionModelId,
+} from '../examples/llm-example-utils';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -272,6 +275,19 @@ async function runTests() {
     }
     if (!result.success || walletBalance.provider !== 'base' || account !== null) {
       throw new Error('Latest helper types were not exported correctly');
+    }
+  })();
+
+  // Test 12c: example vision helpers
+  await test('Should expose stable vision model detection helpers', () => {
+    if (!isLikelyVisionModelId('qwen2.5-vl-72b-instruct')) {
+      throw new Error('Vision helper should recognize common VL model ids');
+    }
+    if (!isLikelyVisionModelId('qwen3.5-35b-a3b-gguf-q4km')) {
+      throw new Error('Vision helper should recognize deployed qwen3.5 vision-capable model ids');
+    }
+    if (isLikelyVisionModelId('qwen3-30b-a3b-gptq-int4')) {
+      throw new Error('Vision helper should not classify text-only qwen ids as vision models');
     }
   })();
 

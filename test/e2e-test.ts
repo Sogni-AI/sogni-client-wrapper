@@ -3,7 +3,10 @@
  */
 
 import * as dotenv from 'dotenv';
-import { SogniClientWrapper, ClientEvent } from '../src';
+import { SogniClientWrapper, ClientEvent, type ModelInfo } from '../src';
+import {
+  isLikelyVisionModelId,
+} from '../examples/llm-example-utils';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -26,9 +29,14 @@ const CREDENTIALS = {
 
 // Optional LLM e2e controls:
 // - SOGNI_LLM_MODEL: preferred LLM model id
+// - SOGNI_VISION_MODEL: preferred vision-capable LLM model id
+// - SOGNI_VISION_IMAGE_URL: existing Sogni-hosted image URL for multimodal chat
 // - SOGNI_REQUIRE_LLM_E2E=true: fail if LLM models are unavailable
 const PREFERRED_LLM_MODEL = process.env.SOGNI_LLM_MODEL;
+const PREFERRED_VISION_MODEL = process.env.SOGNI_VISION_MODEL;
+const PREFERRED_VISION_IMAGE_URL = process.env.SOGNI_VISION_IMAGE_URL;
 const REQUIRE_LLM_E2E = process.env.SOGNI_REQUIRE_LLM_E2E === 'true';
+const REQUIRE_VISION_E2E = process.env.SOGNI_REQUIRE_VISION_E2E === 'true';
 const REQUIRE_TOOL_CALL_E2E = process.env.SOGNI_REQUIRE_TOOL_CALL_E2E === 'true';
 const E2E_SCOPE = (process.env.SOGNI_E2E_SCOPE || 'all').toLowerCase();
 const LLM_TEST_NAME_PATTERN = /(llm|tool[- ]?call)/i;
@@ -54,6 +62,74 @@ async function fetchMediaBuffer(url: string, label: string): Promise<Buffer> {
 
   const arrayBuffer = await response.arrayBuffer();
   return Buffer.from(arrayBuffer);
+}
+
+function findPreferredModel(
+  models: ModelInfo[],
+  options: {
+    media: ModelInfo['media'];
+    include?: RegExp[];
+    exclude?: RegExp[];
+  }
+): ModelInfo | undefined {
+  const include = options.include || [];
+  const exclude = options.exclude || [];
+
+  return [...models]
+    .filter((model) => model.media === options.media)
+    .filter((model) => include.length === 0 || include.some((pattern) => pattern.test(model.id)))
+    .filter((model) => exclude.every((pattern) => !pattern.test(model.id)))
+    .sort((a, b) => b.workerCount - a.workerCount)[0];
+}
+
+async function ensureVisionImageUrl(
+  client: SogniClientWrapper,
+  options: {
+    preferredUrl?: string;
+    cachedUrl?: string;
+    imageModel?: ModelInfo;
+  } = {}
+): Promise<string> {
+  if (options.preferredUrl) {
+    return options.preferredUrl;
+  }
+  if (options.cachedUrl) {
+    return options.cachedUrl;
+  }
+
+  const models = await client.getAvailableModels({ sortByWorkers: true });
+  const imageModel =
+    options.imageModel ||
+    findPreferredModel(models, {
+      media: 'image',
+      exclude: [/edit/i, /img2img/i],
+    }) ||
+    findPreferredModel(models, { media: 'image' });
+
+  if (!imageModel) {
+    throw new Error('No image-capable model available to create a vision input image');
+  }
+
+  console.log(`   Generating temporary vision input image with: ${imageModel.id}`);
+  const result = await client.createProject({
+    type: 'image',
+    modelId: imageModel.id,
+    positivePrompt: 'A cute cartoon cat wearing sunglasses',
+    negativePrompt: 'blurry, low quality',
+    steps: imageModel.recommendedSettings?.steps || 4,
+    guidance: imageModel.recommendedSettings?.guidance || 3.5,
+    numberOfMedia: 1,
+    network: 'fast',
+    tokenType: 'spark',
+    waitForCompletion: true,
+    timeout: 180000,
+  });
+
+  const url = result.imageUrls?.[0];
+  if (!url) {
+    throw new Error('Temporary vision input image generation did not return an image URL');
+  }
+  return url;
 }
 
 function test(name: string, fn: () => void | Promise<void>) {
@@ -159,8 +235,12 @@ async function runTests() {
   let referenceAudioBuffer: Buffer | undefined;
   let referenceVideoUrl: string | undefined;
   let availableModelIds: string[] = [];
-  let availableModels: Array<{ id: string; media?: string; recommendedSettings?: { steps?: number } }> = [];
+  let availableModels: ModelInfo[] = [];
+  let selectedImageModel: ModelInfo | undefined;
+  let selectedI2vModelId: string | undefined;
+  let selectedT2vModelId: string | undefined;
   let selectedLlmModelId: string | undefined;
+  let selectedVisionModelId: string | undefined;
   let availableLlmModels: Record<string, { workers?: number }> = {};
   let selectedToolCallingModelId: string | undefined;
 
@@ -210,6 +290,20 @@ async function runTests() {
       const models = await client.getAvailableModels({ sortByWorkers: true });
       availableModels = models;
       availableModelIds = models.map((m) => m.id);
+      selectedImageModel =
+        findPreferredModel(models, {
+          media: 'image',
+          exclude: [/edit/i, /img2img/i],
+        }) ||
+        findPreferredModel(models, { media: 'image' });
+      selectedI2vModelId = findPreferredModel(models, {
+        media: 'video',
+        include: [/_i2v_lightx2v/i, /_i2v/i],
+      })?.id;
+      selectedT2vModelId = findPreferredModel(models, {
+        media: 'video',
+        include: [/_t2v_lightx2v/i, /_t2v/i],
+      })?.id;
       console.log(`   Found ${models.length} models`);
       
       if (models.length === 0) {
@@ -217,6 +311,17 @@ async function runTests() {
       }
       
       console.log(`   Top model: ${models[0].id} (${models[0].workerCount} workers)`);
+      if (selectedImageModel) {
+        console.log(
+          `   Selected image model: ${selectedImageModel.id} (${selectedImageModel.workerCount} workers)`
+        );
+      }
+      if (selectedI2vModelId) {
+        console.log(`   Selected i2v model: ${selectedI2vModelId}`);
+      }
+      if (selectedT2vModelId) {
+        console.log(`   Selected t2v model: ${selectedT2vModelId}`);
+      }
     })();
 
     // Test 5: Get most popular model
@@ -250,24 +355,26 @@ async function runTests() {
     })();
 
     // Test 7: Generate a simple image
-    await test('Should generate image with Flux model', async () => {
+    await test('Should generate image with an available image model', async () => {
       // Wait a bit to avoid rate limiting
       await sleep(5000);
       if (!client) throw new Error('Client not initialized');
+      if (!selectedImageModel) {
+        throw new Error('No image-capable model available');
+      }
       
-      const model = await client.getMostPopularModel();
-      console.log(`   Using model: ${model.id}`);
+      console.log(`   Using model: ${selectedImageModel.id}`);
       console.log(`   Generating image...`);
       
       let progressCount = 0;
       
       const result = await client.createProject({
         type: 'image',
-        modelId: model.id,
+        modelId: selectedImageModel.id,
         positivePrompt: 'A cute cartoon cat wearing sunglasses',
         negativePrompt: 'blurry, low quality',
-        steps: model.recommendedSettings?.steps || 4,
-        guidance: model.recommendedSettings?.guidance || 3.5,
+        steps: selectedImageModel.recommendedSettings?.steps || 4,
+        guidance: selectedImageModel.recommendedSettings?.guidance || 3.5,
         numberOfMedia: 1,
         network: 'fast',
         tokenType: 'spark',
@@ -304,6 +411,9 @@ async function runTests() {
       // Wait to avoid rate limiting
       await sleep(10000);
       if (!client) throw new Error('Client not initialized');
+      if (!selectedImageModel) {
+        throw new Error('No image-capable model available');
+      }
       
       let eventsFired = {
         projectCreated: false,
@@ -324,15 +434,13 @@ async function runTests() {
         eventsFired.projectCompleted = true;
         console.log('   Event: PROJECT_COMPLETED');
       });
-      
-      const model = await client.getMostPopularModel();
-      
+
       await client.createProject({
         type: 'image',
-        modelId: model.id,
+        modelId: selectedImageModel.id,
         positivePrompt: 'A simple red circle on white background',
-        steps: model.recommendedSettings?.steps || 4,
-        guidance: model.recommendedSettings?.guidance || 3.5,
+        steps: selectedImageModel.recommendedSettings?.steps || 4,
+        guidance: selectedImageModel.recommendedSettings?.guidance || 3.5,
         numberOfMedia: 1,
         network: 'fast',
         tokenType: 'spark',
@@ -351,17 +459,20 @@ async function runTests() {
     })();
 
     // Test 9: Generate a video with fastest settings
-    await test('Should generate video with wan_v2.2-14b-fp8_i2v_lightx2v model', async () => {
+    await test('Should generate video with an available i2v model', async () => {
       // Wait to avoid rate limiting
       await sleep(10000);
       if (!client) throw new Error('Client not initialized');
+      if (!selectedI2vModelId) {
+        throw new Error('No i2v video model available');
+      }
 
       if (!catImageUrl) {
         console.log('   ⚠️ No cat image URL from previous test, skipping i2v test');
         throw new Error('Reference image required for i2v model - run image test first');
       }
 
-      console.log('   Using model: wan_v2.2-14b-fp8_i2v_lightx2v (image-to-video)');
+      console.log(`   Using model: ${selectedI2vModelId} (image-to-video)`);
       console.log('   Settings: 512x512, 16fps, 81 frames');
       console.log('   Reference image: Using cat image from test 7');
       console.log('   Fetching reference image...');
@@ -377,7 +488,7 @@ async function runTests() {
 
       const result = await client.createProject({
         type: 'video',
-        modelId: 'wan_v2.2-14b-fp8_i2v_lightx2v',
+        modelId: selectedI2vModelId,
         positivePrompt: 'The cat transforms into a majestic lion, morphing animation, smooth transition',
         negativePrompt: 'blurry, low quality, distorted, glitchy',
         referenceImage: imageBuffer, // Use the cat image as reference
@@ -418,12 +529,15 @@ async function runTests() {
     })();
 
     // Test 10: Generate text-to-video without reference image
-    await test('Should generate text-to-video with wan_v2.2-14b-fp8_t2v_lightx2v model', async () => {
+    await test('Should generate text-to-video with an available t2v model', async () => {
       // Wait to avoid rate limiting
       await sleep(10000);
       if (!client) throw new Error('Client not initialized');
+      if (!selectedT2vModelId) {
+        throw new Error('No t2v video model available');
+      }
 
-      console.log('   Using model: wan_v2.2-14b-fp8_t2v_lightx2v (text-to-video speed variant)');
+      console.log(`   Using model: ${selectedT2vModelId} (text-to-video)`);
       console.log('   Settings: 640x640, 16fps, 81 frames');
       console.log('   Steps: 4 (optimized for speed variant)');
       console.log('   No reference image - pure text-to-video generation');
@@ -433,7 +547,7 @@ async function runTests() {
 
       const result = await client.createProject({
         type: 'video',
-        modelId: 'wan_v2.2-14b-fp8_t2v_lightx2v', // Use speed variant that works reliably
+        modelId: selectedT2vModelId,
         positivePrompt: 'A serene waterfall flowing through a lush green forest',
         negativePrompt: '',  // Empty negative prompt like the working example
         stylePrompt: '',     // Empty style prompt like the working example
@@ -818,6 +932,21 @@ async function runTests() {
       selectedLlmModelId = (preferred || firstAvailable || fallback)[0];
       const workers = (preferred || firstAvailable || fallback)[1]?.workers ?? 0;
       console.log(`   Selected LLM model: ${selectedLlmModelId} (${workers} workers)`);
+
+      const visionPreferred = PREFERRED_VISION_MODEL
+        ? entries.find(([id, info]) => id === PREFERRED_VISION_MODEL && (info.workers || 0) > 0)
+        : undefined;
+      const firstVision = entries
+        .filter(([, info]) => (info.workers || 0) > 0)
+        .sort((a, b) => ((b[1].workers || 0) - (a[1].workers || 0)))
+        .find(([id]) => isLikelyVisionModelId(id));
+
+      selectedVisionModelId = (visionPreferred || firstVision)?.[0];
+      if (selectedVisionModelId) {
+        console.log(`   Selected vision model: ${selectedVisionModelId}`);
+      } else {
+        console.log('   ⚠️ No likely vision-capable LLM model detected');
+      }
     })();
 
     await test('Should estimate LLM chat completion cost', async () => {
@@ -924,6 +1053,49 @@ async function runTests() {
       }
       if (tokenEvents === 0 && completedEvents === 0) {
         throw new Error('No chat token/completed events observed for streaming chat');
+      }
+    })();
+
+    await test('Should generate vision LLM chat completion with image_url content', async () => {
+      await sleep(4000);
+      if (!client) throw new Error('Client not initialized');
+      if (!selectedVisionModelId) {
+        if (REQUIRE_VISION_E2E) {
+          throw new Error('No selected vision-capable LLM model for multimodal chat');
+        }
+        console.log('   ⚠️ Skipping vision LLM chat (no selected vision model)');
+        return;
+      }
+
+      const visionImageUrl = await ensureVisionImageUrl(client, {
+        preferredUrl: PREFERRED_VISION_IMAGE_URL,
+        cachedUrl: catImageUrl,
+        imageModel: selectedImageModel,
+      });
+
+      const result = await client.createChatCompletion({
+        model: selectedVisionModelId,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Describe this image briefly and mention any visible text.' },
+              { type: 'image_url', image_url: { url: visionImageUrl, detail: 'high' } },
+            ],
+          },
+        ],
+        max_tokens: 96,
+        think: false,
+        tokenType: 'spark',
+      });
+
+      console.log(`   Vision model: ${selectedVisionModelId}`);
+      console.log(`   Vision image URL: ${visionImageUrl}`);
+      console.log(`   Vision finish reason: ${result.finishReason}`);
+      console.log(`   Vision content: ${result.content}`);
+
+      if (!result.content || result.content.trim().length === 0) {
+        throw new Error('Empty vision chat response');
       }
     })();
 

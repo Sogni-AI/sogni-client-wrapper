@@ -1,72 +1,33 @@
-import { readFileSync } from 'fs';
-import { extname } from 'path';
 import { config } from 'dotenv';
 import { SogniClientWrapper, type ChatMessage } from '../src';
+import {
+  getArgValue,
+  resolveVisionModel,
+} from './llm-example-utils';
 
 config();
 
-function getArgValue(flag: string): string | undefined {
-  const args = process.argv.slice(2);
-  const index = args.indexOf(flag);
-  if (index === -1) return undefined;
-  return args[index + 1];
-}
-
 function resolvePrompt(): string {
-  return getArgValue('--prompt') || 'Describe this image in one concise paragraph.';
+  return getArgValue('--prompt') || 'Describe this image in one concise paragraph and mention any visible text.';
 }
 
 function resolveImageInput(): string {
   const image = getArgValue('--image');
   if (!image) {
-    throw new Error('Missing --image <path-or-url>. Supports local files, https URLs, and data URIs.');
+    throw new Error(
+      'Missing --image <sogni-hosted-url>. The current backend does not accept inline data URIs for vision chat.'
+    );
   }
   return image;
 }
 
-function getMimeType(filePath: string): string {
-  switch (extname(filePath).toLowerCase()) {
-    case '.png':
-      return 'image/png';
-    case '.webp':
-      return 'image/webp';
-    case '.gif':
-      return 'image/gif';
-    default:
-      return 'image/jpeg';
-  }
-}
-
 function toImageUrl(imageInput: string): string {
-  if (/^(https?:|data:)/i.test(imageInput)) {
+  if (/^https?:/i.test(imageInput)) {
     return imageInput;
   }
-
-  const mimeType = getMimeType(imageInput);
-  const buffer = readFileSync(imageInput);
-  return `data:${mimeType};base64,${buffer.toString('base64')}`;
-}
-
-async function resolveVisionModel(client: SogniClientWrapper): Promise<string> {
-  const models = await client.waitForChatModels(15000);
-  const preferred = process.env.SOGNI_LLM_MODEL;
-  if (preferred && models[preferred] && (models[preferred].workers || 0) > 0) {
-    return preferred;
-  }
-
-  for (const [modelId, modelInfo] of Object.entries(models)) {
-    if ((modelInfo.workers || 0) > 0 && /vision|vlm|qwen3\.5/i.test(modelId)) {
-      return modelId;
-    }
-  }
-
-  for (const [modelId, modelInfo] of Object.entries(models)) {
-    if ((modelInfo.workers || 0) > 0) {
-      return modelId;
-    }
-  }
-
-  throw new Error('No LLM models are currently available.');
+  throw new Error(
+    `Unsupported image input: ${imageInput}. Vision chat currently requires a Sogni-hosted https URL.`
+  );
 }
 
 async function main() {
@@ -96,6 +57,7 @@ async function main() {
     ];
 
     console.log(`Using vision model: ${model}`);
+    console.log(`Image source: ${imageInput}`);
     console.log(`Prompt: ${prompt}`);
 
     const result = await client.createChatCompletion({

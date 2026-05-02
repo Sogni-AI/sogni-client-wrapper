@@ -6,7 +6,6 @@ import type {
   Project,
   Job,
   AvailableModel,
-  CurrentAccount as SogniCurrentAccount,
   ImageProjectParams as SogniImageProjectParams,
   VideoProjectParams as SogniVideoProjectParams,
   AudioProjectParams as SogniAudioProjectParams,
@@ -23,24 +22,41 @@ import type {
   ChatCompletionChunk,
   ChatCompletionResult,
   ChatJobStateEvent,
-  ChatTokenUsage,
   ContentPart,
   TextContentPart,
   ImageUrlContentPart,
+  ChatTokenUsage,
   LLMCostEstimation,
   LLMJobCost,
   LLMModelInfo,
   LLMParamConstraint,
+  LLMSamplingDefaults,
   ToolDefinition,
   ToolCall,
   ToolCallDelta,
   ToolCallFunction,
   ToolChoice,
   ToolFunction,
+  SogniToolsMode,
   ToolExecutionOptions,
   ToolExecutionProgress,
   ToolExecutionResult,
   ToolHistoryEntry,
+  CreativeWorkflowArtifact,
+  CreativeWorkflowEvent,
+  CreativeWorkflowKind,
+  CreativeWorkflowRecord,
+  CreativeWorkflowSseEvent,
+  CreativeWorkflowStatus,
+  CreativeWorkflowHostedToolName,
+  ListCreativeWorkflowOptions,
+  StartCreativeWorkflowOptions,
+  StartCreativeWorkflowParams,
+  StartHostedToolSequenceWorkflowDependency,
+  StartHostedToolSequenceWorkflowInput,
+  StartHostedToolSequenceWorkflowStep,
+  StartImageToVideoWorkflowInput,
+  StreamCreativeWorkflowEventsOptions,
 } from '@sogni-ai/sogni-client';
 
 import type {
@@ -59,7 +75,6 @@ export type {
   Project,
   Job,
   AvailableModel,
-  SogniCurrentAccount as CurrentAccount,
   SupernetType,
   TokenType,
   ImageOutputFormat,
@@ -74,24 +89,41 @@ export type {
   ChatCompletionChunk,
   ChatCompletionResult,
   ChatJobStateEvent,
-  ChatTokenUsage,
   ContentPart,
   TextContentPart,
   ImageUrlContentPart,
+  ChatTokenUsage,
   LLMCostEstimation,
   LLMJobCost,
   LLMModelInfo,
   LLMParamConstraint,
+  LLMSamplingDefaults,
   ToolDefinition,
   ToolCall,
   ToolCallDelta,
   ToolCallFunction,
   ToolChoice,
   ToolFunction,
+  SogniToolsMode,
   ToolExecutionOptions,
   ToolExecutionProgress,
   ToolExecutionResult,
   ToolHistoryEntry,
+  CreativeWorkflowArtifact,
+  CreativeWorkflowEvent,
+  CreativeWorkflowKind,
+  CreativeWorkflowRecord,
+  CreativeWorkflowSseEvent,
+  CreativeWorkflowStatus,
+  CreativeWorkflowHostedToolName,
+  ListCreativeWorkflowOptions,
+  StartCreativeWorkflowOptions,
+  StartCreativeWorkflowParams,
+  StartHostedToolSequenceWorkflowDependency,
+  StartHostedToolSequenceWorkflowInput,
+  StartHostedToolSequenceWorkflowStep,
+  StartImageToVideoWorkflowInput,
+  StreamCreativeWorkflowEventsOptions,
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
@@ -134,6 +166,9 @@ interface BaseClientConfig {
 
   /** Disable WebSocket connection (advanced/testing) */
   disableSocket?: boolean;
+
+  /** Browser-only shared WebSocket mode for cookie-auth multi-tab apps */
+  multiInstance?: boolean;
 
   /** Allow insecure TLS (e.g., testnet with self-signed certs) */
   allowInsecureTLS?: boolean;
@@ -307,11 +342,11 @@ export interface VideoCostEstimateParams {
   /** Output video height */
   height: number;
 
-  /** Frames per second */
-  fps: number;
+  /** Frames per second. Optional for fixed-FPS models like Seedance */
+  fps?: number;
 
-  /** Inference steps */
-  steps: number;
+  /** Inference steps. Optional for models that do not require explicit steps */
+  steps?: number;
 
   /** Number of frames (optional, prefer duration) */
   frames?: number;
@@ -361,45 +396,6 @@ export interface CostEstimate {
 
   /** Cost in Sogni tokens */
   sogni: string;
-}
-
-/**
- * Wallet balance provider
- */
-export type WalletBalanceProvider = 'base' | 'etherlink';
-
-/**
- * Wallet balance response
- */
-export interface WalletBalanceInfo {
-  /** Wallet address queried */
-  walletAddress: string;
-
-  /** Blockchain provider used for the lookup */
-  provider: WalletBalanceProvider;
-
-  /** Wallet SOGNI balance */
-  sogni: string;
-
-  /** Wallet Spark balance */
-  spark: string;
-
-  /** Wallet native token balance (ETH / XTZ-equivalent string from provider API) */
-  ether: string;
-
-  /** Timestamp when the balance was fetched */
-  fetchedAt: Date;
-}
-
-/**
- * Options for executing multiple chat tool calls
- */
-export interface ExecuteChatToolsOptions extends ToolExecutionOptions {
-  /** Handler for non-Sogni tool calls */
-  onToolCall?: (toolCall: ToolCall) => Promise<string>;
-
-  /** Per-tool progress callback */
-  onToolProgress?: (toolCall: ToolCall, progress: ToolExecutionProgress) => void;
 }
 
 /**

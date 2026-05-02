@@ -8,7 +8,6 @@ import { SogniClient, Project, Job, ChatStream } from '@sogni-ai/sogni-client';
 import type {
   SogniClientConfig,
   AuthType,
-  CurrentAccount,
   ProjectConfig,
   ImageProjectConfig,
   VideoProjectConfig,
@@ -36,14 +35,18 @@ import type {
   ChatCompletionChunk,
   ChatCompletionResult,
   ChatJobStateEvent,
-  ToolCall,
-  ToolExecutionOptions,
-  ToolExecutionResult,
-  ExecuteChatToolsOptions,
   LLMCostEstimation,
   LLMModelInfo,
   ChatErrorData,
-  WalletBalanceInfo,
+  CreativeWorkflowEvent,
+  CreativeWorkflowRecord,
+  CreativeWorkflowSseEvent,
+  ListCreativeWorkflowOptions,
+  StartCreativeWorkflowOptions,
+  StartCreativeWorkflowParams,
+  StartHostedToolSequenceWorkflowInput,
+  StartImageToVideoWorkflowInput,
+  StreamCreativeWorkflowEventsOptions,
 } from '../types';
 import { ClientEvent } from '../types';
 import {
@@ -85,6 +88,7 @@ interface InternalConfig {
   socketEndpoint?: string;
   restEndpoint?: string;
   disableSocket?: boolean;
+  multiInstance?: boolean;
   allowInsecureTLS?: boolean;
   autoConnect: boolean;
   reconnect: boolean;
@@ -133,6 +137,7 @@ export class SogniClientWrapper extends EventEmitter {
       socketEndpoint: config.socketEndpoint,
       restEndpoint: config.restEndpoint,
       disableSocket: config.disableSocket,
+      multiInstance: config.multiInstance,
       allowInsecureTLS: config.allowInsecureTLS,
       autoConnect: config.autoConnect !== false,
       reconnect: config.reconnect !== false,
@@ -197,6 +202,7 @@ export class SogniClientWrapper extends EventEmitter {
         socketEndpoint: this.config.socketEndpoint,
         restEndpoint: this.config.restEndpoint,
         disableSocket: this.config.disableSocket,
+        multiInstance: this.config.multiInstance,
       });
 
       // Authentication depends on authType
@@ -307,8 +313,11 @@ export class SogniClientWrapper extends EventEmitter {
           this.client.chat.off('modelsUpdated', this.chatModelsUpdatedEventHandler);
         }
 
-        // Properly disconnect WebSocket to avoid connection leaks
-        if (this.client.apiClient && this.client.apiClient.socket) {
+        if (typeof this.client.dispose === 'function') {
+          this.client.dispose();
+          this.log('SDK client disposed');
+        } else if (this.client.apiClient && this.client.apiClient.socket) {
+          // Fallback for older SDKs without dispose()
           this.client.apiClient.socket.disconnect();
           this.log('WebSocket disconnected');
         }
@@ -327,6 +336,15 @@ export class SogniClientWrapper extends EventEmitter {
 
     this.emit(ClientEvent.DISCONNECTED);
     this.log('Disconnected');
+  }
+
+  /**
+   * Dispose this wrapper instance and release all listeners/resources.
+   * The wrapper should not be reused after calling this method.
+   */
+  async dispose(): Promise<void> {
+    await this.disconnect();
+    this.removeAllListeners();
   }
 
   /**
@@ -448,39 +466,81 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   /**
-   * Get the current tracked account snapshot, if connected
+   * Start a creative workflow via the SDK creative workflows API
    */
-  getCurrentAccount(): CurrentAccount | null {
-    return this.client?.account.currentAccount || null;
-  }
-
-  /**
-   * Get projects currently tracked by the underlying SDK instance
-   */
-  getTrackedProjects(): Project[] {
-    return this.client?.projects.trackedProjects || [];
-  }
-
-  /**
-   * Execute a single Sogni chat tool call
-   */
-  async executeChatTool(
-    toolCall: ToolCall,
-    options: ToolExecutionOptions = {}
-  ): Promise<ToolExecutionResult> {
+  async startCreativeWorkflow(
+    params: StartCreativeWorkflowParams,
+    options?: StartCreativeWorkflowOptions
+  ): Promise<CreativeWorkflowRecord> {
     await this.ensureConnected();
-    return this.client!.chat.tools.execute(toolCall, options);
+    return this.client!.creativeWorkflows.start(params, options);
   }
 
   /**
-   * Execute multiple chat tool calls, including mixed Sogni and custom tools
+   * Start an image-to-video creative workflow
    */
-  async executeChatTools(
-    toolCalls: ToolCall[],
-    options: ExecuteChatToolsOptions = {}
-  ): Promise<ToolExecutionResult[]> {
+  async startImageToVideoWorkflow(
+    input: StartImageToVideoWorkflowInput,
+    options?: StartCreativeWorkflowOptions & { tokenType?: 'sogni' | 'spark' }
+  ): Promise<CreativeWorkflowRecord> {
     await this.ensureConnected();
-    return this.client!.chat.tools.executeAll(toolCalls, options);
+    return this.client!.creativeWorkflows.startImageToVideo(input, options);
+  }
+
+  /**
+   * Start a hosted tool sequence creative workflow
+   */
+  async startHostedToolSequenceWorkflow(
+    input: StartHostedToolSequenceWorkflowInput,
+    options?: StartCreativeWorkflowOptions & { tokenType?: 'sogni' | 'spark' }
+  ): Promise<CreativeWorkflowRecord> {
+    await this.ensureConnected();
+    return this.client!.creativeWorkflows.startHostedToolSequence(input, options);
+  }
+
+  /**
+   * List creative workflows
+   */
+  async listCreativeWorkflows(
+    options?: ListCreativeWorkflowOptions
+  ): Promise<CreativeWorkflowRecord[]> {
+    await this.ensureConnected();
+    return this.client!.creativeWorkflows.list(options);
+  }
+
+  /**
+   * Get a creative workflow by ID
+   */
+  async getCreativeWorkflow(workflowId: string): Promise<CreativeWorkflowRecord> {
+    await this.ensureConnected();
+    return this.client!.creativeWorkflows.get(workflowId);
+  }
+
+  /**
+   * Get historic events for a creative workflow
+   */
+  async getCreativeWorkflowEvents(workflowId: string): Promise<CreativeWorkflowEvent[]> {
+    await this.ensureConnected();
+    return this.client!.creativeWorkflows.events(workflowId);
+  }
+
+  /**
+   * Cancel a creative workflow
+   */
+  async cancelCreativeWorkflow(workflowId: string): Promise<CreativeWorkflowRecord> {
+    await this.ensureConnected();
+    return this.client!.creativeWorkflows.cancel(workflowId);
+  }
+
+  /**
+   * Stream creative workflow SSE events
+   */
+  async streamCreativeWorkflowEvents(
+    workflowId: string,
+    options?: StreamCreativeWorkflowEventsOptions
+  ): Promise<AsyncIterableIterator<CreativeWorkflowSseEvent>> {
+    await this.ensureConnected();
+    return this.client!.creativeWorkflows.streamEvents(workflowId, options);
   }
 
   /**
@@ -499,31 +559,6 @@ export class SogniClientWrapper extends EventEmitter {
       sogni: parseFloat(balances.sogni.net) || 0,
       spark: parseFloat(balances.spark.net) || 0,
       lastUpdated: new Date(),
-    };
-  }
-
-  /**
-   * Get blockchain wallet balance for the current or specified wallet address
-   */
-  async getWalletBalance(
-    walletAddress?: string,
-    provider: WalletBalanceInfo['provider'] = 'base'
-  ): Promise<WalletBalanceInfo> {
-    await this.ensureConnected();
-
-    const resolvedWalletAddress = walletAddress || this.client!.account.currentAccount.walletAddress;
-    if (!resolvedWalletAddress) {
-      throw new SogniValidationError(
-        'Wallet address is required when the current account does not expose one yet'
-      );
-    }
-
-    const balance = await this.client!.account.walletBalance(resolvedWalletAddress, provider);
-    return {
-      ...balance,
-      walletAddress: resolvedWalletAddress,
-      provider,
-      fetchedAt: new Date(),
     };
   }
 
@@ -553,35 +588,38 @@ export class SogniClientWrapper extends EventEmitter {
     if (typeof params.width !== 'number' || typeof params.height !== 'number') {
       throw new SogniValidationError('Width and height are required and must be numbers');
     }
-    if (typeof params.fps !== 'number' || params.fps <= 0) {
-      throw new SogniValidationError('FPS is required and must be a positive number');
+    if (params.fps !== undefined && (typeof params.fps !== 'number' || params.fps <= 0)) {
+      throw new SogniValidationError('FPS must be a positive number');
     }
-    if (typeof params.steps !== 'number' || params.steps <= 0) {
-      throw new SogniValidationError('Steps is required and must be a positive number');
+    if (params.steps !== undefined && (typeof params.steps !== 'number' || params.steps <= 0)) {
+      throw new SogniValidationError('Steps must be a positive number');
     }
 
     const tokenType = params.tokenType || 'spark';
     const numberOfMedia = params.numberOfMedia || 1;
+    const fps = this.getVideoFps(params.modelId, params.fps);
 
     let duration = params.duration;
     if (duration === undefined || duration === null) {
       if (params.frames !== undefined && params.frames > 0) {
-        const durationFps = this.isWanModel(params.modelId) ? 16 : params.fps;
+        const durationFps = this.getVideoGenerationFps(params.modelId, fps);
         duration = Math.max(1, Math.round((params.frames - 1) / durationFps));
       } else {
-        duration = 1;
+        duration = this.getVideoDurationBounds(params.modelId).min;
       }
     }
 
-    const maxDuration = this.isLtx2Model(params.modelId) ? 20 : 10;
-    if (duration < 1 || duration > maxDuration) {
-      throw new SogniValidationError(`Duration must be between 1 and ${maxDuration} seconds`);
+    const { min: minDuration, max: maxDuration } = this.getVideoDurationBounds(params.modelId);
+    if (duration < minDuration || duration > maxDuration) {
+      throw new SogniValidationError(
+        `Duration must be between ${minDuration} and ${maxDuration} seconds`
+      );
     }
 
     const frames =
       params.frames !== undefined
         ? params.frames
-        : this.calculateVideoFrames(params.modelId, duration, params.fps);
+        : this.calculateVideoFrames(params.modelId, duration, fps);
 
     return this.client!.projects.estimateVideoCost({
       tokenType,
@@ -590,7 +628,7 @@ export class SogniClientWrapper extends EventEmitter {
       height: params.height,
       duration,
       frames,
-      fps: params.fps,
+      fps,
       steps: params.steps,
       numberOfMedia,
     });
@@ -1227,6 +1265,18 @@ export class SogniClientWrapper extends EventEmitter {
    * Get recommended settings for a model
    */
   private getRecommendedSettings(modelId: string): ModelInfo['recommendedSettings'] {
+    if (this.isSeedanceModel(modelId)) {
+      return { fps: 24 };
+    }
+
+    if (this.isWanModel(modelId)) {
+      return { steps: modelId.includes('lightx2v') ? 4 : 20, fps: 16, frames: 81 };
+    }
+
+    if (this.isLtx2Model(modelId)) {
+      return { steps: modelId.includes('distilled') ? 4 : 20, fps: 24, frames: 121 };
+    }
+
     // Qwen Image Edit models
     if (modelId.includes('qwen_image_edit')) {
       if (modelId.includes('lightning')) {
@@ -1256,9 +1306,52 @@ export class SogniClientWrapper extends EventEmitter {
     return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
   }
 
+  private isSeedanceModel(modelId: string): boolean {
+    return modelId.startsWith('seedance-2-0');
+  }
+
+  private getVideoDurationBounds(modelId: string): { min: number; max: number } {
+    if (this.isSeedanceModel(modelId)) {
+      return { min: 4, max: 15 };
+    }
+    if (this.isLtx2Model(modelId)) {
+      return { min: 1, max: 20 };
+    }
+    return { min: 1, max: 10 };
+  }
+
+  private getVideoGenerationFps(modelId: string, fps: number): number {
+    if (this.isWanModel(modelId)) {
+      return 16;
+    }
+    if (this.isSeedanceModel(modelId)) {
+      return 24;
+    }
+    return fps;
+  }
+
+  private getVideoFps(modelId: string, fps: number | undefined): number {
+    if (this.isSeedanceModel(modelId)) {
+      if (fps !== undefined && fps !== 24) {
+        throw new SogniValidationError('Seedance video models require fps to be 24');
+      }
+      return 24;
+    }
+
+    if (fps === undefined) {
+      return this.isWanModel(modelId) ? 16 : 24;
+    }
+
+    return fps;
+  }
+
   private calculateVideoFrames(modelId: string, duration: number, fps: number): number {
     if (this.isWanModel(modelId)) {
       return Math.round(duration * 16) + 1;
+    }
+
+    if (this.isSeedanceModel(modelId)) {
+      return Math.round(duration * 24) + 1;
     }
 
     let frames = Math.round(duration * fps) + 1;

@@ -68,7 +68,8 @@ import {
 } from '../utils/helpers';
 
 const MIN_VIDEO_DIMENSION = 480;
-const MAX_VIDEO_DIMENSION = 1536;
+const MAX_VIDEO_DIMENSION = 2048;
+const MAX_WAN_VIDEO_DIMENSION = 1536;
 const VIDEO_DIMENSION_MULTIPLE = 16;
 const LTX2_FRAME_STEP = 8;
 
@@ -553,35 +554,46 @@ export class SogniClientWrapper extends EventEmitter {
     if (typeof params.width !== 'number' || typeof params.height !== 'number') {
       throw new SogniValidationError('Width and height are required and must be numbers');
     }
-    if (typeof params.fps !== 'number' || params.fps <= 0) {
-      throw new SogniValidationError('FPS is required and must be a positive number');
+    if (params.fps !== undefined && (typeof params.fps !== 'number' || params.fps <= 0)) {
+      throw new SogniValidationError('FPS must be a positive number');
     }
-    if (typeof params.steps !== 'number' || params.steps <= 0) {
-      throw new SogniValidationError('Steps is required and must be a positive number');
+    if (params.steps !== undefined && (typeof params.steps !== 'number' || params.steps <= 0)) {
+      throw new SogniValidationError('Steps must be a positive number');
+    }
+    if (params.referenceVideoUrls !== undefined) {
+      if (!Array.isArray(params.referenceVideoUrls)) {
+        throw new SogniValidationError('referenceVideoUrls must be an array of URL strings');
+      }
+      if (params.referenceVideoUrls.some((url) => typeof url !== 'string' || url.trim().length === 0)) {
+        throw new SogniValidationError('referenceVideoUrls must contain only non-empty URL strings');
+      }
     }
 
     const tokenType = params.tokenType || 'spark';
     const numberOfMedia = params.numberOfMedia || 1;
+    const fps = this.getEstimateFps(params.modelId, params.fps);
 
     let duration = params.duration;
     if (duration === undefined || duration === null) {
       if (params.frames !== undefined && params.frames > 0) {
-        const durationFps = this.isWanModel(params.modelId) ? 16 : params.fps;
+        const durationFps = this.isWanModel(params.modelId) ? 16 : fps;
         duration = Math.max(1, Math.round((params.frames - 1) / durationFps));
       } else {
-        duration = 1;
+        duration = this.isSeedanceModel(params.modelId) ? 5 : 1;
       }
     }
 
-    const maxDuration = this.isLtx2Model(params.modelId) ? 20 : 10;
-    if (duration < 1 || duration > maxDuration) {
-      throw new SogniValidationError(`Duration must be between 1 and ${maxDuration} seconds`);
+    const durationLimits = this.getVideoDurationLimits(params.modelId);
+    if (duration < durationLimits.min || duration > durationLimits.max) {
+      throw new SogniValidationError(
+        `Duration must be between ${durationLimits.min} and ${durationLimits.max} seconds`
+      );
     }
 
     const frames =
       params.frames !== undefined
         ? params.frames
-        : this.calculateVideoFrames(params.modelId, duration, params.fps);
+        : this.calculateVideoFrames(params.modelId, duration, fps);
 
     return this.client!.projects.estimateVideoCost({
       tokenType,
@@ -590,9 +602,12 @@ export class SogniClientWrapper extends EventEmitter {
       height: params.height,
       duration,
       frames,
-      fps: params.fps,
-      steps: params.steps,
+      fps,
+      ...(params.steps !== undefined && { steps: params.steps }),
       numberOfMedia,
+      ...(params.hasVideoInput !== undefined && { hasVideoInput: params.hasVideoInput }),
+      ...(params.referenceVideo !== undefined && { referenceVideo: params.referenceVideo }),
+      ...(params.referenceVideoUrls !== undefined && { referenceVideoUrls: params.referenceVideoUrls }),
     });
   }
 
@@ -910,7 +925,7 @@ export class SogniClientWrapper extends EventEmitter {
     if (width && height) {
       const originalWidth = width;
       const originalHeight = height;
-      const normalizedDims = this.normalizeVideoDimensions(width, height);
+      const normalizedDims = this.normalizeVideoDimensions(width, height, config.modelId);
       if (normalizedDims.adjusted) {
         console.log(
           `[SogniClientWrapper] Adjusted video dimensions from ${originalWidth}x${originalHeight} to ${normalizedDims.width}x${normalizedDims.height} to meet video requirements.`
@@ -960,7 +975,7 @@ export class SogniClientWrapper extends EventEmitter {
     return normalized;
   }
 
-  private normalizeVideoDimensions(width: number, height: number): {
+  private normalizeVideoDimensions(width: number, height: number, modelId: string): {
     width: number;
     height: number;
     adjusted: boolean;
@@ -968,11 +983,12 @@ export class SogniClientWrapper extends EventEmitter {
     let targetWidth = width;
     let targetHeight = height;
     let adjusted = false;
+    const maxDimension = this.getMaxVideoDimension(modelId);
 
-    if (targetWidth > MAX_VIDEO_DIMENSION || targetHeight > MAX_VIDEO_DIMENSION) {
+    if (targetWidth > maxDimension || targetHeight > maxDimension) {
       const scaleFactor = Math.min(
-        MAX_VIDEO_DIMENSION / targetWidth,
-        MAX_VIDEO_DIMENSION / targetHeight
+        maxDimension / targetWidth,
+        maxDimension / targetHeight
       );
       targetWidth = Math.floor(targetWidth * scaleFactor);
       targetHeight = Math.floor(targetHeight * scaleFactor);
@@ -988,10 +1004,10 @@ export class SogniClientWrapper extends EventEmitter {
       targetHeight = Math.floor(targetHeight * scaleFactor);
       adjusted = true;
 
-      if (targetWidth > MAX_VIDEO_DIMENSION || targetHeight > MAX_VIDEO_DIMENSION) {
+      if (targetWidth > maxDimension || targetHeight > maxDimension) {
         const downscaleFactor = Math.min(
-          MAX_VIDEO_DIMENSION / targetWidth,
-          MAX_VIDEO_DIMENSION / targetHeight
+          maxDimension / targetWidth,
+          maxDimension / targetHeight
         );
         targetWidth = Math.floor(targetWidth * downscaleFactor);
         targetHeight = Math.floor(targetHeight * downscaleFactor);
@@ -1252,8 +1268,45 @@ export class SogniClientWrapper extends EventEmitter {
     return modelId.startsWith('wan_');
   }
 
+  private isWanAnimateModel(modelId: string): boolean {
+    return (
+      modelId.includes('_animate-move') ||
+      modelId.includes('_animate-replace') ||
+      modelId.includes('_animate_move') ||
+      modelId.includes('_animate_replace')
+    );
+  }
+
   private isLtx2Model(modelId: string): boolean {
     return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
+  }
+
+  private isSeedanceModel(modelId: string): boolean {
+    return modelId.startsWith('seedance-2-0');
+  }
+
+  private getMaxVideoDimension(modelId: string): number {
+    return this.isWanModel(modelId) ? MAX_WAN_VIDEO_DIMENSION : MAX_VIDEO_DIMENSION;
+  }
+
+  private getVideoDurationLimits(modelId: string): { min: number; max: number } {
+    if (this.isSeedanceModel(modelId)) {
+      return { min: 4, max: 15 };
+    }
+    if (this.isLtx2Model(modelId) || this.isWanAnimateModel(modelId)) {
+      return { min: 1, max: 20 };
+    }
+    return { min: 1, max: 10 };
+  }
+
+  private getEstimateFps(modelId: string, fps?: number): number {
+    if (this.isSeedanceModel(modelId)) {
+      return 24;
+    }
+    if (fps !== undefined) {
+      return fps;
+    }
+    return this.isWanModel(modelId) ? 16 : 24;
   }
 
   private calculateVideoFrames(modelId: string, duration: number, fps: number): number {

@@ -3,6 +3,8 @@
  */
 
 import * as dotenv from 'dotenv';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import { SogniClientWrapper, ClientEvent, type ModelInfo } from '../src';
 import {
   isLikelyVisionModelId,
@@ -64,6 +66,35 @@ async function fetchMediaBuffer(url: string, label: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
+async function fetchMediaDataUri(url: string, label: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${label}: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get('content-type')?.split(';')[0] || 'image/png';
+  const arrayBuffer = await response.arrayBuffer();
+  return `data:${contentType};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+}
+
+async function fileToImageDataUri(path: string): Promise<string> {
+  const buffer = await readFile(path);
+  const contentType = path.toLowerCase().endsWith('.jpg') || path.toLowerCase().endsWith('.jpeg')
+    ? 'image/jpeg'
+    : 'image/png';
+  return `data:${contentType};base64,${buffer.toString('base64')}`;
+}
+
+async function toVisionImageDataUri(input: string, label: string): Promise<string> {
+  if (input.startsWith('data:')) {
+    return input;
+  }
+  if (/^https?:/i.test(input)) {
+    return fetchMediaDataUri(input, label);
+  }
+  return fileToImageDataUri(input);
+}
+
 function findPreferredModel(
   models: ModelInfo[],
   options: {
@@ -92,7 +123,7 @@ function findPreferredModelById(models: ModelInfo[], modelIds: string[]): ModelI
   return undefined;
 }
 
-async function ensureVisionImageUrl(
+async function ensureVisionImageDataUri(
   client: SogniClientWrapper,
   options: {
     preferredUrl?: string;
@@ -101,10 +132,16 @@ async function ensureVisionImageUrl(
   } = {}
 ): Promise<string> {
   if (options.preferredUrl) {
-    return options.preferredUrl;
+    return toVisionImageDataUri(options.preferredUrl, 'preferred vision image');
   }
   if (options.cachedUrl) {
-    return options.cachedUrl;
+    return toVisionImageDataUri(options.cachedUrl, 'cached vision image');
+  }
+
+  try {
+    return await fileToImageDataUri(join(process.cwd(), 'examples/duck.jpg'));
+  } catch {
+    // Fall back to creating a fresh image when the checked-in fixture is unavailable.
   }
 
   const models = await client.getAvailableModels({ sortByWorkers: true });
@@ -139,7 +176,7 @@ async function ensureVisionImageUrl(
   if (!url) {
     throw new Error('Temporary vision input image generation did not return an image URL');
   }
-  return url;
+  return toVisionImageDataUri(url, 'temporary vision image');
 }
 
 function test(name: string, fn: () => void | Promise<void>) {
@@ -1082,7 +1119,7 @@ async function runTests() {
         return;
       }
 
-      const visionImageUrl = await ensureVisionImageUrl(client, {
+      const visionImageDataUri = await ensureVisionImageDataUri(client, {
         preferredUrl: PREFERRED_VISION_IMAGE_URL,
         cachedUrl: catImageUrl,
         imageModel: selectedImageModel,
@@ -1095,7 +1132,7 @@ async function runTests() {
             role: 'user',
             content: [
               { type: 'text', text: 'Describe this image briefly and mention any visible text.' },
-              { type: 'image_url', image_url: { url: visionImageUrl, detail: 'high' } },
+              { type: 'image_url', image_url: { url: visionImageDataUri, detail: 'high' } },
             ],
           },
         ],
@@ -1105,7 +1142,7 @@ async function runTests() {
       });
 
       console.log(`   Vision model: ${selectedVisionModelId}`);
-      console.log(`   Vision image URL: ${visionImageUrl}`);
+      console.log(`   Vision image input: inline data URI (${visionImageDataUri.length} chars)`);
       console.log(`   Vision finish reason: ${result.finishReason}`);
       console.log(`   Vision content: ${result.content}`);
 

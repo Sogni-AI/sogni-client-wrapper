@@ -307,11 +307,11 @@ export interface VideoCostEstimateParams {
   /** Output video height */
   height: number;
 
-  /** Frames per second */
-  fps: number;
+  /** Frames per second. Seedance estimates always use 24fps. */
+  fps?: number;
 
-  /** Inference steps */
-  steps: number;
+  /** Inference steps. Optional for external API-backed video models such as Seedance. */
+  steps?: number;
 
   /** Number of frames (optional, prefer duration) */
   frames?: number;
@@ -324,6 +324,15 @@ export interface VideoCostEstimateParams {
 
   /** Token type for estimate */
   tokenType?: TokenType;
+
+  /** Price Seedance estimates using the video-input rate band */
+  hasVideoInput?: boolean;
+
+  /** Estimate-only signal: presence implies Seedance video-input pricing */
+  referenceVideo?: unknown;
+
+  /** Estimate-only Seedance video context URLs; non-empty list implies video-input pricing */
+  referenceVideoUrls?: string[];
 }
 
 /**

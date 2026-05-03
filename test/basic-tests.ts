@@ -944,6 +944,115 @@ async function runTests() {
     validateProjectConfig(animateReplaceConfig);
   })();
 
+  // Test 46b: Seedance canonical multimodal video fields
+  await test('Should accept canonical Seedance multimodal video fields', () => {
+    const config: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'seedance-2-0',
+      positivePrompt:
+        'Use @Image1 for product identity, @Video1 for camera motion, and @Audio1 for music rhythm.',
+      numberOfMedia: 1,
+      duration: 8,
+      fps: 24,
+      width: 1920,
+      height: 1088,
+      referenceImageUrls: ['https://cdn.example.com/product.png'],
+      referenceVideoUrls: ['https://cdn.example.com/motion.mp4'],
+      referenceAudioUrls: ['https://cdn.example.com/music.m4a'],
+      generateAudio: false,
+    };
+
+    validateProjectConfig(config);
+  })();
+
+  // Test 46c: Seedance reference limits
+  await test('Should reject Seedance audio-only references', () => {
+    const config: VideoProjectConfig = {
+      type: 'video',
+      modelId: 'seedance-2-0',
+      positivePrompt: 'Use @Audio1 as a music guide',
+      numberOfMedia: 1,
+      duration: 5,
+      fps: 24,
+      width: 1920,
+      height: 1088,
+      referenceAudioUrls: ['https://cdn.example.com/music.m4a'],
+    };
+
+    try {
+      validateProjectConfig(config);
+      throw new Error('Should have rejected audio-only Seedance references');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) {
+        throw new Error('Wrong error type for Seedance reference validation');
+      }
+    }
+  })();
+
+  // Test 46d: Seedance fields should be forwarded without legacy downscaling
+  await test('Should forward Seedance context fields and preserve full dimensions', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedParams: any = null;
+    const projectStub = {
+      id: 'project-seedance',
+      on: () => {},
+      waitForCompletion: async () => [],
+    };
+
+    (client as any).client = {
+      projects: {
+        create: async (params: any) => {
+          capturedParams = params;
+          return projectStub;
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.createVideoProject({
+      modelId: 'seedance-2-0',
+      positivePrompt:
+        'Use @Image1 for product identity, @Video1 for camera motion, and @Audio1 for music rhythm.',
+      numberOfMedia: 1,
+      duration: 8,
+      fps: 24,
+      width: 1920,
+      height: 1088,
+      referenceImageUrls: ['https://cdn.example.com/product.png'],
+      referenceVideoUrls: ['https://cdn.example.com/motion.mp4'],
+      referenceAudioUrls: ['https://cdn.example.com/music.m4a'],
+      generateAudio: false,
+      waitForCompletion: false,
+    });
+
+    if (!capturedParams) {
+      throw new Error('Did not capture SDK create params');
+    }
+    if (capturedParams.width !== 1920 || capturedParams.height !== 1088) {
+      throw new Error(`Unexpected Seedance dimensions ${capturedParams.width}x${capturedParams.height}`);
+    }
+    if (capturedParams.referenceImageUrls?.[0] !== 'https://cdn.example.com/product.png') {
+      throw new Error('Seedance referenceImageUrls was not forwarded');
+    }
+    if (capturedParams.referenceVideoUrls?.[0] !== 'https://cdn.example.com/motion.mp4') {
+      throw new Error('Seedance referenceVideoUrls was not forwarded');
+    }
+    if (capturedParams.referenceAudioUrls?.[0] !== 'https://cdn.example.com/music.m4a') {
+      throw new Error('Seedance referenceAudioUrls was not forwarded');
+    }
+    if (capturedParams.generateAudio !== false) {
+      throw new Error('Seedance generateAudio was not forwarded');
+    }
+  })();
+
   // Test 47: createProject should not inject empty prompts
   await test('Should not inject empty negative/style prompts when omitted', async () => {
     const client = new SogniClientWrapper({
@@ -1151,6 +1260,55 @@ async function runTests() {
     }
     if (capturedEstimateParams.frames !== 481) {
       throw new Error(`Expected LTX 2.3 frames=481, got ${capturedEstimateParams.frames}`);
+    }
+  })();
+
+  // Test 51b: estimateVideoCost handles Seedance canonical pricing inputs
+  await test('Should estimate Seedance with fixed 24fps and video-input signal', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateVideoCost({
+      modelId: 'seedance-2-0',
+      width: 1920,
+      height: 1088,
+      duration: 8,
+      fps: 30,
+      referenceVideoUrls: ['https://cdn.example.com/source.mp4'],
+      tokenType: 'spark',
+    });
+
+    if (!capturedEstimateParams) {
+      throw new Error('Did not capture estimate params');
+    }
+    if (capturedEstimateParams.fps !== 24) {
+      throw new Error(`Expected Seedance fps=24, got ${capturedEstimateParams.fps}`);
+    }
+    if (capturedEstimateParams.frames !== 193) {
+      throw new Error(`Expected Seedance frames=193, got ${capturedEstimateParams.frames}`);
+    }
+    if (capturedEstimateParams.steps !== undefined) {
+      throw new Error('Seedance estimate should not inject steps when omitted');
+    }
+    if (capturedEstimateParams.referenceVideoUrls?.[0] !== 'https://cdn.example.com/source.mp4') {
+      throw new Error('Seedance referenceVideoUrls was not forwarded to estimateVideoCost');
     }
   })();
 

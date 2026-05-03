@@ -14,7 +14,7 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 - **Audio Generation Support**: Generate music/audio tracks with audio models and estimate audio costs.
 - **Image Editing Support**: Edit images using Qwen models with context images for multi-reference editing.
 - **LLM Chat + Tool Calling Support**: Use chat completions through Sogni's LLM worker network, including streaming and function/tool calling.
-- **Vision Chat + Thinking Controls**: Send OpenAI-style multimodal `image_url` messages and toggle reasoning with `think`.
+- **Vision Chat + Thinking Controls**: Send OpenAI-style multimodal `image_url` messages with inline base64 data URIs and toggle reasoning with `think`.
 - **Chat Tool Execution Helpers**: Execute Sogni platform tool calls manually from the wrapper, including streaming follow-up loops.
 - **Flexible Authentication**: Token, cookies, or API key authentication.
 - **Wallet + Tracking Utilities**: Query Base/Etherlink wallet balances and inspect SDK-tracked projects/current account state.
@@ -121,7 +121,7 @@ node your-script.js
 
 ## Video Rendering Support
 
-The wrapper supports video generation with Sogni WAN and LTX-2 models. Generate videos from text prompts, images, audio, or other videos.
+The wrapper supports video generation with Sogni WAN, LTX-2, and Seedance 2.0 models. Generate videos from text prompts, images, audio, other videos, or multimodal Seedance context.
 
 ### Video Generation Example
 
@@ -160,6 +160,19 @@ const estimate = await client.estimateVideoCost({
 console.log('Estimated USD cost:', estimate.usd);
 ```
 
+Seedance video-input estimates can opt into the video-input rate band:
+
+```typescript
+const estimate = await client.estimateVideoCost({
+  modelId: 'seedance-2-0',
+  width: 1920,
+  height: 1088,
+  duration: 8,
+  referenceVideoUrls: ['https://cdn.example.com/motion-reference.mp4'],
+  tokenType: 'spark',
+});
+```
+
 ### Video Workflows
 
 The wrapper supports multiple video generation workflows:
@@ -169,10 +182,27 @@ The wrapper supports multiple video generation workflows:
 3. **Sound-to-Video (s2v / ia2v / a2v)**: Drive generation with audio references
 4. **Video-to-Video (v2v)**: Control motion/style from a reference video
 5. **Animate Workflows**: Create character animations or motion transfers
+6. **Seedance Multimodal**: Use `seedance-2-0` or `seedance-2-0-fast` with optional image, video, and audio reference URLs
+
+Seedance reference URL arrays must use publicly reachable HTTPS URLs. Seedance supports up to 9 image assets, 3 video assets, 3 audio assets, and 12 total assets; audio references require at least one image or video reference.
 
 ### Advanced Video Examples
 
 ```typescript
+// Seedance multimodal context
+const seedanceResult = await client.createVideoProject({
+  modelId: 'seedance-2-0',
+  positivePrompt: 'Use @Image1 as product identity, @Video1 for camera movement, and @Audio1 for music rhythm. Create one cohesive launch spot.',
+  referenceImageUrls: ['https://cdn.example.com/product.png'],
+  referenceVideoUrls: ['https://cdn.example.com/motion-reference.mp4'],
+  referenceAudioUrls: ['https://cdn.example.com/music-reference.m4a'],
+  width: 1920,
+  height: 1088,
+  duration: 8,
+  fps: 24,
+  numberOfMedia: 1,
+});
+
 // Image-to-Video with interpolation
 const i2vResult = await client.createVideoProject({
   modelId: 'wan_v2.2-14b-fp8_i2v_lightx2v',
@@ -397,7 +427,7 @@ const result = await client.createChatCompletion({
         {
           type: 'image_url',
           image_url: {
-            url: 'https://example.com/photo.jpg',
+            url: 'data:image/jpeg;base64,...',
             detail: 'high',
           },
         },
@@ -445,7 +475,7 @@ Run these scripts with `npx tsx`:
 
 - `examples/llm-chat-basic.ts`
 - `examples/llm-chat-streaming.ts`
-- `examples/llm-chat-vision.ts --image https://<sogni-hosted-image-url>`
+- `examples/llm-chat-vision.ts --image examples/duck.jpg`
 - `examples/llm-tool-calling-custom.ts`
 - `examples/llm-tool-calling-sogni-tools.ts` (supports `--dry-run`)
 
@@ -617,7 +647,7 @@ const client = new SogniClientWrapper({
 - `getCurrentAccount(): CurrentAccount | null`: Returns the SDK's current account snapshot if the client has connected.
 - `getTrackedProjects(): Project[]`: Returns the projects currently tracked by the underlying SDK instance.
 - `getSizePresets(network: 'fast' \| 'relaxed', modelId: string): Promise<SizePreset[]>`: Gets available output size presets for a model.
-- `estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate>`: Estimates video generation costs (frames/duration, fps, steps, size).
+- `estimateVideoCost(params: VideoCostEstimateParams): Promise<CostEstimate>`: Estimates video generation costs (frames/duration, fps, steps, size, Seedance video-input pricing).
 - `estimateAudioCost(params: AudioCostEstimateParams): Promise<CostEstimate>`: Estimates audio generation costs (duration, steps, count).
 - `createChatCompletion(params)`: Creates chat completions (streaming or non-streaming, including `tools` / `tool_choice` function calling).
 - `executeChatTool(toolCall, options?)`: Executes a single Sogni platform tool call returned by chat.
@@ -780,7 +810,7 @@ To run the end-to-end tests, you need to provide your Sogni API credentials via 
    # SOGNI_LLM_MODEL=qwen3-30b-a3b-gptq-int4
    # Optional: force a specific vision-capable LLM model for the vision example/e2e test
    # SOGNI_VISION_MODEL=qwen2.5-vl-72b-instruct
-   # Optional: use an existing Sogni-hosted image URL for the vision e2e test
+   # Optional: use an existing image URL or data URI for the vision e2e test
    # SOGNI_VISION_IMAGE_URL=https://complete-images-production.s3-accelerate.amazonaws.com/...
    # Optional: fail suite if LLM tests cannot run (default: skip LLM tests if unavailable)
    # SOGNI_REQUIRE_LLM_E2E=true

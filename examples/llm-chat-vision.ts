@@ -1,4 +1,6 @@
 import { config } from 'dotenv';
+import { extname } from 'path';
+import { readFile } from 'fs/promises';
 import { SogniClientWrapper, type ChatMessage } from '../src';
 import {
   getArgValue,
@@ -15,19 +17,42 @@ function resolveImageInput(): string {
   const image = getArgValue('--image');
   if (!image) {
     throw new Error(
-      'Missing --image <sogni-hosted-url>. The current backend does not accept inline data URIs for vision chat.'
+      'Missing --image <path-or-data-uri>. Vision chat requires an inline base64 data URI; local files are converted automatically.'
     );
   }
   return image;
 }
 
-function toImageUrl(imageInput: string): string {
-  if (/^https?:/i.test(imageInput)) {
+function contentTypeForPath(path: string): string {
+  switch (extname(path).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.webp':
+      return 'image/webp';
+    case '.gif':
+      return 'image/gif';
+    default:
+      return 'image/png';
+  }
+}
+
+async function toImageDataUri(imageInput: string): Promise<string> {
+  if (imageInput.startsWith('data:')) {
     return imageInput;
   }
-  throw new Error(
-    `Unsupported image input: ${imageInput}. Vision chat currently requires a Sogni-hosted https URL.`
-  );
+  if (/^https?:/i.test(imageInput)) {
+    const response = await fetch(imageInput);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get('content-type')?.split(';')[0] || 'image/png';
+    const arrayBuffer = await response.arrayBuffer();
+    return `data:${contentType};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+  }
+
+  const buffer = await readFile(imageInput);
+  return `data:${contentTypeForPath(imageInput)};base64,${buffer.toString('base64')}`;
 }
 
 async function main() {
@@ -37,7 +62,7 @@ async function main() {
 
   const imageInput = resolveImageInput();
   const prompt = resolvePrompt();
-  const imageUrl = toImageUrl(imageInput);
+  const imageUrl = await toImageDataUri(imageInput);
 
   const client = new SogniClientWrapper({
     username: process.env.SOGNI_USERNAME,

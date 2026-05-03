@@ -40,6 +40,95 @@ export function isAudioProjectConfig(config: ProjectConfig): config is AudioProj
   return config.type === 'audio';
 }
 
+function isSeedanceVideoModel(modelId: string): boolean {
+  return modelId.startsWith('seedance-2-0');
+}
+
+function isLtx2VideoModel(modelId: string): boolean {
+  return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
+}
+
+function isWanAnimateVideoModel(modelId: string): boolean {
+  return (
+    modelId.includes('_animate-move') ||
+    modelId.includes('_animate-replace') ||
+    modelId.includes('_animate_move') ||
+    modelId.includes('_animate_replace')
+  );
+}
+
+function getVideoDurationLimits(modelId: string): { min: number; max: number } {
+  if (isSeedanceVideoModel(modelId)) {
+    return { min: 4, max: 15 };
+  }
+  if (isLtx2VideoModel(modelId) || isWanAnimateVideoModel(modelId)) {
+    return { min: 1, max: 20 };
+  }
+  return { min: 1, max: 10 };
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function validateReferenceUrlArray(value: unknown, propertyName: string): string[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new SogniValidationError(`${propertyName} must be an array of HTTPS URL strings`);
+  }
+
+  const urls = value.map((url) => (typeof url === 'string' ? url.trim() : url));
+  if (
+    urls.some(
+      (url) => typeof url !== 'string' || url.length === 0 || !isHttpsUrl(url)
+    )
+  ) {
+    throw new SogniValidationError(`${propertyName} must contain only HTTPS URL strings`);
+  }
+
+  return urls as string[];
+}
+
+function validateSeedanceReferenceAssets(config: VideoProjectConfig): void {
+  const referenceImageUrls = validateReferenceUrlArray(config.referenceImageUrls, 'referenceImageUrls');
+  const referenceVideoUrls = validateReferenceUrlArray(config.referenceVideoUrls, 'referenceVideoUrls');
+  const referenceAudioUrls = validateReferenceUrlArray(config.referenceAudioUrls, 'referenceAudioUrls');
+
+  const imageCount =
+    (config.referenceImage ? 1 : 0) +
+    (config.referenceImageEnd ? 1 : 0) +
+    referenceImageUrls.length;
+  const videoCount = (config.referenceVideo ? 1 : 0) + referenceVideoUrls.length;
+  const audioCount =
+    (config.referenceAudio || config.referenceAudioIdentity ? 1 : 0) + referenceAudioUrls.length;
+  const totalAssetCount = imageCount + videoCount + audioCount;
+
+  if (imageCount > 9) {
+    throw new SogniValidationError('Seedance supports at most 9 image assets');
+  }
+  if (videoCount > 3) {
+    throw new SogniValidationError('Seedance supports at most 3 video assets');
+  }
+  if (audioCount > 3) {
+    throw new SogniValidationError('Seedance supports at most 3 audio assets');
+  }
+  if (totalAssetCount > 12) {
+    throw new SogniValidationError('Seedance supports at most 12 total asset files');
+  }
+  if (audioCount > 0 && imageCount === 0 && videoCount === 0) {
+    throw new SogniValidationError(
+      'Seedance audio references require at least one image or video reference'
+    );
+  }
+}
+
 /**
  * Get the maximum number of context images supported by a model
  */
@@ -243,6 +332,34 @@ export function validateProjectConfig(config: ProjectConfig): void {
       throw new SogniValidationError('Video output format must be "mp4"');
     }
 
+    const isSeedance = isSeedanceVideoModel(config.modelId);
+    if (!isSeedance) {
+      if (config.referenceImageUrls || config.referenceVideoUrls || config.referenceAudioUrls) {
+        throw new SogniValidationError(
+          'referenceImageUrls, referenceVideoUrls, and referenceAudioUrls are supported only by Seedance models'
+        );
+      }
+    } else {
+      validateSeedanceReferenceAssets(config);
+    }
+
+    if (config.generateAudio !== undefined && typeof config.generateAudio !== 'boolean') {
+      throw new SogniValidationError('generateAudio must be a boolean');
+    }
+
+    if (config.duration !== undefined) {
+      const limits = getVideoDurationLimits(config.modelId);
+      if (
+        typeof config.duration !== 'number' ||
+        config.duration < limits.min ||
+        config.duration > limits.max
+      ) {
+        throw new SogniValidationError(
+          `Video duration must be between ${limits.min} and ${limits.max} seconds`
+        );
+      }
+    }
+
     if (config.frames !== undefined) {
       if (typeof config.frames !== 'number' || config.frames < 1 || config.frames > 2001) {
         throw new SogniValidationError('Frames must be between 1 and 2001');
@@ -252,6 +369,9 @@ export function validateProjectConfig(config: ProjectConfig): void {
     if (config.fps !== undefined) {
       if (typeof config.fps !== 'number' || config.fps < 1 || config.fps > 60) {
         throw new SogniValidationError('FPS must be between 1 and 60');
+      }
+      if (isSeedance && config.fps !== 24) {
+        throw new SogniValidationError('Seedance models use fixed 24fps video generation');
       }
     }
 

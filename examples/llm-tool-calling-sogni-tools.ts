@@ -64,7 +64,7 @@ async function executeSogniTool(
     return { error: `Unsupported tool: ${toolCall.function.name}` };
   }
 
-  if (toolCall.function.name === 'sogni_generate_image') {
+  if (toolCall.function.name === 'generate_image') {
     const modelId = selectModel(models, 'image', args.model);
     const positivePrompt = asString(args.prompt, 'An abstract composition');
     const negativePrompt = asString(args.negative_prompt, '');
@@ -104,7 +104,7 @@ async function executeSogniTool(
     };
   }
 
-  if (toolCall.function.name === 'sogni_generate_video') {
+  if (toolCall.function.name === 'generate_video') {
     const modelId = selectModel(
       models,
       'video',

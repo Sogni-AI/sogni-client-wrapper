@@ -1482,7 +1482,7 @@ async function runTests() {
     const sogniCall: ToolCall = {
       id: 'tc-1',
       type: 'function',
-      function: { name: 'sogni_generate_image', arguments: '{}' },
+      function: { name: 'generate_image', arguments: '{}' },
     };
     const customCall: ToolCall = {
       id: 'tc-2',
@@ -1491,7 +1491,7 @@ async function runTests() {
     };
 
     if (!isSogniToolCall(sogniCall)) {
-      throw new Error('Expected sogni_generate_image to be identified as Sogni tool');
+      throw new Error('Expected generate_image to be identified as Sogni tool');
     }
     if (isSogniToolCall(customCall)) {
       throw new Error('Expected get_weather to not be identified as Sogni tool');
@@ -1693,17 +1693,9 @@ async function runTests() {
     ];
 
     (client as any).client = {
-      creativeWorkflows: {
+      workflows: {
         start: async (...args: any[]) => {
           calls.push({ method: 'start', args });
-          return workflow;
-        },
-        startImageToVideo: async (...args: any[]) => {
-          calls.push({ method: 'startImageToVideo', args });
-          return workflow;
-        },
-        startHostedToolSequence: async (...args: any[]) => {
-          calls.push({ method: 'startHostedToolSequence', args });
           return workflow;
         },
         list: async (...args: any[]) => {
@@ -1736,21 +1728,16 @@ async function runTests() {
     };
 
     await client.startCreativeWorkflow({
-      kind: 'image_to_video',
-      input: { prompt: 'Turn this into a short product video' },
+      input: {
+        title: 'Image to video',
+        steps: [
+          {
+            toolName: 'generate_video',
+            arguments: { prompt: 'Turn this into a short product video' },
+          },
+        ],
+      },
       tokenType: 'spark',
-    });
-    await client.startImageToVideoWorkflow(
-      { prompt: 'Animate this image' },
-      { tokenType: 'sogni' }
-    );
-    await client.startHostedToolSequenceWorkflow({
-      steps: [
-        {
-          toolName: 'sogni_generate_video',
-          arguments: { prompt: 'Render a preview' },
-        },
-      ],
     });
     await client.listCreativeWorkflows({ limit: 5 });
     await client.getCreativeWorkflow('wf-1');
@@ -1773,8 +1760,6 @@ async function runTests() {
     const methodsSeen = calls.map((call) => call.method);
     const requiredMethods = [
       'start',
-      'startImageToVideo',
-      'startHostedToolSequence',
       'list',
       'get',
       'events',

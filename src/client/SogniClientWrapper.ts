@@ -44,8 +44,6 @@ import type {
   ListCreativeWorkflowOptions,
   StartCreativeWorkflowOptions,
   StartCreativeWorkflowParams,
-  StartHostedToolSequenceWorkflowInput,
-  StartImageToVideoWorkflowInput,
   StreamCreativeWorkflowEventsOptions,
 } from '../types';
 import { ClientEvent } from '../types';
@@ -473,29 +471,7 @@ export class SogniClientWrapper extends EventEmitter {
     options?: StartCreativeWorkflowOptions
   ): Promise<CreativeWorkflowRecord> {
     await this.ensureConnected();
-    return this.client!.creativeWorkflows.start(params, options);
-  }
-
-  /**
-   * Start an image-to-video creative workflow
-   */
-  async startImageToVideoWorkflow(
-    input: StartImageToVideoWorkflowInput,
-    options?: StartCreativeWorkflowOptions & { tokenType?: 'sogni' | 'spark' }
-  ): Promise<CreativeWorkflowRecord> {
-    await this.ensureConnected();
-    return this.client!.creativeWorkflows.startImageToVideo(input, options);
-  }
-
-  /**
-   * Start a hosted tool sequence creative workflow
-   */
-  async startHostedToolSequenceWorkflow(
-    input: StartHostedToolSequenceWorkflowInput,
-    options?: StartCreativeWorkflowOptions & { tokenType?: 'sogni' | 'spark' }
-  ): Promise<CreativeWorkflowRecord> {
-    await this.ensureConnected();
-    return this.client!.creativeWorkflows.startHostedToolSequence(input, options);
+    return this.client!.workflows.start(params, options);
   }
 
   /**
@@ -505,7 +481,7 @@ export class SogniClientWrapper extends EventEmitter {
     options?: ListCreativeWorkflowOptions
   ): Promise<CreativeWorkflowRecord[]> {
     await this.ensureConnected();
-    return this.client!.creativeWorkflows.list(options);
+    return this.client!.workflows.list(options);
   }
 
   /**
@@ -513,7 +489,7 @@ export class SogniClientWrapper extends EventEmitter {
    */
   async getCreativeWorkflow(workflowId: string): Promise<CreativeWorkflowRecord> {
     await this.ensureConnected();
-    return this.client!.creativeWorkflows.get(workflowId);
+    return this.client!.workflows.get(workflowId);
   }
 
   /**
@@ -521,7 +497,7 @@ export class SogniClientWrapper extends EventEmitter {
    */
   async getCreativeWorkflowEvents(workflowId: string): Promise<CreativeWorkflowEvent[]> {
     await this.ensureConnected();
-    return this.client!.creativeWorkflows.events(workflowId);
+    return this.client!.workflows.events(workflowId);
   }
 
   /**
@@ -529,7 +505,7 @@ export class SogniClientWrapper extends EventEmitter {
    */
   async cancelCreativeWorkflow(workflowId: string): Promise<CreativeWorkflowRecord> {
     await this.ensureConnected();
-    return this.client!.creativeWorkflows.cancel(workflowId);
+    return this.client!.workflows.cancel(workflowId);
   }
 
   /**
@@ -540,7 +516,7 @@ export class SogniClientWrapper extends EventEmitter {
     options?: StreamCreativeWorkflowEventsOptions
   ): Promise<AsyncIterableIterator<CreativeWorkflowSseEvent>> {
     await this.ensureConnected();
-    return this.client!.creativeWorkflows.streamEvents(workflowId, options);
+    return this.client!.workflows.streamEvents(workflowId, options);
   }
 
   /**

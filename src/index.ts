@@ -134,7 +134,6 @@ export {
   ChatStream,
   CreativeWorkflowsApi,
   SogniTools,
-  buildSogniTools,
   isSogniToolCall,
   parseCreativeWorkflowSseChunk,
   parseToolCallArguments,

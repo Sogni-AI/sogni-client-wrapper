@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import {
   SogniClientWrapper,
-  buildSogniTools,
+  SogniTools,
   isSogniToolCall,
   parseToolCallArguments,
   type ChatMessage,
@@ -237,7 +237,7 @@ async function main() {
   try {
     const llmModel = await resolveChatModel(client);
     const mediaModels = await client.getAvailableModels({ minWorkers: 1 });
-    const tools = buildSogniTools(mediaModels.map((m) => ({ id: m.id, media: m.media })));
+    const tools = SogniTools.all;
 
     const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
 

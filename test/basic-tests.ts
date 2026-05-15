@@ -30,7 +30,6 @@ import {
   type InputMedia,
   type VideoControlNetName,
   type VideoControlNetParams,
-  buildSogniTools,
   SogniTools,
   isSogniToolCall,
   parseToolCallArguments,
@@ -1467,13 +1466,9 @@ async function runTests() {
       throw new Error('Missing one or more built-in Sogni tool definitions');
     }
 
-    const tools = buildSogniTools([
-      { id: 'flux1-schnell-fp8', media: 'image' },
-      { id: 'wan_v2.2-14b-fp8_t2v_lightx2v', media: 'video' },
-      { id: 'ace_step_1.5_turbo', media: 'audio' },
-    ]);
-    if (!Array.isArray(tools) || tools.length < 3) {
-      throw new Error('buildSogniTools did not return expected tool array');
+    const all = SogniTools.all;
+    if (!Array.isArray(all) || all.length !== 24) {
+      throw new Error(`SogniTools.all expected 24 tools, got ${all.length}`);
     }
   })();
 

@@ -7,53 +7,55 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist-esm/index.js",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
-      "import": "./dist/contracts/index.mjs",
+      "import": "./dist-esm/contracts/index.js",
       "require": "./dist/contracts/index.js",
       "default": "./dist/contracts/index.js"
     },
     "./tools": {
       "types": "./dist/tools/index.d.ts",
-      "import": "./dist/tools/index.mjs",
+      "import": "./dist-esm/tools/index.js",
       "require": "./dist/tools/index.js",
       "default": "./dist/tools/index.js"
     },
     "./replay": {
       "types": "./dist/replay/index.d.ts",
-      "import": "./dist/replay/index.mjs",
+      "import": "./dist-esm/replay/index.js",
       "require": "./dist/replay/index.js",
       "default": "./dist/replay/index.js"
     },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
-      "import": "./dist/runtime/index.mjs",
+      "import": "./dist-esm/runtime/index.js",
       "require": "./dist/runtime/index.js",
       "default": "./dist/runtime/index.js"
     },
     "./skills/asset_reference_management": {
       "types": "./dist/skills/asset_reference_management/index.d.ts",
-      "import": "./dist/skills/asset_reference_management/index.mjs",
+      "import": "./dist-esm/skills/asset_reference_management/index.js",
       "require": "./dist/skills/asset_reference_management/index.js",
       "default": "./dist/skills/asset_reference_management/index.js"
     },
     "./workflows": {
       "types": "./dist/workflows/index.d.ts",
-      "import": "./dist/workflows/index.mjs",
+      "import": "./dist-esm/workflows/index.js",
       "require": "./dist/workflows/index.js",
       "default": "./dist/workflows/index.js"
     },
     "./media": {
       "types": "./dist/media/index.d.ts",
-      "import": "./dist/media/index.mjs",
+      "import": "./dist-esm/media/index.js",
       "require": "./dist/media/index.js",
       "default": "./dist/media/index.js"
     },
     "./public-skill-runtime": {
       "types": "./dist/public-skill-runtime/index.d.ts",
-      "import": "./dist/public-skill-runtime/index.mjs",
+      "import": "./dist-esm/public-skill-runtime/index.js",
       "require": "./dist/public-skill-runtime/index.js",
       "default": "./dist/public-skill-runtime/index.js"
     },
@@ -61,8 +63,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "sync:subpath-shims": "node scripts/generate-subpath-shims.mjs",
-    "build": "npm run sync:subpath-shims && tsc && node scripts/copy-esm-shims.mjs",
+    "build": "tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package-json.mjs",
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
@@ -104,7 +105,6 @@
   "homepage": "https://github.com/Sogni-AI/sogni-intelligence-client#readme",
   "dependencies": {
     "@sogni-ai/sogni-client": "5.0.0-alpha.1",
-    "@sogni/creative-agent": "file:../sogni-creative-agent",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
@@ -118,6 +118,15 @@
   },
   "files": [
     "dist",
+    "dist-esm",
+    "contracts",
+    "media",
+    "workflows",
+    "replay",
+    "runtime",
+    "tools",
+    "public-skill-runtime",
+    "skills",
     "README.md",
     "LICENSE",
     ".env.example"

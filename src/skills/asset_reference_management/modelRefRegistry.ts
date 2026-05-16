@@ -1,0 +1,176 @@
+/**
+ * Per-model formatting of `model_ref` tokens.
+ *
+ * Each model expects a different literal in its prompt to refer to an
+ * input asset. The registry keeps these formats in one place so adapter
+ * code, manifest helpers, and prompt validators can agree on the
+ * canonical form.
+ *
+ * Adding a new model: add an entry to `MODEL_REF_FORMATS` with both a
+ * `format(index, type)` builder and a `parse(token)` matcher. The two
+ * must round-trip — `parse(format(i, t)) === { index: i, type: t? }`.
+ * A parser may also accept natural-language aliases that the model can
+ * understand, but `format()` remains the canonical emitted form.
+ */
+
+import type { AssetType, KnownAssetModelId } from './types.js';
+
+export interface ParsedModelRef {
+  /** 1-indexed unless the format is explicitly 0-indexed. */
+  index: number;
+  /** Asset type, when the format encodes it (Seedance "@Video1" / "@Image1"). */
+  type?: AssetType;
+}
+
+export interface ModelRefFormat {
+  format(index: number, type: AssetType): string;
+  parse(token: string): ParsedModelRef | null;
+  /** Regex matching reference-like tokens this format owns for validation. */
+  scanRegex: RegExp;
+}
+
+export interface ModelRefFormatResolution {
+  format: ModelRefFormat;
+  model_id: KnownAssetModelId | 'unknown';
+  fell_back: boolean;
+}
+
+const SEEDANCE_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `@Video${index}`;
+    if (type === 'audio') return `@Audio${index}`;
+    return `@Image${index}`;
+  },
+  parse(token) {
+    const m = /^@(Image|Video|Audio)(\d+)$/.exec(token.trim());
+    if (!m) return null;
+    const idx = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(idx) || idx < 1) return null;
+    const t: AssetType = m[1] === 'Video' ? 'video' : m[1] === 'Audio' ? 'audio' : 'image';
+    return { index: idx, type: t };
+  },
+  scanRegex: /@(?:Image|Video|Audio)\d+/g,
+};
+
+const GPT_IMAGE_2_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `Video ${index}`;
+    if (type === 'audio') return `Audio ${index}`;
+    return `Image ${index}`;
+  },
+  parse(token) {
+    const m = /^(Image|Video|Audio)\s+(\d+)$/.exec(token.trim());
+    if (!m) return null;
+    const kind = m[1]!;
+    const idx = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(idx) || idx < 1) return null;
+    const t: AssetType = kind === 'Video' ? 'video' : kind === 'Audio' ? 'audio' : 'image';
+    return { index: idx, type: t };
+  },
+  scanRegex: /(?<!@)(?<!\b[Gg][Pp][Tt]\s)(?:\[(?:Image|Video|Audio)\s+\d+\]|\b(?:Image|Video|Audio)\s+\d+\b)/g,
+};
+
+/**
+ * Context-conditioned models (LTX-2.3, some Wan variants, qwen-image-edit)
+ * use 0-indexed positional `context_image_N` / `context_video_N` slots.
+ */
+const CONTEXT_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    const slot = Math.max(0, index - 1);
+    if (type === 'video') return `context_video_${slot}`;
+    if (type === 'audio') return `context_audio_${slot}`;
+    return `context_image_${slot}`;
+  },
+  parse(token) {
+    const m = /^context_(image|video|audio)_(\d+)$/.exec(token.trim());
+    if (!m) return null;
+    const slot = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(slot) || slot < 0) return null;
+    return {
+      index: slot + 1,
+      type: m[1] as AssetType,
+    };
+  },
+  scanRegex: /context_(?:image|video|audio)_\d+/g,
+};
+
+const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
+  seedance: SEEDANCE_FORMAT,
+  'gpt-image-2': GPT_IMAGE_2_FORMAT,
+  ltx23: CONTEXT_FORMAT,
+  wan: CONTEXT_FORMAT,
+  'qwen-image-edit': CONTEXT_FORMAT,
+  flux: GPT_IMAGE_2_FORMAT,
+};
+
+function cloneGlobalRegex(regex: RegExp): RegExp {
+  return new RegExp(regex.source, regex.flags.includes('g') ? regex.flags : `${regex.flags}g`);
+}
+
+/**
+ * Resolve the format for a `model_id`. Unknown ids fall back to the
+ * GPT-Image-2 `Image N` shape, which is the most readable default.
+ */
+export function getModelRefFormat(modelId: string): ModelRefFormat {
+  return getModelRefFormatResolution(modelId).format;
+}
+
+export function getModelRefFormatResolution(modelId: string): ModelRefFormatResolution {
+  const trimmed = modelId.trim().toLowerCase();
+  if (trimmed in MODEL_REF_FORMATS) {
+    return {
+      format: MODEL_REF_FORMATS[trimmed as KnownAssetModelId],
+      model_id: trimmed as KnownAssetModelId,
+      fell_back: false,
+    };
+  }
+  // Heuristic fallbacks — model ids in chat are sometimes more specific
+  // (e.g. "ltx23-fast", "seedance-1080p").
+  if (trimmed.startsWith('seedance')) return { format: SEEDANCE_FORMAT, model_id: 'seedance', fell_back: false };
+  if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) {
+    return {
+      format: GPT_IMAGE_2_FORMAT,
+      model_id: trimmed.startsWith('flux') ? 'flux' : 'gpt-image-2',
+      fell_back: false,
+    };
+  }
+  if (
+    trimmed.startsWith('ltx') ||
+    trimmed.startsWith('wan') ||
+    trimmed.startsWith('qwen-image')
+  ) {
+    return {
+      format: CONTEXT_FORMAT,
+      model_id: trimmed.startsWith('wan') ? 'wan' : trimmed.startsWith('qwen-image') ? 'qwen-image-edit' : 'ltx23',
+      fell_back: false,
+    };
+  }
+  console.warn(`[ASSET REF] Unknown model_id "${modelId}" fell back to GPT Image 2 model_ref format.`);
+  return {
+    format: GPT_IMAGE_2_FORMAT,
+    model_id: 'unknown',
+    fell_back: true,
+  };
+}
+
+export function getModelRefFormatEntries(): ReadonlyArray<{
+  model_id: KnownAssetModelId;
+  format: ModelRefFormat;
+}> {
+  return (Object.entries(MODEL_REF_FORMATS) as Array<[KnownAssetModelId, ModelRefFormat]>)
+    .map(([model_id, format]) => ({
+      model_id,
+      format: {
+        ...format,
+        scanRegex: cloneGlobalRegex(format.scanRegex),
+      },
+    }));
+}
+
+export function formatModelRef(modelId: string, index: number, type: AssetType): string {
+  return getModelRefFormat(modelId).format(index, type);
+}
+
+export function listKnownAssetModelIds(): KnownAssetModelId[] {
+  return Object.keys(MODEL_REF_FORMATS) as KnownAssetModelId[];
+}

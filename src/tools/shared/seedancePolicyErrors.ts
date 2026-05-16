@@ -1,0 +1,331 @@
+/**
+ * Seedance-specific terminal policy & generation-failure error taxonomy.
+ *
+ * Pure logic — used by browser chat, hosted chat in sogni-api, and the skill
+ * runtime so all three speak the same Seedance error contract.
+ */
+import {
+  vendorModelPremiumPayloadFromError,
+  type VendorModelPremiumRequiredPayload,
+} from '../../media/index.js';
+
+export const SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE =
+  'InputImageSensitiveContentDetected.PrivacyInformation';
+
+export const SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE =
+  "Seedance rejected the input image because it may contain a real person. Seedance Video currently doesn't allow photographic depictions of real people. Please use a non-real-person or more stylized reference image, or switch to another video model.";
+
+export const SEEDANCE_PROVIDER_CONTENT_POLICY_MESSAGE =
+  "Seedance blocked this video because it did not pass the provider's content policy. No video was returned.";
+
+export const SEEDANCE_VENDOR_GENERATION_FAILED_MESSAGE =
+  "Seedance couldn't complete this video after it started, so no media was generated. The provider did not return a specific reason. Please retry once; if it fails again, report the issue from this message.";
+
+export const SEEDANCE_REFERENCE_AUDIO_TOO_LONG_MESSAGE =
+  'Seedance rejected the reference audio because it is longer than this video mode allows. Use an audio clip at or below the provider limit, or retry with the audio trimmed to that length.';
+
+export interface SeedanceTerminalPolicyPayload {
+  error: 'seedance_input_image_privacy_policy' | 'seedance_content_policy';
+  message: typeof SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE | typeof SEEDANCE_PROVIDER_CONTENT_POLICY_MESSAGE;
+  retryPolicy: 'manual_user_confirmation';
+  nextAction: 'wait_for_user';
+  vendorCode?: 5061;
+  vendorErrorCode: typeof SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE | string;
+}
+
+export interface SeedanceTerminalGenerationFailurePayload {
+  error: 'seedance_generation_failed' | 'seedance_reference_audio_too_long';
+  message: string;
+  retryPolicy: 'manual_user_confirmation';
+  nextAction: 'wait_for_user';
+  reportIssue?: true;
+  reportIssueReason?: string;
+  vendorError?: string;
+  vendorErrorCode?: string;
+  maxAudioDurationSeconds?: number;
+}
+
+export class SeedanceTerminalPolicyError extends Error {
+  readonly payload: SeedanceTerminalPolicyPayload;
+
+  constructor(payload: SeedanceTerminalPolicyPayload) {
+    super(payload.message);
+    this.name = 'SeedanceTerminalPolicyError';
+    this.payload = payload;
+  }
+}
+
+function collectErrorText(value: unknown, seen = new WeakSet<object>()): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (value instanceof Error) {
+    const cause = (value as { cause?: unknown }).cause;
+    return [
+      value.name,
+      value.message,
+      cause ? collectErrorText(cause, seen) : '',
+    ].filter(Boolean).join(' ');
+  }
+  if (typeof value !== 'object') return String(value);
+  if (seen.has(value)) return '';
+  seen.add(value);
+
+  const record = value as Record<string, unknown>;
+  const nested = Object.values(record)
+    .map((nestedValue) => collectErrorText(nestedValue, seen))
+    .filter(Boolean)
+    .join(' ');
+
+  try {
+    return `${JSON.stringify(value)} ${nested}`.trim();
+  } catch {
+    return nested;
+  }
+}
+
+function hasVendorCode5061(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'number') return value === 5061;
+  if (typeof value === 'string') return value.trim() === '5061';
+  if (value instanceof Error) {
+    const cause = (value as { cause?: unknown }).cause;
+    return cause ? hasVendorCode5061(cause, seen) : false;
+  }
+  if (typeof value !== 'object') return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+
+  const record = value as Record<string, unknown>;
+  if (record.code === 5061 || record.code === '5061') return true;
+  return Object.values(record).some((nestedValue) =>
+    hasVendorCode5061(nestedValue, seen),
+  );
+}
+
+function textHasSeedanceRealPersonPrivacySignal(text: string): boolean {
+  return (
+    /\bmay\s+contain\s+(?:a\s+)?real\s+person\b/i.test(text) ||
+    /\bcontains?\s+(?:a\s+)?real\s+person\b/i.test(text) ||
+    /\bphotographic\s+depictions?\s+of\s+real\s+people\b/i.test(text)
+  );
+}
+
+function textHasSeedanceContentPolicySignal(text: string): boolean {
+  return (
+    /\bcontent[_\s-]?policy\b/i.test(text) ||
+    /\bmoderation\b/i.test(text) ||
+    /\bsafety\s+(?:system|review|violation|violations)\b/i.test(text) ||
+    /\bsafety[_\s-]?violations?\b/i.test(text) ||
+    /\bSensitiveContentDetected\b/i.test(text) ||
+    /\bsensitive\s+content\b/i.test(text) ||
+    /\bnsfw\b/i.test(text)
+  );
+}
+
+function vendorErrorCodeFromText(text: string): string | null {
+  const jsonCode = text.match(/"code"\s*:\s*"([^"]+)"/i)?.[1];
+  return jsonCode ?? null;
+}
+
+function seedanceAudioDurationLimitFromText(text: string): number | null {
+  const match = text.match(
+    /\baudio\s+duration\b[\s\S]{0,180}\b(?:less than or equal to|<=|no more than|maximum(?:\s+of)?)\s+(\d+(?:\.\d+)?)\b/i,
+  );
+  if (!match?.[1]) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+/**
+ * BytePlus / Seedance returns terse `InvalidParameter` messages embedded in a
+ * `400 {"error":{...,"message":"…"}}` blob. Pull the inner message so we can
+ * surface it to the user instead of swallowing it as a generic
+ * "no specific reason" failure.
+ */
+function seedanceInvalidParameterMessageFromText(text: string): string | null {
+  if (!text) return null;
+  // Capture both `"message":"…"` and `'message':'…'` shapes.
+  const match = text.match(
+    /"(?:message|Message)"\s*:\s*"((?:[^"\\]|\\.)*)"/,
+  );
+  if (!match?.[1]) return null;
+  let parsed = match[1];
+  try {
+    parsed = JSON.parse(`"${parsed}"`);
+  } catch {
+    /* leave raw — escapes will read fine in plain English */
+  }
+  parsed = parsed.replace(/\s*Request id:\s*[A-Za-z0-9._-]+/i, '').trim();
+  return parsed.length > 0 ? parsed : null;
+}
+
+interface SeedanceInvalidParameterShape {
+  /** The raw vendor-facing message (already stripped of request ids). */
+  vendorMessage: string;
+  /** A plain-language summary the chat UI can show to the user. */
+  userMessage: string;
+}
+
+const SEEDANCE_FRAME_REFERENCE_CONFLICT_PATTERN =
+  /\bfirst\/last frame content cannot be mixed with reference media content\b/i;
+
+// sogni-socket rejects any request that combines first/last-frame parameter
+// images with reference media (audio, video, or extra image references)
+// pre-flight. The dispatcher does not silently adapt — the prompt format
+// differs between the two BytePlus modes, so collapsing one into the other
+// would leave the prompt mismatched with the dispatch and degrade results.
+// The socket's rejection text already names both modes and the recommended
+// next steps, so we treat it as the canonical user-facing explanation.
+const SEEDANCE_SOCKET_MIXED_MODE_PATTERN =
+  /\bSeedance rejects requests that combine first\/last-frame images with reference media\b/i;
+
+/**
+ * Map a recognised Seedance `InvalidParameter` message onto a user-facing
+ * explanation. Falls back to surfacing the vendor text verbatim.
+ */
+function shapeSeedanceInvalidParameterMessage(
+  vendorMessage: string,
+): SeedanceInvalidParameterShape {
+  if (SEEDANCE_SOCKET_MIXED_MODE_PATTERN.test(vendorMessage)) {
+    // The socket's pre-flight rejection already lists both modes and the
+    // recommended next steps; pass it through verbatim.
+    return { vendorMessage, userMessage: vendorMessage };
+  }
+  if (SEEDANCE_FRAME_REFERENCE_CONFLICT_PATTERN.test(vendorMessage)) {
+    return {
+      vendorMessage,
+      userMessage:
+        "Seedance can't combine a locked first/last frame image with audio, video, or extra image references in the same request. Send the image as a reference instead of a frame anchor, or remove the audio/video reference and try again.",
+    };
+  }
+  return {
+    vendorMessage,
+    userMessage: `Seedance rejected the request: ${vendorMessage}`,
+  };
+}
+
+export function seedanceTerminalPolicyPayloadFromError(
+  error: unknown,
+): SeedanceTerminalPolicyPayload | null {
+  if (error instanceof SeedanceTerminalPolicyError) return error.payload;
+
+  const text = collectErrorText(error);
+  const hasVendorPrivacyCode = text.includes(SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE);
+  const hasRealPersonPrivacySignal = textHasSeedanceRealPersonPrivacySignal(text);
+  const hasContentPolicySignal = textHasSeedanceContentPolicySignal(text);
+  if (!hasVendorPrivacyCode && !hasRealPersonPrivacySignal && !hasContentPolicySignal) return null;
+
+  const isSeedanceError = /\bseedance\b/i.test(text);
+  const hasExpectedVendorCode = hasVendorCode5061(error) || /\b5061\b/.test(text);
+  if (!isSeedanceError && !hasExpectedVendorCode) return null;
+
+  if (!hasVendorPrivacyCode && !hasRealPersonPrivacySignal) {
+    return {
+      error: 'seedance_content_policy',
+      message: SEEDANCE_PROVIDER_CONTENT_POLICY_MESSAGE,
+      retryPolicy: 'manual_user_confirmation',
+      nextAction: 'wait_for_user',
+      ...(hasExpectedVendorCode ? { vendorCode: 5061 } : {}),
+      vendorErrorCode: vendorErrorCodeFromText(text) ?? 'SEEDANCE_CONTENT_POLICY',
+    };
+  }
+
+  return {
+    error: 'seedance_input_image_privacy_policy',
+    message: SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE,
+    retryPolicy: 'manual_user_confirmation',
+    nextAction: 'wait_for_user',
+    ...(hasExpectedVendorCode ? { vendorCode: 5061 } : {}),
+    vendorErrorCode: SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE,
+  };
+}
+
+export function seedanceTerminalPolicyErrorFromError(
+  error: unknown,
+): SeedanceTerminalPolicyError | null {
+  const payload = seedanceTerminalPolicyPayloadFromError(error);
+  return payload ? new SeedanceTerminalPolicyError(payload) : null;
+}
+
+export function seedanceTerminalGenerationFailurePayloadFromError(
+  error: unknown,
+): SeedanceTerminalGenerationFailurePayload | VendorModelPremiumRequiredPayload | null {
+  const premiumPayload = vendorModelPremiumPayloadFromError(error);
+  if (premiumPayload) return premiumPayload;
+
+  const text = collectErrorText(error);
+  if (
+    !/\bAll\s+\d+\s+(?:video generation|sound-to-video|video-to-video)\s+jobs failed\b/i.test(text)
+    && !/\bVendor task\b[\s\S]{0,140}\bstatus=failed\b/i.test(text)
+    && !/\bVendor (?:job|dispatch) failed\b/i.test(text)
+    && !SEEDANCE_SOCKET_MIXED_MODE_PATTERN.test(text)
+  ) {
+    return null;
+  }
+
+  if (SEEDANCE_SOCKET_MIXED_MODE_PATTERN.test(text)) {
+    // Surface the socket's pre-flight rejection verbatim — it already names
+    // both modes and the recommended next steps. Trim to the start of the
+    // mode-naming sentence so any upstream wrapper prose doesn't bury it.
+    const start = text.search(/\bSeedance rejects requests that combine first\/last-frame images with reference media\b/i);
+    const message = start >= 0 ? text.slice(start, start + 1500).trim() : text.slice(0, 1500).trim();
+    return {
+      error: 'seedance_generation_failed',
+      message,
+      retryPolicy: 'manual_user_confirmation',
+      nextAction: 'wait_for_user',
+      vendorErrorCode: 'SEEDANCE_MIXED_MODE_REJECTED',
+      vendorError: text.slice(0, 500),
+    };
+  }
+  const audioDurationLimit = seedanceAudioDurationLimitFromText(text);
+  if (audioDurationLimit !== null) {
+    return {
+      error: 'seedance_reference_audio_too_long',
+      message: `Seedance rejected the reference audio because it is longer than ${audioDurationLimit}s for this video mode. Use an audio clip ${audioDurationLimit}s or shorter, or retry with the audio trimmed to that length.`,
+      retryPolicy: 'manual_user_confirmation',
+      nextAction: 'wait_for_user',
+      vendorErrorCode: 'InvalidParameter',
+      maxAudioDurationSeconds: audioDurationLimit,
+      ...(text ? { vendorError: text.slice(0, 500) } : {}),
+    };
+  }
+  const invalidParameterMessage = seedanceInvalidParameterMessageFromText(text);
+  if (invalidParameterMessage) {
+    if (textHasSeedanceRealPersonPrivacySignal(invalidParameterMessage)) {
+      return {
+        error: 'seedance_generation_failed',
+        message: SEEDANCE_VENDOR_GENERATION_FAILED_MESSAGE,
+        retryPolicy: 'manual_user_confirmation',
+        nextAction: 'wait_for_user',
+        reportIssue: true,
+        reportIssueReason: 'Seedance provider job failed after starting with a privacy-related provider detail.',
+        vendorErrorCode: text.includes(SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE)
+          ? SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE
+          : 'SEEDANCE_PRIVACY_DETAIL',
+        vendorError: text.slice(0, 500),
+      };
+    }
+    const shaped = shapeSeedanceInvalidParameterMessage(invalidParameterMessage);
+    return {
+      error: 'seedance_generation_failed',
+      message: shaped.userMessage,
+      retryPolicy: 'manual_user_confirmation',
+      nextAction: 'wait_for_user',
+      vendorErrorCode: 'InvalidParameter',
+      vendorError: shaped.vendorMessage.slice(0, 500),
+    };
+  }
+  return {
+    error: 'seedance_generation_failed',
+    message: SEEDANCE_VENDOR_GENERATION_FAILED_MESSAGE,
+    retryPolicy: 'manual_user_confirmation',
+    nextAction: 'wait_for_user',
+    reportIssue: true,
+    reportIssueReason: 'Seedance provider job failed after starting without a specific provider reason.',
+    ...(text ? { vendorError: text.slice(0, 500) } : {}),
+  };
+}

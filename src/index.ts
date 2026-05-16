@@ -133,6 +133,7 @@ export {
 export {
   ChatStream,
   CreativeWorkflowsApi,
+  SogniClient,
   SogniTools,
   isSogniToolCall,
   parseCreativeWorkflowSseChunk,

@@ -290,3 +290,34 @@ export type {
   ComposeWorkflowTemplateInputDeclArg,
   BuildComposeWorkflowTemplateToolArgsInput,
 } from './hostedComposition.js';
+
+// Path C re-exports — symbols that creative-agent's pre-flight extractions
+// (Phase 8 Path C commits) added to specific contracts/* files but the
+// wrapper barrel wasn't yet updated to expose. Needed so creative-agent's
+// shim files (which now do `export * from '@sogni-ai/sogni-intelligence-client/contracts'`)
+// can resolve back-compat re-exports of these symbols.
+export {
+  SEEDANCE_STORYBOARD_REFERENCE_PROMPT,
+} from './storyboard.js';
+export {
+  LITERAL_VIDEO_PROMPT_OVERRIDE,
+  LITERAL_SEEDANCE_PROMPT_OVERRIDE,
+  SEEDANCE_EXPAND_PROMPT_DESCRIPTION,
+  GENERATE_VIDEO_SKIP_PROMPT_PROCESSING_DESCRIPTION,
+  ANIMATE_PHOTO_SKIP_PROMPT_PROCESSING_DESCRIPTION,
+  SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE,
+  SEEDANCE_TOOL_AUDIO_REFERENCE_GUIDANCE,
+  SEEDANCE_TOOL_V2V_REFERENCE_GUIDANCE,
+} from './toolPromptMarkers.js';
+export {
+  BACKBONE_VERSIONS,
+  BackboneWorkflowValidationError,
+  MAX_HOSTED_TOOL_SEQUENCE_STEPS,
+  normalizeBackboneDurableWorkflowSteps,
+  buildBackboneDurableWorkflowRun,
+} from './backboneDurableWorkflow.js';
+export {
+  getCostClassNumericWeight,
+  UNKNOWN_COST_CLASS_FALLBACK_WEIGHT,
+  COST_CLASS_NUMERIC_WEIGHTS,
+} from './data/costEstimation.js';

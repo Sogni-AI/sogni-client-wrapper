@@ -4195,7 +4195,11 @@ export function inferExplicitStoryboardFrameCountFromText(text: string): number 
   if (!normalized) return null;
 
   const countToken = String.raw`(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty(?:[-\s]?(?:one|two|three|four))?)`;
-  const countModifiers = String.raw`(?:(?:timed|timecoded|time-coded|sequential|distinct|separate|individual|video|storyboard|story-board|key|scene|shot|clean|polished|portrait|landscape|widescreen)\s+){0,5}`;
+  // Whitelist of adjectives/modifiers commonly placed between an explicit
+  // count and a storyboard unit (e.g. "12 clear beats", "5 quick panels").
+  // The unit nouns below already anchor the match, so keeping a focused
+  // adjective list avoids overreach while accepting natural phrasing.
+  const countModifiers = String.raw`(?:(?:timed|timecoded|time-coded|sequential|distinct|separate|individual|video|storyboard|story-board|key|scene|shot|clean|clear|polished|portrait|landscape|widescreen|quick|short|tight|fast|crisp|simple|core|main|punchy|fun|cool|brief|concise|focused|solid|strong|bold|sharp|smooth|seamless|cinematic|dynamic|engaging|compelling|powerful|tasty|tight-knit)\s+){0,5}`;
   const storyboardUnits = String.raw`(?:panels?|frames?|storyboard\s+frames?|shots?|keyframes?|beats?|cells?|stills?|thumbnails?)`;
   const candidates: number[] = [];
   const patterns = [

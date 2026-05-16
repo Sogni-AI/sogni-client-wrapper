@@ -5,9 +5,11 @@
  * splices the new clip in place of the original segment. It can also splice an
  * existing uploaded/generated video clip into that window via
  * replacementVideoIndex, optionally trimming a source window from that
- * replacement clip first. By default regenerated segments preserve the base
- * video's audio in that window (e.g., dialogue stays intact); existing
- * replacement clips keep their own audio unless keepOriginalAudio=true.
+ * replacement clip first. By default the regenerated segment's own audio
+ * replaces the base video's audio in that window; existing replacement clips
+ * also keep their own audio. Pass keepOriginalAudio=true to mux the base
+ * video's audio over the regenerated window when the user explicitly asks
+ * to preserve the existing audio.
  *
  * Model dispatch:
  *   - LTX-2.3 / Wan 2.2 base → extract boundary frames, render animate_photo
@@ -33,7 +35,7 @@ export const definition: ToolDefinition = {
       'Returns both the standalone replacement clip and the spliced composite. ' +
       'For LTX-2.3 and Wan 2.2 base videos the tool locks both ends with first/last-frame keyframes for seamless edges. ' +
       'For Seedance base videos the tool uses the original window as a reference for video-to-video transformation. If a requested window is shorter than the selected model\'s native render minimum, the handler renders a slightly larger handled clip, trims the result back to the requested seconds, then splices exactly that requested range. ' +
-      'By default the original audio is preserved across regenerated windows so dialogue is not lost; pass keepOriginalAudio=false to also adopt the new regenerated clip\'s audio (set false when the user explicitly asks for new narration/voiceover in the replaced window). When replacementVideoIndex is set, the existing replacement clip keeps its own audio by default; pass keepOriginalAudio=true only when the user explicitly wants the base video audio to stay over the replacement window.',
+      'By default the regenerated segment\'s audio replaces the original audio in the [startSeconds, endSeconds] window, so new motion stays in sync with new sound. Pass keepOriginalAudio=true only when the user explicitly asks to keep the existing audio — phrasings like "keep the audio", "leave the original audio", "preserve the music/score/dialogue", "don\'t change the audio". If the user uses an ambiguous phrasing such as "with the audio" (which could mean either "with the original audio kept" or "with new audio"), DO NOT call this tool yet — first ask the user whether to preserve or replace the original audio in the replaced window. When replacementVideoIndex is set, the existing replacement clip\'s own audio is used; pass keepOriginalAudio=true only when the user explicitly wants the base video audio to stay over the replacement window.',
     parameters: {
       type: 'object',
       properties: {
@@ -83,7 +85,7 @@ export const definition: ToolDefinition = {
         keepOriginalAudio: {
           type: 'boolean',
           description:
-            'When true (default), the audio from the original [startSeconds, endSeconds] window is muxed onto the regenerated visuals so the user keeps the original dialogue/score. When false, the new clip\'s own audio is used (LTX renders fresh audio; Seedance V2V depends on generateAudio). Default: true.',
+            'When true, the audio from the original [startSeconds, endSeconds] window is muxed onto the regenerated visuals so the user keeps the original dialogue/score. When false (default), the new clip\'s own audio is used (LTX renders fresh audio; Seedance V2V depends on generateAudio). Default: false. Set true only when the user explicitly asks to preserve the existing audio; if the user uses an ambiguous phrasing like "with the audio", ask the user to clarify rather than guessing.',
         },
       },
       required: ['startSeconds', 'endSeconds'],

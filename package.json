@@ -1,9 +1,49 @@
 {
-  "name": "@sogni-ai/sogni-client-wrapper",
-  "version": "2.0.0",
-  "description": "Enhanced Node.js wrapper for Sogni AI SDK with n8n compatibility and improved developer experience",
+  "name": "@sogni-ai/sogni-intelligence-client",
+  "version": "3.0.0-alpha.0",
+  "description": "Public Sogni Intelligence client — Node.js convenience wrapper for the Sogni SDK plus the public-safe subset of @sogni/creative-agent contracts (ContractRegistry, AssetManifest, RunRecord, tool envelopes). For agent builders, third-party integrations, and downstream SDKs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "default": "./dist/tools/index.js"
+    },
+    "./replay": {
+      "types": "./dist/replay/index.d.ts",
+      "default": "./dist/replay/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
+    },
+    "./skills/asset_reference_management": {
+      "types": "./dist/skills/asset_reference_management/index.d.ts",
+      "default": "./dist/skills/asset_reference_management/index.js"
+    },
+    "./workflows": {
+      "types": "./dist/workflows/index.d.ts",
+      "default": "./dist/workflows/index.js"
+    },
+    "./media": {
+      "types": "./dist/media/index.d.ts",
+      "default": "./dist/media/index.js"
+    },
+    "./public-skill-runtime": {
+      "types": "./dist/public-skill-runtime/index.d.ts",
+      "default": "./dist/public-skill-runtime/index.js"
+    },
+    "./schemas/*": "./dist/schemas/*",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
@@ -18,8 +58,16 @@
   },
   "keywords": [
     "sogni",
+    "sogni-intelligence",
     "ai",
+    "agent",
+    "agent-builder",
+    "creative-agent",
+    "contracts",
+    "tool-calling",
     "image-generation",
+    "video-generation",
+    "audio-generation",
     "n8n",
     "workflow",
     "automation",
@@ -31,12 +79,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Sogni-AI/sogni-client-wrapper.git"
+    "url": "git+https://github.com/Sogni-AI/sogni-intelligence-client.git"
   },
   "bugs": {
-    "url": "https://github.com/Sogni-AI/sogni-client-wrapper/issues"
+    "url": "https://github.com/Sogni-AI/sogni-intelligence-client/issues"
   },
-  "homepage": "https://github.com/Sogni-AI/sogni-client-wrapper#readme",
+  "homepage": "https://github.com/Sogni-AI/sogni-intelligence-client#readme",
   "dependencies": {
     "@sogni-ai/sogni-client": "5.0.0-alpha.1",
     "sharp": "^0.34.5"

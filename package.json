@@ -87,6 +87,7 @@
   "homepage": "https://github.com/Sogni-AI/sogni-intelligence-client#readme",
   "dependencies": {
     "@sogni-ai/sogni-client": "5.0.0-alpha.1",
+    "@sogni/creative-agent": "file:../sogni-creative-agent-phase8",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

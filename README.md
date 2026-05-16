@@ -1,6 +1,6 @@
 # Sogni Client Wrapper
 
-[![NPM version](https://img.shields.io/npm/v/@sogni-ai/sogni-client-wrapper.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-client-wrapper) [![License](https://img.shields.io/npm/l/@sogni-ai/sogni-client-wrapper.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-client-wrapper)
+[![NPM version](https://img.shields.io/npm/v/@sogni-ai/sogni-intelligence-client.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-intelligence-client) [![License](https://img.shields.io/npm/l/@sogni-ai/sogni-intelligence-client.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-intelligence-client)
 
 An enhanced Node.js wrapper for the [`@sogni-ai/sogni-client`](https://sdk-docs.sogni.ai/) library, designed for robustness, ease of use, and seamless integration with platforms like [n8n](https://n8n.io/).
 
@@ -27,13 +27,13 @@ This library simplifies interaction with the Sogni AI Supernet by providing a pr
 ## Installation
 
 ```bash
-npm install @sogni-ai/sogni-client-wrapper
+npm install @sogni-ai/sogni-intelligence-client
 ```
 
 Or with Yarn:
 
 ```bash
-yarn add @sogni-ai/sogni-client-wrapper
+yarn add @sogni-ai/sogni-intelligence-client
 ```
 
 ## Quick Start
@@ -44,7 +44,7 @@ First, create a `.env` file in your project root to securely store your credenti
 
 ```bash
 # Copy the example file
-cp node_modules/@sogni-ai/sogni-client-wrapper/.env.example .env
+cp node_modules/@sogni-ai/sogni-intelligence-client/.env.example .env
 ```
 
 ### 2. Install Dependencies
@@ -57,7 +57,7 @@ npm install dotenv
 
 ```typescript
 import { config } from 'dotenv';
-import { SogniClientWrapper } from '@sogni-ai/sogni-client-wrapper';
+import { SogniClientWrapper } from '@sogni-ai/sogni-intelligence-client';
 
 // Load environment variables from .env file
 config();
@@ -295,7 +295,7 @@ for await (const chunk of stream) {
 `createChatCompletion()` accepts OpenAI-style `tools` and `tool_choice` parameters.
 
 ```typescript
-import type { ChatMessage, ToolCall, ToolDefinition } from '@sogni-ai/sogni-client-wrapper';
+import type { ChatMessage, ToolCall, ToolDefinition } from '@sogni-ai/sogni-intelligence-client';
 
 const tools: ToolDefinition[] = [
   {
@@ -364,21 +364,17 @@ for (let turn = 0; turn < 4; turn++) {
 
 The wrapper re-exports the SDK helpers for Sogni platform tool calling:
 
-- `SogniTools`
-- `buildSogniTools()`
+- `SogniTools` — the canonical 24-tool surface (use `SogniTools.all` for the full list)
 - `isSogniToolCall()`
 - `parseToolCallArguments()`
 
 ```typescript
-import { buildSogniTools } from '@sogni-ai/sogni-client-wrapper';
-
-const models = await client.getAvailableModels({ minWorkers: 1 });
-const tools = buildSogniTools(models.map((m) => ({ id: m.id, media: m.media })));
+import { SogniTools } from '@sogni-ai/sogni-intelligence-client';
 
 const result = await client.createChatCompletion({
   model: 'qwen3-30b-a3b-gptq-int4',
   messages: [{ role: 'user', content: 'Create a dramatic sunset image' }],
-  tools,
+  tools: SogniTools.all,
   tool_choice: 'auto',
   tokenType: 'spark',
 });
@@ -420,9 +416,7 @@ Useful for streaming or custom multi-round tool loops where you want the wrapper
 const result = await client.createChatCompletion({
   model: 'qwen3-30b-a3b-gptq-int4',
   messages: [{ role: 'user', content: 'Generate a neon cyberpunk city image.' }],
-  tools: buildSogniTools(
-    (await client.getAvailableModels()).map((model) => ({ id: model.id, media: model.media }))
-  ),
+  tools: SogniTools.all,
   tool_choice: 'auto',
   tokenType: 'spark',
 });
@@ -538,7 +532,7 @@ The `contextImages` parameter accepts an array of `InputMedia` types:
 The wrapper provides helper functions for working with context images:
 
 ```typescript
-import { getMaxContextImages, supportsContextImages } from '@sogni-ai/sogni-client-wrapper';
+import { getMaxContextImages, supportsContextImages } from '@sogni-ai/sogni-intelligence-client';
 
 // Check if a model supports context images
 if (supportsContextImages('qwen_image_edit_2511_fp8')) {
@@ -625,14 +619,14 @@ const client = new SogniClientWrapper({
 - `estimateChatCost(params)`: Estimates chat completion cost.
 - `getAvailableChatModels()`: Returns available chat/LLM models.
 - `waitForChatModels(timeout?)`: Waits until chat/LLM models are available.
-- SDK helper exports: `ChatStream`, `ChatToolsApi`, `CurrentAccount`, `SogniTools`, `buildSogniTools`, `isSogniToolCall`, `parseToolCallArguments`.
+- SDK helper exports: `ChatStream`, `ChatToolsApi`, `CurrentAccount`, `SogniTools`, `isSogniToolCall`, `parseToolCallArguments`.
 
 ### Event Handling
 
 The wrapper is an `EventEmitter` and provides type-safe events.
 
 ```typescript
-import { ClientEvent } from '@sogni-ai/sogni-client-wrapper';
+import { ClientEvent } from '@sogni-ai/sogni-intelligence-client';
 
 client.on(ClientEvent.CONNECTED, () => {
   console.log('Client is connected!');
@@ -725,7 +719,7 @@ The library throws custom errors that extend `SogniError`. This allows you to ca
 - `SogniBalanceError`: Insufficient token balance.
 
 ```typescript
-import { SogniAuthenticationError, SogniProjectError } from '@sogni-ai/sogni-client-wrapper';
+import { SogniAuthenticationError, SogniProjectError } from '@sogni-ai/sogni-intelligence-client';
 
 try {
   // ... your code
@@ -820,7 +814,7 @@ This library is written in TypeScript and exports all necessary types for a full
 - `ToolExecutionOptions` / `ToolExecutionProgress` / `ToolExecutionResult` / `ToolHistoryEntry`: Types for manual or automatic chat tool execution.
 - `LLMModelInfo` / `LLMCostEstimation`: Types for chat model metadata and cost estimates.
 - `WalletBalanceInfo`: Wallet balance response shape for Base/Etherlink lookups.
-- `SogniTools` / `buildSogniTools` / `isSogniToolCall` / `parseToolCallArguments`: Helper exports for platform tool calling workflows.
+- `SogniTools` / `isSogniToolCall` / `parseToolCallArguments`: Helper exports for platform tool calling workflows.
 - `ProjectEvent`: Raw project events from the SDK.
 - `JobEvent`: Raw job events from the SDK (includes ETA updates).
 

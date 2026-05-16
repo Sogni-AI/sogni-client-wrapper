@@ -1,13 +1,3 @@
-/**
- * ID-LoRA prompt helpers (Phase 8.5-prep).
- *
- * Pure helper module — system prompt + tool definition + message builders +
- * parser/formatter — moved out of `src/prompts/` so the PUBLIC bucket of
- * the upcoming `@sogni-ai/sogni-intelligence-client` carve-out can import
- * the ID-LoRA conversion surface without crossing into PRIVATE
- * prompt-composition orchestration. `src/prompts/audioIdPrompt.ts`
- * re-exports the symbols here for back-compat with existing consumers.
- */
 import type { SogniChatMessage } from '../runtime/chatTypes.js';
 import type { ToolDefinition } from '../tools/definitions/types.js';
 

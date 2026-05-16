@@ -1,15 +1,3 @@
-/**
- * Image-prompt helpers (Phase 8.5-prep).
- *
- * Model-aware system prompt + tool definition + message builder + parser
- * moved out of `src/prompts/` so the PUBLIC bucket of the upcoming
- * `@sogni-ai/sogni-intelligence-client` carve-out can import the image
- * prompt-engineering surface without crossing into PRIVATE
- * prompt-composition orchestration. Depends only on the already-public
- * `runtime/chatTypes` and `tools/definitions/types` plus the
- * Phase 8.5-prep contracts-local `randomThemes`. `src/prompts/imagePrompt.ts`
- * re-exports the symbols here for back-compat with existing consumers.
- */
 import type { SogniChatMessage } from '../runtime/chatTypes.js';
 import type { ToolDefinition } from '../tools/definitions/types.js';
 import { getRandomTheme } from './randomThemes.js';

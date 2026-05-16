@@ -1,16 +1,3 @@
-/**
- * Music-composition prompt helpers (Phase 8.5-prep).
- *
- * Lyrics + instrumental composition system prompts, tool definitions,
- * message builders, and result parser moved out of `src/prompts/` so
- * the PUBLIC bucket of the upcoming `@sogni-ai/sogni-intelligence-client`
- * carve-out can import the music-composition surface without crossing
- * into PRIVATE prompt-composition orchestration. Depends only on the
- * already-public `runtime/chatTypes`, `tools/definitions/types`, and
- * `media/musicSettings` plus the contracts-local `randomThemes`.
- * `src/prompts/musicComposition.ts` re-exports the symbols here for
- * back-compat with existing consumers.
- */
 import type { SogniChatMessage } from '../runtime/chatTypes.js';
 import type { ToolDefinition } from '../tools/definitions/types.js';
 import {

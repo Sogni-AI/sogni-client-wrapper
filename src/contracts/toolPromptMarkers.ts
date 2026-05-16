@@ -1,16 +1,7 @@
 /**
  * Tool-definition prompt markers.
  *
- * Phase 8 Path C extracts these description/override constants out of
- * `src/prompts/` so PUBLIC-bucket tool definitions in `src/tools/definitions/*`
- * (which ship inside `@sogni-ai/sogni-intelligence-client/tools`) don't have
- * to import from PRIVATE `prompts/`.
- *
- * The original declarations lived in `src/prompts/literalPrompt.ts` and
- * `src/prompts/video/seedance.ts` and are re-exported there for back-compat
- * so existing private consumers keep working.
  */
-
 import { LITERAL_PROMPT_OVERRIDE } from './promptOverrideMarker.js';
 
 export const LITERAL_VIDEO_PROMPT_OVERRIDE =

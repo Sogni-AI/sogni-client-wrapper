@@ -2,12 +2,6 @@
  * Curated prompt seeds used when a user asks for generation without providing
  * a concrete idea. Keeping these central prevents apps from drifting into
  * different random-prompt behavior.
- *
- * Phase 8.5-prep moves this pure-data helper out of `src/prompts/` so the
- * PUBLIC bucket of the upcoming `@sogni-ai/sogni-intelligence-client`
- * carve-out can import it without crossing into PRIVATE prompt-composition
- * internals. `src/prompts/randomThemes.ts` re-exports the symbols here for
- * back-compat with existing private consumers.
  */
 export const RANDOM_THEMES = [
   'a mountain summit',

@@ -1,20 +1,6 @@
 /**
  * Storyboard shape contracts.
  *
- * Phase 8.1 of the Creative Agent Master Plan extracts the type-only
- * slice of the campaign storyboard so the `storyboard/` adapter
- * registry can describe its inputs without depending on the
- * `agent/campaignStoryboard.ts` runtime module. Putting the shapes
- * here keeps `agent/` and `storyboard/` peers — both import from
- * `contracts/`, neither imports the other — which is the
- * precondition for moving `storyboard/` into a public-safe package
- * later in the plan.
- *
- * This file is intentionally type-only with a pair of schema/marker
- * constants that the types reference via `typeof`. No business
- * logic lives here. The canonical agent runtime continues to live
- * in `agent/campaignStoryboard.ts` and re-exports these same
- * symbols for back-compat at every existing public call site.
  */
 import type {
   StoryboardPlanningContract,
@@ -158,11 +144,6 @@ export interface CampaignStoryboardValidationResult {
 
 /**
  * Seedance storyboard reference fallback prompt.
- *
- * Phase 8 Path C extracts this constant from `agent/seedanceStoryboardReference.ts`
- * so the public-bucket storyboard adapter (`storyboard/adapters/seedance.ts`)
- * can import it without crossing into PRIVATE `agent/`. Re-exported from
- * `agent/seedanceStoryboardReference.ts` for back-compat.
  */
 export const SEEDANCE_STORYBOARD_REFERENCE_PROMPT =
   'Create a full-screen cinematic video from the storyboard in @Image1. Treat @Image1 as the controlling source for shot order and intent, and as a source layout reference: use the thumbnails, timing, Dialogue/VO, Audio/SFX, timecodes, camera/motion notes, transitions, and scene order as instructions, not as a visual board to reproduce. Do not display the storyboard grid, borders, caption bars, storyboard title/footer text, panel numbers, section labels, slide titles, headings, or transcribed narration. Convert the ordered thumbnails into full-screen chronological beats; do not reuse only one or two motifs while skipping panels. When the board has panel titles, captions, section numbers, slide titles, or headings but no formal Dialogue/VO labels, treat those labels as short audio-only narration/voiceover or key-message beats in order unless they are clearly visual-only metadata. Voice each label as its own brief phrase with a pause; do not concatenate labels into run-on sentences and do not speak panel numbers. Show storyboard labels as visible text only when the user explicitly asks for visible text, subtitles, a title card, lower third, signage, or a title/end frame. Preserve the story spine, character/product/reference continuity, and cause-and-effect progression between beats. Treat transitions as motion instructions, not unrelated hard cuts unless the storyboard explicitly asks for hard cuts. Use brand color, lighting, product imagery, and composition instead of invented typography. Keep visible text limited to exact copy the user or storyboard explicitly marks as on-screen text, signage, title text, or end-frame text. Use a music/SFX arc that follows the storyboard audio notes and lands the final beat. Keep unrelated UI, extra logos, microtext, subtitles, and extra scenes out of the frame.';

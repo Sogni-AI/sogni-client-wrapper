@@ -61,9 +61,6 @@ export type {
   RepairRecipeFiredPayload,
 } from './telemetry.js';
 export { isContractsTelemetryEvent, makeBufferedSink } from './telemetry.js';
-
-// Shared contract-data (Phase 3 gating policies, Phase 4 repair
-// recipes, Phase 5 prompt contracts). Cross-consumer: sogni-chat,
 // sogni-api hosted chat, future SDKs.
 export {
   MEDIA_TOOL_NAMES,
@@ -116,13 +113,9 @@ export type {
   ToolPermission,
   ToolPermissionDecision,
 } from './data/toolPermissions.js';
-
-// Literal-prompt override marker (Phase 8.2-prep). PUBLIC-bucket tool
 // definitions import this sentinel from contracts/ instead of PRIVATE
 // `prompts/`.
 export { LITERAL_PROMPT_OVERRIDE } from './promptOverrideMarker.js';
-
-// Backbone tool-name catalog constants (Phase 8.2-prep). Pure-data
 // tool-name lists consumed by `contracts/data/toolCatalog.ts` and
 // re-exported from `backbone/` for back-compat.
 export {
@@ -133,8 +126,6 @@ export {
   BACKBONE_HOSTED_APP_TOOL_NAMES,
 } from './backboneToolCatalog.js';
 export type { BackboneAppToolName } from './backboneToolCatalog.js';
-
-// Backbone durable-workflow shape contracts (Phase 8.2-prep). Type-
 // only / pure-data slice consumed by `runtime/durableWorkflowClient.ts`
 // and re-exported from `backbone/` for back-compat.
 export {
@@ -154,8 +145,6 @@ export type {
   BackboneWorkflowStatus,
   BackboneWorkflowStepDependencyBinding,
 } from './backboneDurableWorkflow.js';
-
-// Storyboard shape contracts (Phase 8.1). Type-only slice consumed by
 // `agent/campaignStoryboard.ts` and the `storyboard/` adapter registry
 // so neither side has to import the other.
 export {
@@ -176,8 +165,6 @@ export type {
 } from './storyboard.js';
 
 export * from './hostedToolValidation.js';
-
-// Random-theme seeds (Phase 8.5-prep). Pure-data helper extracted from
 // `prompts/randomThemes.ts` so PUBLIC-bucket consumers (sogni-web's
 // llmHelpers, the future `@sogni-ai/sogni-intelligence-client` carve-
 // out) can import without crossing into PRIVATE `prompts/`.
@@ -187,8 +174,6 @@ export {
   getRandomTheme,
   getRandomLyricsTheme,
 } from './randomThemes.js';
-
-// ID-LoRA prompt helpers (Phase 8.5-prep). Self-contained helper module
 // extracted from `prompts/audioIdPrompt.ts`. No internal `prompts/`
 // dependencies, so the entire surface ships in the PUBLIC bucket.
 export {
@@ -199,8 +184,6 @@ export {
   formatIdLoRaPrompt,
 } from './idLoraPrompt.js';
 export type { IdLoRaPromptParts } from './idLoraPrompt.js';
-
-// Image-prompt helpers (Phase 8.5-prep). Model-aware prompt-engineering
 // surface (system prompt + tool definition + message builder + parser)
 // extracted from `prompts/imagePrompt.ts`. Depends only on the
 // contracts-local `randomThemes` plus the already-public runtime and
@@ -215,8 +198,6 @@ export type {
   ImagePromptingType,
   BuildImagePromptMessagesInput,
 } from './imagePrompt.js';
-
-// Music-composition prompt helpers (Phase 8.5-prep). Lyrics +
 // instrumental composition surface (system prompts, tool definitions,
 // message builders, result parser) extracted from
 // `prompts/musicComposition.ts`. Depends only on the already-public
@@ -230,8 +211,6 @@ export {
   parseToolCallResult,
 } from './musicComposition.js';
 export type { LyricsGenerationResult } from './musicComposition.js';
-
-// Video-composition prompt helpers (Phase 8.5-prep). LTX-2 + Wan 2.2
 // video prompt-engineering surface (system prompts, tool definition,
 // message builders, parser, supporting types) extracted from
 // `prompts/videoComposition.ts`. Depends only on the contracts-local
@@ -255,14 +234,10 @@ export type {
   CharacterReferenceVideoCompositionMessageInput,
   CompositionToolCallResultLike,
 } from './videoComposition.js';
-
-// Compose-workflow destination-models shape (Phase 8.5-prep). The only
 // piece of `prompts/composeWorkflow.ts` that ships in the PUBLIC bucket
 // — a small pure data shape consumed by `buildComposeWorkflowToolArgs`
 // and by sogni-web's llmHelpers.
 export type { ComposeWorkflowDestinationModels } from './composeWorkflowTypes.js';
-
-// Hosted composition tool helpers (Phase 8.5-prep). Argument-shaping
 // helpers and dispatcher-message builder for the hosted synchronous
 // creative tools, extracted from `prompts/hostedComposition.ts`. Depends
 // only on contracts-local helpers (`composeWorkflowTypes`,
@@ -290,9 +265,6 @@ export type {
   ComposeWorkflowTemplateInputDeclArg,
   BuildComposeWorkflowTemplateToolArgsInput,
 } from './hostedComposition.js';
-
-// Path C re-exports — symbols that creative-agent's pre-flight extractions
-// (Phase 8 Path C commits) added to specific contracts/* files but the
 // wrapper barrel wasn't yet updated to expose. Needed so creative-agent's
 // shim files (which now do `export * from '@sogni-ai/sogni-intelligence-client/contracts'`)
 // can resolve back-compat re-exports of these symbols.

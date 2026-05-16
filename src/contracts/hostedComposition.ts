@@ -1,20 +1,3 @@
-/**
- * Hosted composition tool helpers (Phase 8.5-prep).
- *
- * Argument-shaping helpers and dispatcher-message builder for the hosted
- * synchronous creative tools (`enhance_prompt`, `compose_lyrics`,
- * `compose_instrumental`, `compose_script`, `compose_workflow`,
- * `compose_workflow_template`) moved out of `src/prompts/` so the PUBLIC
- * bucket of the upcoming `@sogni-ai/sogni-intelligence-client` carve-out
- * can import the hosted-composition surface without crossing into PRIVATE
- * prompt-composition orchestration. Depends only on the already-public
- * `runtime/chatTypes` and `workflows/types` plus the contracts-local
- * `composeWorkflowTypes`, `imagePrompt`, `randomThemes`, and
- * `videoComposition`.
- *
- * `src/prompts/hostedComposition.ts` re-exports the symbols here for
- * back-compat with existing consumers.
- */
 import type { SogniChatMessage } from '../runtime/chatTypes.js';
 import type { WorkflowTemplate } from '../workflows/types.js';
 import type { ComposeWorkflowDestinationModels } from './composeWorkflowTypes.js';

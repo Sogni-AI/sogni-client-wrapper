@@ -1,15 +1,6 @@
 /**
  * Backbone durable-workflow shape contracts.
  *
- * Phase 8.2-prep extracts the type-only / pure-data slice of the
- * backbone durable workflow run so PUBLIC-bucket modules — notably
- * `runtime/durableWorkflowClient.ts` — can describe the
- * `/v1/creative-agent/workflows` REST contract without crossing into
- * PRIVATE `backbone/`. The original declarations lived in
- * `src/backbone/index.ts` and are re-exported from there for back-
- * compat so existing private consumers (durable workflow runtime,
- * chat run, workflow plan/template, etc.) keep working unchanged.
- *
  * This file is intentionally type-only with version-tag string
  * constants the types reference via `typeof`, plus the pure-data
  * `BACKBONE_DURABLE_HOSTED_STEP_TOOL_NAMES` list (derived from the
@@ -129,7 +120,6 @@ export interface BackboneDurableWorkflowInput {
 }
 
 // ---------------------------------------------------------------------------
-// Pure normalizer / constructor (Phase 8 Path C)
 //
 // `BACKBONE_VERSIONS`, `normalizeBackboneDurableWorkflowSteps`, and
 // `buildBackboneDurableWorkflowRun` were moved here from `backbone/index.ts`

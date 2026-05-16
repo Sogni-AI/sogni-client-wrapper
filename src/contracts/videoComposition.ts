@@ -1,20 +1,3 @@
-/**
- * Video-composition prompt helpers (Phase 8.5-prep).
- *
- * LTX-2 + Wan 2.2 video prompt system prompts, tool definition, message
- * builders, parser, and supporting types moved out of `src/prompts/` so
- * the PUBLIC bucket of the upcoming `@sogni-ai/sogni-intelligence-client`
- * carve-out can import the video-prompt-engineering surface without
- * crossing into PRIVATE prompt-composition orchestration. Depends only
- * on the already-public `runtime/chatTypes`, `tools/definitions/types`,
- * the pure-logic `tools/shared/llmHelpers` (zero further imports), and
- * the contracts-local `randomThemes`.
- *
- * `src/prompts/videoComposition.ts` re-exports the symbols here for
- * back-compat with existing consumers (such as
- * `prompts/hostedComposition.ts`, which still imports
- * `GenerateWanPromptParams` and `VideoFramePromptOptions`).
- */
 import type { SogniChatContentPart, SogniChatMessage } from '../runtime/chatTypes.js';
 import type { ToolDefinition } from '../tools/definitions/types.js';
 import { stripThinkBlocks } from '../tools/shared/llmHelpers.js';

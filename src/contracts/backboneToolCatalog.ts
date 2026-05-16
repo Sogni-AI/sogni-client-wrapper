@@ -1,16 +1,6 @@
 /**
  * Backbone tool-name catalog constants.
  *
- * Phase 8.2-prep extracts the pure-data tool-name lists out of
- * `src/backbone/` so PUBLIC-bucket modules — notably
- * `contracts/data/toolCatalog.ts` and its test — can resolve the
- * canonical tool catalog without crossing into PRIVATE `backbone/`.
- *
- * The original declarations lived in `src/backbone/index.ts` and are
- * re-exported there for back-compat so existing private consumers
- * (knowledge manifests, durable workflow normalization, etc.) keep
- * working without any import changes.
- *
  * This file is intentionally constants/types only. No business logic
  * lives here.
  */

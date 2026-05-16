@@ -11,13 +11,19 @@
  *   "$run.id"
  *
  * At execution time, `resolveBindings()` walks the args tree recursively.
- * Strings that start with `$` are looked up in the BindingContext and
- * replaced with the resolved value. Strings that interpolate bindings
- * inside other text (`"${$inputs.name}'s photo"`) are NOT supported in v1
- * — use a separate interactive stage if you need runtime string assembly.
+ *
+ * - **Pure binding strings** (the whole string is `$root.path`): replaced
+ *   with the resolved value AT TYPE (number stays number, array stays
+ *   array, the selected ArtifactVersion stays the object).
+ * - **Embedded bindings** (literal text containing `$inputs.X`,
+ *   `$artifacts.X.Y`, `$item.X`, etc.): every match is replaced with the
+ *   resolved value stringified, so prompts can naturally template a few
+ *   inputs into a longer instruction.
  *
  * The resolver is intentionally strict: unknown paths throw so the executor
  * can fail fast and the builder can surface the error before a Run starts.
+ * Embedded bindings whose paths fail throw the same `BindingError` rather
+ * than silently leaving the `$inputs.foo` text in the rendered prompt.
  */
 
 import type { Artifact, ArtifactItem, ArtifactVersion, BindingContext } from './types.js';
@@ -116,8 +122,14 @@ export function resolveBindings<T>(value: T, ctx: BindingContext): T {
 }
 
 function walk(value: unknown, ctx: BindingContext): unknown {
-  if (isBinding(value)) {
-    return resolveOne(value, ctx);
+  if (typeof value === 'string') {
+    if (value.startsWith('$')) {
+      return resolveOne(value, ctx);
+    }
+    if (value.indexOf('$') !== -1) {
+      return interpolateString(value, ctx);
+    }
+    return value;
   }
   if (Array.isArray(value)) {
     return value.map((v) => walk(v, ctx));
@@ -130,6 +142,44 @@ function walk(value: unknown, ctx: BindingContext): unknown {
     return out;
   }
   return value;
+}
+
+// Match `$root.field[ix].field.field…` greedily but stop at whitespace,
+// punctuation, and characters that can't legally appear in a binding path.
+// Identifier chars: A-Z a-z 0-9 _. Brackets contain digits or `*`. Dots
+// separate fields. The grammar matches the strict parseBinding form.
+const EMBEDDED_BINDING_RE =
+  /\$(?:inputs|artifacts|item|runtime|run)(?:\.[A-Za-z_][A-Za-z0-9_]*|\[(?:\d+|\*)\])+/g;
+
+/**
+ * Replace every `$root.path` reference embedded in a literal string with
+ * its resolved value (stringified). Throws `BindingError` if any embedded
+ * path is structurally invalid, walks into null, or resolves to undefined.
+ * A workflow author embedding `$inputs.foo` clearly meant something to
+ * substitute there; silently leaving an empty string would let typos
+ * ship to production unnoticed.
+ */
+function interpolateString(value: string, ctx: BindingContext): string {
+  return value.replace(EMBEDDED_BINDING_RE, (match) => {
+    const resolved = resolveOne(match, ctx);
+    if (resolved === undefined) {
+      throw new BindingError(`Embedded binding resolved to undefined: ${match}`);
+    }
+    return stringifyEmbedded(resolved);
+  });
+}
+
+function stringifyEmbedded(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  // Arrays and objects flatten via JSON for safe roundtrip; pure-binding
+  // callers wanting typed access should use the standalone `$path` form.
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function resolveOne(binding: string, ctx: BindingContext): unknown {

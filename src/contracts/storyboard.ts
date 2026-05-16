@@ -133,6 +133,16 @@ export interface CampaignStoryboard {
     approvedScriptContext: string | null;
     frameCount: number;
     promptAuthorship?: 'user' | 'assistant';
+    /**
+     * Number of beat/scene sections the storyboard parser recognized
+     * in the source script before end-card extraction / scene
+     * normalization. Distinguishes "the author wrote 12 beats; the
+     * parser routed one into endCard" (parsedSectionCount=12,
+     * scenes=11) from "the author wrote 11 beats" (parsedSectionCount
+     * =11, scenes=11). Undefined when the source had no parseable
+     * beat structure (free-form description).
+     */
+    parsedSectionCount?: number;
   };
 }
 

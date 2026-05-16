@@ -38,7 +38,7 @@ The package exposes nine subpath entry points so consumers import only what they
 | `…/runtime` | Contract runtime — apply policies, recipes, and prompt contracts at call sites |
 | `…/public-skill-runtime` | Skill‑side helpers: classify turns, compile tool surface, dispatch tool calls |
 | `…/skills/asset_reference_management` | Asset‑reference resolution helpers for hosted media |
-| `…/workflows` | Creative‑workflow type definitions and bindings |
+| `…/workflows` | Creative‑workflow type definitions, bindings with embedded‑interpolation support, and a `primitives` namespace of pure helpers for `wf:*` stage tools (LLM judge + `__PASS__`/`__FAIL__` parser, bounded retry‑until‑predicate, storyboard script expander, dialogue duration fitter, SSRF allow‑list for fetched artifact URLs) |
 | `…/media` | Media reference helpers (upload / download URL flows) |
 | `…/schemas/*` | Raw JSON Schema artifacts for cross‑language codegen (Swift, Kotlin, Python, etc.) |
 

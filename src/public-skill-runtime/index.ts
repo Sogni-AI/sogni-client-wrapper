@@ -3529,6 +3529,19 @@ export interface SceneSpec {
 export interface StoryboardProject {
   title: string;
   sourceProvenance: 'user' | 'approved_assistant' | 'assistant_draft';
+  /**
+   * Number of beat/scene sections the parser recognized in the
+   * source script BEFORE any end-card extraction or scene
+   * normalization. Available when the script could be split into
+   * discrete beats (markdown table rows, "Beat N" headings, inline
+   * beat markers). Undefined when the source was a free-form
+   * description with no parseable structure. Downstream consumers
+   * use this to distinguish "the script was 12 beats and the parser
+   * legitimately routed beat 12 into endCard" (parsedSectionCount=12,
+   * scenes=11) from "the script genuinely listed only 11 beats"
+   * (parsedSectionCount=11, scenes=11).
+   */
+  parsedSectionCount?: number;
   durationSec: number | null;
   outputAspectRatio: string;
   frameAspectRatio: string;
@@ -5377,8 +5390,19 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
 }
 
 function splitStoryboardSceneSections(text: string): Array<{ number: number; heading: string; body: string }> {
+  // Match a storyboard beat heading. The prefix is intentionally
+  // permissive so we recognize the common markdown decorations
+  // authors use without listing each combination by hand:
+  //   `### BEAT 1`             — heading
+  //   `- BEAT 1`               — bullet
+  //   `**Beat 1**`             — emphasis
+  //   `### > BEAT 1`           — heading + blockquote (Markdown callout)
+  //   `> BEAT 1`               — blockquote only
+  //   `> ### **BEAT 1**`       — any combination of the above
+  // The decoration class accepts repeated combinations of bullet,
+  // heading, blockquote, and emphasis markers separated by spaces.
   const matches = Array.from(text.matchAll(
-    /^\s*(?:[-*+]\s*)?(?:#{1,6}\s*)?(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})\b\s*(?:[-:.)|]\s*)?([^\n]*)/gim,
+    /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})\b\s*(?:[-:.)|]\s*)?([^\n]*)/gim,
   ));
   if (matches.length === 0) return [];
 
@@ -6359,6 +6383,48 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const storySpine = inferStoryboardStorySpine(allText, storySpineFallback);
   const productFeatureMap = inferStoryboardProductFeatureMap(allText, scenes);
 
+  // Track how many beat/scene sections the AUTHOR wrote in the
+  // source script — this is the "intended beat count" downstream
+  // lossy / undercount checks need so they can distinguish a
+  // legitimately complete script from an undercounted one.
+  //
+  // We can't simply trust `sections.length` because the scene
+  // splitter rejects rows whose timing column isn't a strict numeric
+  // range (e.g. `0:30-End`). Those rows still represent a beat the
+  // author wrote, and downstream end-card extraction routes them
+  // into the typed endCard structure. To count the author's actual
+  // beats we scan the script for explicit beat markers — either
+  // markdown table rows whose first labeled column is a beat number
+  // (`| **N** |`) or scene-section headings (`Scene|Beat|Shot|Panel|
+  // Frame N`) — and take the largest count we see. We fall back to
+  // the chosen `sections` array when no beat markers are present.
+  const beatMarkerScripts = [approvedScriptContext, sourceText];
+  let directBeatMarkerCount = 0;
+  for (const text of beatMarkerScripts) {
+    if (!text) continue;
+    const numbersSeen = new Set<number>();
+    for (const match of text.matchAll(
+      /^\s*\|\s*(?:[*_]{1,3})?\s*(\d{1,2})\s*(?:[*_]{1,3})?\s*\|/gim,
+    )) {
+      const value = Number(match[1]);
+      if (Number.isInteger(value) && value >= 1 && value <= 64) numbersSeen.add(value);
+    }
+    for (const match of text.matchAll(
+      /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})\b/gim,
+    )) {
+      const value = Number(match[1]);
+      if (Number.isInteger(value) && value >= 1 && value <= 64) numbersSeen.add(value);
+    }
+    if (numbersSeen.size > directBeatMarkerCount) {
+      directBeatMarkerCount = numbersSeen.size;
+    }
+  }
+  const recognizedSectionCount = directBeatMarkerCount > 0
+    ? directBeatMarkerCount
+    : sections.length > 0
+      ? sections.length
+      : Math.max(approvedSections.length, sourceSections.length);
+
   return {
     title: inferStoryboardTitle(allText),
     sourceProvenance: approvedScriptContext
@@ -6366,6 +6432,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
       : options.promptAuthorship === 'assistant'
         ? 'assistant_draft'
         : 'user',
+    ...(recognizedSectionCount > 0 ? { parsedSectionCount: recognizedSectionCount } : {}),
     durationSec,
     outputAspectRatio: layout.boardAspectRatio,
     frameAspectRatio: layout.cellAspectRatio,

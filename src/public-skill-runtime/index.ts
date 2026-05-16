@@ -5367,9 +5367,13 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
       : beatLabel && !/^\d{1,2}$/.test(beatLabel)
         ? beatLabel
         : '';
-    const sceneTitle = beatTitleSource
-      ? `${beatTitleSource}: ${visual.title}`
-      : visual.title;
+    // When the table has a dedicated Purpose/Beat-name column, that label is
+    // already a complete title (often "Name: Subtitle"). Appending the visual
+    // cell's auto-extracted title produces ugly "X: Y: Z..." strings and
+    // truncates Z mid-sentence (visual.title comes from a fixed-length slice
+    // of the visual body). The visual content is already preserved in the
+    // body's `Visual:` field, so keep the title concise.
+    const sceneTitle = beatTitleSource || visual.title;
 
     sections.push({
       number,
@@ -5678,13 +5682,54 @@ function sanitizeStoryboardExternalAudioReferences(value: string): string {
   return sanitized;
 }
 
+// Split `value` on commas/semicolons, but only at top level — commas inside
+// parentheses/brackets/braces/quotes stay inside their phrase. Without this
+// "Low, annoying office drone (AC hum, distant typing)." would split into
+// 3 tokens; we want it to stay as one (or two, if the leading "Low,
+// annoying" is its own clause).
+function splitStoryboardSfxAtTopLevel(value: string): string[] {
+  const result: string[] = [];
+  let buffer = '';
+  let parens = 0;
+  let brackets = 0;
+  let braces = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (inSingleQuote) {
+      buffer += ch;
+      if (ch === "'") inSingleQuote = false;
+      continue;
+    }
+    if (inDoubleQuote) {
+      buffer += ch;
+      if (ch === '"') inDoubleQuote = false;
+      continue;
+    }
+    if (ch === "'") { inSingleQuote = true; buffer += ch; continue; }
+    if (ch === '"') { inDoubleQuote = true; buffer += ch; continue; }
+    if (ch === '(') parens += 1;
+    else if (ch === ')' && parens > 0) parens -= 1;
+    else if (ch === '[') brackets += 1;
+    else if (ch === ']' && brackets > 0) brackets -= 1;
+    else if (ch === '{') braces += 1;
+    else if (ch === '}' && braces > 0) braces -= 1;
+    if ((ch === ',' || ch === ';') && parens === 0 && brackets === 0 && braces === 0) {
+      if (buffer.trim()) result.push(buffer.trim());
+      buffer = '';
+      continue;
+    }
+    buffer += ch;
+  }
+  if (buffer.trim()) result.push(buffer.trim());
+  return result;
+}
+
 function normalizeStoryboardAudioSfx(value: string): string[] {
   const compact = sanitizeStoryboardExternalAudioReferences(compactStoryboardLine(value));
   if (!compact || isNoAudioPlaceholder(compact)) return [];
-  return compact
-    .split(/\s*,\s*|\s*;\s*/)
-    .map(item => item.trim())
-    .filter(Boolean);
+  return splitStoryboardSfxAtTopLevel(compact).filter(Boolean);
 }
 
 function buildSceneFromSection(

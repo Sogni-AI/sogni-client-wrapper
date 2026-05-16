@@ -2,19 +2,18 @@
 
 [![NPM version](https://img.shields.io/npm/v/@sogni-ai/sogni-intelligence-client.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-intelligence-client) [![License](https://img.shields.io/npm/l/@sogni-ai/sogni-intelligence-client.svg)](https://www.npmjs.com/package/@sogni-ai/sogni-intelligence-client)
 
-The public Sogni Intelligence client for Node.js. Bundles a hardened wrapper over the [`@sogni-ai/sogni-client`](https://sdk-docs.sogni.ai/) SDK with the public‑safe subset of Sogni's creative‑agent platform: hosted tool definitions, contract registry, asset manifest, run‑record types with redaction, skill runtime helpers, and JSON schema artifacts for cross‑language codegen.
+The public, mid‑tier Node.js client for the [Sogni Supernet](https://sogni.ai/) — Sogni's OpenAI‑compatible LLM and agent API for image, video, music, and chat generation. Bundles a hardened wrapper over the [`@sogni-ai/sogni-client`](https://sdk-docs.sogni.ai/) SDK with the public‑safe subset of Sogni's creative‑agent platform: hosted tool definitions, the contract registry, asset manifests, `RunRecord` types with redaction, skill‑runtime helpers, and JSON Schema artifacts for cross‑language codegen.
 
-Designed for agent builders, third‑party integrations, downstream SDKs, and orchestration frameworks (n8n, LangChain, Anthropic skills, custom runtimes).
+For most agent builders this is the recommended starting point. Designed for third‑party integrations, downstream SDKs, and orchestration frameworks (n8n, LangChain, Anthropic skills, custom runtimes). Drives the same contracts and tool surface that the hosted `POST https://api.sogni.ai/v1/chat/completions`, `/v1/chat/runs`, and `/v1/creative-agent/workflows` endpoints use, so a client‑side agent loop stays shape‑locked with the server.
 
-## When to use this
+## Which package should I install?
 
-- Build an AI agent that generates images, videos, audio, or LLM chat through Sogni's worker network.
-- Wrap Sogni inside another framework or runtime — promise‑based, connection‑managed, n8n‑friendly.
-- Implement a custom skill that interoperates with Sogni's hosted‑tool surface.
-- Replay, audit, or redact previous Sogni runs from `RunRecord` JSON.
-- Generate type‑safe clients for the public contracts in another language using the bundled JSON schemas.
-
-If you only need raw model inference and have no use for tool calling, contracts, or skills, use [`@sogni-ai/sogni-client`](https://www.npmjs.com/package/@sogni-ai/sogni-client) directly.
+| You're building… | Install |
+|---|---|
+| Custom AI agent that calls Sogni tools, validates LLM tool arguments, manages asset references | **`@sogni-ai/sogni-intelligence-client`** (recommended) |
+| Thin wrapper that only generates an image/video/audio from a single direct call | [`@sogni-ai/sogni-client`](https://www.npmjs.com/package/@sogni-ai/sogni-client) (raw SDK) |
+| n8n workflow node | **`@sogni-ai/sogni-intelligence-client`** (n8n compat helpers preserved) |
+| Anthropic‑style Claude Skill, OpenClaw plugin, Hermes / Manus agent | [`@sogni-ai/sogni-creative-agent-skill`](https://github.com/Sogni-AI/sogni-creative-agent-skill) (consumes intelligence‑client under the hood) |
 
 ## Installation
 
@@ -177,7 +176,7 @@ Sogni's hosted tool surface — `generate_image`, `generate_video`, `analyze_vid
 - Apply gating policies, repair recipes, and prompt contracts at runtime: `createPublicSkillDefaultContractRuntime` from `/public-skill-runtime`.
 - Generate JSON Schema clients for other languages from `/schemas/*`.
 
-For an end‑to‑end agent example, see the [`@sogni-ai/sogni-creative-agent-skill`](https://www.npmjs.com/package/@sogni-ai/sogni-creative-agent-skill) reference implementation — it consumes only this package's public surface.
+For an end‑to‑end agent example, see the [Sogni Creative Agent Skill](https://github.com/Sogni-AI/sogni-creative-agent-skill) — the `sogni-agent` CLI plus a `SKILL.md` behavior file for Claude Code, OpenClaw, Hermes Agent, and Manus. It consumes only this package's public surface.
 
 ## RunRecord replay & redaction
 
@@ -224,13 +223,27 @@ Each error carries `cause` and a typed `data` field where applicable.
 - Dual CJS + ESM builds (`require()` and `import` both work).
 - `moduleResolution: 'node'` and `'bundler'` both supported; `'node16'` / `'nodenext'` consumers should prefer the `import` condition.
 
-## Related packages
+## Migrating from `@sogni-ai/sogni-client-wrapper`
 
-| Package | Role |
+If you previously installed `@sogni-ai/sogni-client-wrapper`, the import path is the only thing that changes:
+
+```diff
+- import { SogniClientWrapper } from '@sogni-ai/sogni-client-wrapper';
++ import { SogniClientWrapper } from '@sogni-ai/sogni-intelligence-client';
+```
+
+All wrapper APIs are preserved at the root export. The intelligence client adds the new subpaths above; adopt them incrementally. The old `@sogni-ai/sogni-client-wrapper` npm name is deprecated.
+
+## Related packages and docs
+
+| | Where |
 |---|---|
-| [`@sogni-ai/sogni-client`](https://www.npmjs.com/package/@sogni-ai/sogni-client) | The underlying low‑level SDK. Bundled and re‑exported here. |
-| [`@sogni-ai/sogni-creative-agent-skill`](https://www.npmjs.com/package/@sogni-ai/sogni-creative-agent-skill) | Anthropic‑style skill artifact + CLI built on top of this package. |
-| `@sogni/creative-agent` (private) | Server‑side orchestration: agent loops, hosted execution, billing, persona management. Not on npm. |
+| **Intelligence Client docs** | https://sdk-docs.sogni.ai/our-superapps/sogni-sdk/intelligence-client/ |
+| **Sogni Intelligence API** | https://sdk-docs.sogni.ai/sogni-intelligence/introduction/ |
+| **`@sogni-ai/sogni-client`** (raw SDK) | [npm](https://www.npmjs.com/package/@sogni-ai/sogni-client) · [docs](https://sdk-docs.sogni.ai/) |
+| **`@sogni-ai/sogni-creative-agent-skill`** (CLI + Anthropic skill) | [GitHub](https://github.com/Sogni-AI/sogni-creative-agent-skill) · [npm](https://www.npmjs.com/package/@sogni-ai/sogni-creative-agent-skill) |
+| **SogniKit** (Swift, regenerated from `/schemas/*.json`) | https://github.com/Sogni-AI/SogniKit |
+| `@sogni/creative-agent` (private) | Server‑side orchestration, billing enforcement, persona management. Not on npm. |
 
 ## Testing
 

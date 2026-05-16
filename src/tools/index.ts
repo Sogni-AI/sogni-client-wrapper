@@ -66,3 +66,4 @@ export type {
   ToolResultErr,
   ToolResultOk,
 } from './result.js';
+export { expandSingleSourceFanOutForPerClipPrompts } from './normalizeArgs.js';

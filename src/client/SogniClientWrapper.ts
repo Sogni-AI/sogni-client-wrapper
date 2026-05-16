@@ -45,8 +45,8 @@ import type {
   StartCreativeWorkflowOptions,
   StartCreativeWorkflowParams,
   StreamCreativeWorkflowEventsOptions,
-} from '../types';
-import { ClientEvent } from '../types';
+} from '../types/index.js';
+import { ClientEvent } from '../types/index.js';
 import {
   SogniError,
   SogniConnectionError,
@@ -55,7 +55,7 @@ import {
   SogniTimeoutError,
   SogniModelNotFoundError,
   SogniValidationError,
-} from '../utils/errors';
+} from '../utils/errors.js';
 import {
   generateAppId,
   validateClientConfig,
@@ -66,7 +66,7 @@ import {
   waitFor,
   retry,
   getMaxContextImages,
-} from '../utils/helpers';
+} from '../utils/helpers.js';
 
 const MIN_VIDEO_DIMENSION = 480;
 const MAX_VIDEO_DIMENSION = 1536;

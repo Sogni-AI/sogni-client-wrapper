@@ -2,7 +2,7 @@
  * Custom error classes for Sogni Client Wrapper
  */
 
-import type { ErrorData } from '../types';
+import type { ErrorData } from '../types/index.js';
 
 /**
  * Base error class for all Sogni-related errors

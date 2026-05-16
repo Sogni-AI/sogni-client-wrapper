@@ -9,8 +9,8 @@ import type {
   ImageProjectConfig,
   VideoProjectConfig,
   AudioProjectConfig,
-} from '../types';
-import { SogniValidationError } from './errors';
+} from '../types/index.js';
+import { SogniValidationError } from './errors.js';
 
 /**
  * Generate a unique app ID

@@ -4,7 +4,7 @@
  */
 
 // Main client
-export { SogniClientWrapper } from './client/SogniClientWrapper';
+export { SogniClientWrapper } from './client/SogniClientWrapper.js';
 
 // Types
 export type {
@@ -91,9 +91,9 @@ export type {
   ControlNetMode,
   VideoControlNetName,
   VideoControlNetParams,
-} from './types';
+} from './types/index.js';
 
-export { ClientEvent } from './types';
+export { ClientEvent } from './types/index.js';
 
 // Errors
 export {
@@ -107,7 +107,7 @@ export {
   SogniConfigurationError,
   SogniModelNotFoundError,
   SogniNetworkError,
-} from './utils/errors';
+} from './utils/errors.js';
 
 // Utilities
 export {
@@ -127,7 +127,7 @@ export {
   formatDuration,
   getMaxContextImages,
   supportsContextImages,
-} from './utils/helpers';
+} from './utils/helpers.js';
 
 // SDK chat tool-calling helpers
 export {
@@ -141,4 +141,4 @@ export {
 } from '@sogni-ai/sogni-client';
 
 // Default export
-export { SogniClientWrapper as default } from './client/SogniClientWrapper';
+export { SogniClientWrapper as default } from './client/SogniClientWrapper.js';

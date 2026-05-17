@@ -115,7 +115,8 @@
     "test:e2e:llm": "SOGNI_E2E_SCOPE=llm node --import tsx test/e2e-test.ts",
     "typecheck:examples": "tsc --noEmit -p tsconfig.examples.json",
     "test:examples": "npm run typecheck:examples",
-    "test:all": "npm run test && npm run test:examples && npm run test:e2e"
+    "test:all": "npm run test && npm run test:examples && npm run test:e2e",
+    "release": "semantic-release"
   },
   "keywords": [
     "sogni",
@@ -153,9 +154,12 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
     "@types/node": "^22.0.0",
     "dotenv": "^17.2.3",
     "husky": "^9.1.7",
+    "semantic-release": "^24.2.9",
     "tsx": "^4.20.6",
     "typescript": "^5.0.0"
   },

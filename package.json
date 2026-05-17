@@ -1,9 +1,25 @@
 {
   "name": "@sogni-ai/sogni-intelligence-client",
-  "version": "3.0.0-alpha.2",
+  "version": "3.0.0-alpha.3",
   "description": "Public Sogni Intelligence client — Node.js convenience wrapper for the Sogni SDK plus the public-safe subset of @sogni/creative-agent contracts (ContractRegistry, AssetManifest, RunRecord, tool envelopes). For agent builders, third-party integrations, and downstream SDKs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "contracts": ["./dist/contracts/index.d.ts"],
+      "tools": ["./dist/tools/index.d.ts"],
+      "replay": ["./dist/replay/index.d.ts"],
+      "runtime": ["./dist/runtime/index.d.ts"],
+      "skills/asset_reference_management": ["./dist/skills/asset_reference_management/index.d.ts"],
+      "workflows": ["./dist/workflows/index.d.ts"],
+      "media": ["./dist/media/index.d.ts"],
+      "public-skill-runtime": ["./dist/public-skill-runtime/index.d.ts"],
+      "chatRun": ["./dist/chatRun/index.d.ts"],
+      "context": ["./dist/context/index.d.ts"],
+      "openai-tools": ["./dist/openai-tools/index.d.ts"],
+      "skill-runtime-source": ["./dist/skill-runtime-source/index.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -71,11 +87,24 @@
       "require": "./dist/context/index.js",
       "default": "./dist/context/index.js"
     },
+    "./openai-tools": {
+      "types": "./dist/openai-tools/index.d.ts",
+      "import": "./dist-esm/openai-tools/index.js",
+      "require": "./dist/openai-tools/index.js",
+      "default": "./dist/openai-tools/index.js"
+    },
+    "./openai-tools/*.json": "./dist/openai-tools/*.json",
+    "./skill-runtime-source": {
+      "types": "./dist/skill-runtime-source/index.d.ts",
+      "import": "./dist-esm/skill-runtime-source/index.js",
+      "require": "./dist/skill-runtime-source/index.js",
+      "default": "./dist/skill-runtime-source/index.js"
+    },
     "./schemas/*": "./dist/schemas/*",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package-json.mjs",
+    "build": "tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package-json.mjs && node scripts/copy-openai-tools-json.mjs && node scripts/copy-schemas-json.mjs",
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
@@ -131,15 +160,18 @@
   "files": [
     "dist",
     "dist-esm",
+    "src",
     "contracts",
     "media",
     "workflows",
     "replay",
     "runtime",
     "tools",
+    "openai-tools",
     "public-skill-runtime",
     "chatRun",
     "context",
+    "schemas",
     "skills",
     "README.md",
     "LICENSE",

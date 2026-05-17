@@ -277,7 +277,7 @@ const GPU_WORKER_FAILED_TOOLS = MEDIA_TOOL_NAMES.filter(
   (name) => name !== 'animate_photo', // already has a more specific recipe
 );
 
-export const PHASE_4_REPAIR_RECIPES: ReadonlyArray<RepairRecipe> = [
+export const REPAIR_RECIPES: ReadonlyArray<RepairRecipe> = [
   ...SPECIFIC_RECIPES,
   ...MEDIA_TOOL_NAMES.map(makeUserInputIncompleteRecipe),
   ...MEDIA_TOOL_NAMES.map(makeCostLimitExceededRecipe),
@@ -293,13 +293,13 @@ export const PHASE_4_REPAIR_RECIPES: ReadonlyArray<RepairRecipe> = [
 ];
 
 /**
- * Populate a ContractRegistry with the Phase 4 repair recipes.
+ * Populate a ContractRegistry with the default repair recipes.
  * Idempotent — registering the same recipeId twice overwrites the
  * prior entry because ContractRegistry uses a Map keyed on
  * (toolName, errorCode).
  */
 export function populateContractsRepairRecipes(registry: ContractRegistry): void {
-  for (const recipe of PHASE_4_REPAIR_RECIPES) {
+  for (const recipe of REPAIR_RECIPES) {
     registry.registerRepairRecipe(recipe);
   }
 }

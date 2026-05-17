@@ -9,9 +9,9 @@ export type SkillVideoWorkflow =
   | 'v2v';
 
 import {
-  PHASE_3_GATING_POLICIES,
-  PHASE_4_REPAIR_RECIPES,
-  PHASE_5_PROMPT_CONTRACTS,
+  GATING_POLICIES,
+  REPAIR_RECIPES,
+  PROMPT_CONTRACTS,
 } from '../contracts/data/index.js';
 
 type LtxWorkflow = 't2v' | 'i2v' | 'ia2v' | 'a2v' | 'v2v';
@@ -277,7 +277,7 @@ function publicSkillRepairMode(mode: string): PublicSkillRepairRecipe['mode'] {
 }
 
 export const PUBLIC_SKILL_DEFAULT_POLICIES: PublicSkillToolGatingPolicy[] =
-  PHASE_3_GATING_POLICIES.map((policy) => ({
+  GATING_POLICIES.map((policy) => ({
     policyId: policy.policyId,
     trigger: {
       allOf: [...policy.trigger.allOf],
@@ -299,13 +299,13 @@ export const PUBLIC_SKILL_DEFAULT_POLICIES: PublicSkillToolGatingPolicy[] =
   }));
 
 export const PUBLIC_SKILL_DEFAULT_PROMPT_CONTRACTS: PublicSkillPromptContract[] =
-  PHASE_5_PROMPT_CONTRACTS.map((contract) => ({
+  PROMPT_CONTRACTS.map((contract) => ({
     toolName: contract.toolName,
     fragment: publicSkillPromptContractFragment(contract),
   }));
 
 export const PUBLIC_SKILL_DEFAULT_REPAIR_RECIPES: PublicSkillRepairRecipe[] =
-  PHASE_4_REPAIR_RECIPES.map((recipe) => ({
+  REPAIR_RECIPES.map((recipe) => ({
     toolName: recipe.toolName,
     errorCode: recipe.errorCode,
     mode: publicSkillRepairMode(recipe.mode),
@@ -314,7 +314,7 @@ export const PUBLIC_SKILL_DEFAULT_REPAIR_RECIPES: PublicSkillRepairRecipe[] =
   }));
 
 export const PUBLIC_SKILL_DEFAULT_TOOL_NAMES: string[] = [
-  ...new Set(PHASE_5_PROMPT_CONTRACTS.map((contract) => contract.toolName)),
+  ...new Set(PROMPT_CONTRACTS.map((contract) => contract.toolName)),
 ];
 
 export const PUBLIC_SKILL_DEFAULT_TOOL_DEFINITIONS: PublicSkillContractToolDefinition[] =
@@ -1041,6 +1041,26 @@ export const APP_SETTINGS_SKILL: SkillManifest = {
   toolNames: ['set_content_filter'],
 };
 
+export const COMPOSITION_PLANNING_SKILL: SkillManifest = {
+  id: 'composition_planning',
+  name: 'Composition & planning',
+  description:
+    'Plan and shape creative work before any media is rendered: prompt enhancement (enhance_prompt), lyric/instrumental composition (compose_lyrics, compose_instrumental), script/storyboard/ad/trailer/talking-head writing (compose_script), and durable workflow plans or savable workflow templates (compose_workflow, compose_workflow_template). These tools return plans, prompts, or text — they do not consume render credits themselves.',
+  toolNames: [
+    'enhance_prompt',
+    'compose_lyrics',
+    'compose_instrumental',
+    'compose_script',
+    'compose_workflow',
+    'compose_workflow_template',
+  ],
+  constraints: [
+    'Composition tools return plans, prompts, or text — never assume they produced media. After enhance_prompt / compose_lyrics / compose_instrumental / compose_script, hand the output to the matching generation tool (generate_image, generate_video, generate_music, etc.) only if the user asked you to render.',
+    'compose_workflow returns a one-shot durable plan; compose_workflow_template returns a savable, parameterized template. Pick compose_workflow_template only when the user wants to SAVE / NAME / REUSE the recipe; otherwise pick compose_workflow.',
+    'After compose_workflow_template returns the template_draft, finalize the turn immediately — do not call render tools "to preview" the template.',
+  ],
+};
+
 export const ALL_BUILT_IN_SKILLS: readonly SkillManifest[] = [
   QUALITY_AUDIT_SKILL,
   SESSION_CONTROL_SKILL,
@@ -1053,6 +1073,7 @@ export const ALL_BUILT_IN_SKILLS: readonly SkillManifest[] = [
   MEDIA_ANALYSIS_SKILL,
   PERSONA_MANAGEMENT_SKILL,
   APP_SETTINGS_SKILL,
+  COMPOSITION_PLANNING_SKILL,
 ];
 
 // ---------------------------------------------------------------------------

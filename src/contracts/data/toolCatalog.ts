@@ -6,7 +6,7 @@ import {
   BACKBONE_HOSTED_APP_TOOL_NAMES,
   type BackboneAppToolName,
 } from '../backboneToolCatalog.js';
-import { PHASE_5_PROMPT_CONTRACTS } from './promptContracts.js';
+import { PROMPT_CONTRACTS } from './promptContracts.js';
 import { TOOL_COST_METADATA, getToolCostMetadata, type ToolCostMetadata } from './toolCostMetadata.js';
 
 export type ToolCatalogFamily =
@@ -54,7 +54,7 @@ export interface CanonicalToolCatalogEntry {
 }
 
 const PROMPT_CONTRACT_TOOL_NAMES = new Set(
-  PHASE_5_PROMPT_CONTRACTS.map((contract) => contract.toolName),
+  PROMPT_CONTRACTS.map((contract) => contract.toolName),
 );
 
 const BACKBONE_APP_TOOL_NAME_SET = new Set<string>(BACKBONE_APP_TOOL_NAMES);

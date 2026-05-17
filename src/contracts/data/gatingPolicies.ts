@@ -57,7 +57,7 @@ export const MEDIA_TOOL_NAMES: ReadonlyArray<string> = [
   'dance_montage',
 ];
 
-export const PHASE_3_GATING_POLICIES: ReadonlyArray<ToolGatingPolicy> = [
+export const GATING_POLICIES: ReadonlyArray<ToolGatingPolicy> = [
   {
     policyId: 'DIAGNOSTIC_REQUEST',
     version: '1.0.0',
@@ -260,12 +260,12 @@ export const PHASE_3_GATING_POLICIES: ReadonlyArray<ToolGatingPolicy> = [
 ];
 
 /**
- * Populate a ContractRegistry with the Phase 3 gating policies.
+ * Populate a ContractRegistry with the default gating policies.
  * Idempotent — registering the same policyId twice overwrites the
  * prior entry because ContractRegistry uses a Map keyed on policyId.
  */
 export function populateContractsGatingPolicies(registry: ContractRegistry): void {
-  for (const policy of PHASE_3_GATING_POLICIES) {
+  for (const policy of GATING_POLICIES) {
     registry.registerGatingPolicy(policy);
   }
 }

@@ -13,7 +13,7 @@
  * These policies express that narrowing as **category locks**: the
  * unlock signals come from `runtime`/`session_state` (uploaded or
  * generated media, active persona), and a lock fires when *none* of
- * the unlock signals are present. The existing `PHASE_3_GATING_POLICIES`
+ * the unlock signals are present. The existing `GATING_POLICIES`
  * (media routing, persona, video-modification) layer on top — locks
  * narrow the surface, then routing policies forbid specific tools
  * within the still-visible set when the planner has identified a

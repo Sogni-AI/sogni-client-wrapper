@@ -11,7 +11,7 @@
  */
 
 export {
-  PHASE_3_GATING_POLICIES,
+  GATING_POLICIES,
   MEDIA_TOOL_NAMES,
   populateContractsGatingPolicies,
 } from './gatingPolicies.js';
@@ -24,12 +24,12 @@ export {
 } from './gatingPoliciesToolSurface.js';
 
 export {
-  PHASE_4_REPAIR_RECIPES,
+  REPAIR_RECIPES,
   populateContractsRepairRecipes,
 } from './repairRecipes.js';
 
 export {
-  PHASE_5_PROMPT_CONTRACTS,
+  PROMPT_CONTRACTS,
   populateContractsPromptContracts,
 } from './promptContracts.js';
 

@@ -1,6 +1,6 @@
 {
   "name": "@sogni-ai/sogni-intelligence-client",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "description": "Public Sogni Intelligence client — Node.js convenience wrapper for the Sogni SDK plus the public-safe subset of @sogni/creative-agent contracts (ContractRegistry, AssetManifest, RunRecord, tool envelopes). For agent builders, third-party integrations, and downstream SDKs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -58,6 +58,18 @@
       "import": "./dist-esm/public-skill-runtime/index.js",
       "require": "./dist/public-skill-runtime/index.js",
       "default": "./dist/public-skill-runtime/index.js"
+    },
+    "./chatRun": {
+      "types": "./dist/chatRun/index.d.ts",
+      "import": "./dist-esm/chatRun/index.js",
+      "require": "./dist/chatRun/index.js",
+      "default": "./dist/chatRun/index.js"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "import": "./dist-esm/context/index.js",
+      "require": "./dist/context/index.js",
+      "default": "./dist/context/index.js"
     },
     "./schemas/*": "./dist/schemas/*",
     "./package.json": "./package.json"
@@ -126,6 +138,8 @@
     "runtime",
     "tools",
     "public-skill-runtime",
+    "chatRun",
+    "context",
     "skills",
     "README.md",
     "LICENSE",

@@ -1,6 +1,6 @@
 {
   "name": "@sogni-ai/sogni-intelligence-client",
-  "version": "3.0.0-alpha.3",
+  "version": "3.0.0-alpha.4",
   "description": "Public Sogni Intelligence client — Node.js convenience wrapper for the Sogni SDK plus the public-safe subset of @sogni/creative-agent contracts (ContractRegistry, AssetManifest, RunRecord, tool envelopes). For agent builders, third-party integrations, and downstream SDKs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -104,9 +104,11 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package-json.mjs && node scripts/copy-openai-tools-json.mjs && node scripts/copy-schemas-json.mjs",
+    "codegen": "node scripts/generate-openai-tools-manifests.mjs",
+    "build": "npm run codegen && tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package-json.mjs && node scripts/copy-openai-tools-json.mjs && node scripts/copy-schemas-json.mjs",
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
+    "prepare": "npm run codegen",
     "prepublishOnly": "npm run build",
     "test": "node --import tsx test/basic-tests.ts",
     "test:e2e": "node --import tsx test/e2e-test.ts",
@@ -160,7 +162,7 @@
   "files": [
     "dist",
     "dist-esm",
-    "src",
+    "src/skill-runtime-source",
     "contracts",
     "media",
     "workflows",

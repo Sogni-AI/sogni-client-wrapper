@@ -1,6 +1,8 @@
-import generationToolsManifest from './generation-tools.json';
-import compositionToolsManifest from './composition-tools.json';
-import appToolsManifest from './app-tools.json';
+import {
+  generationToolsManifest,
+  compositionToolsManifest,
+  appToolsManifest,
+} from './_manifests.generated.js';
 import type { ToolDefinition } from '../tools/definitions/types.js';
 
 export type { ToolDefinition } from '../tools/definitions/types.js';
@@ -13,9 +15,9 @@ export interface OpenAIToolsManifest {
   tools: ToolDefinition[];
 }
 
-const generationManifest = generationToolsManifest as unknown as OpenAIToolsManifest;
-const compositionManifest = compositionToolsManifest as unknown as OpenAIToolsManifest;
-const appManifest = appToolsManifest as unknown as OpenAIToolsManifest;
+const generationManifest = generationToolsManifest as OpenAIToolsManifest;
+const compositionManifest = compositionToolsManifest as OpenAIToolsManifest;
+const appManifest = appToolsManifest as OpenAIToolsManifest;
 
 export const GENERATION_TOOLS_MANIFEST: OpenAIToolsManifest = generationManifest;
 export const COMPOSITION_TOOLS_MANIFEST: OpenAIToolsManifest = compositionManifest;

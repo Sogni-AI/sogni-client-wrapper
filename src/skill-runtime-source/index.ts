@@ -1,4 +1,4 @@
-// Public-safe utility leaves bundled into the @sogni-ai/sogni-creative-agent-skill
+// Public-safe utility files bundled into the @sogni-ai/sogni-creative-agent-skill
 // runtime artifact. Lives here so the skill's sync-skill-runtime.mjs codegen can
 // read from `node_modules/@sogni-ai/sogni-intelligence-client/src/skill-runtime-source/`
 // instead of from the private `../sogni-creative-agent` sibling repo.

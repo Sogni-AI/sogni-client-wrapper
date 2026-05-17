@@ -10,6 +10,9 @@ dist/
 dist-esm/
 *.tsbuildinfo
 
+# Generated source (regenerated from src/openai-tools/*.json by `npm run codegen`)
+src/openai-tools/_manifests.generated.ts
+
 # Environment files
 .env
 .env.local

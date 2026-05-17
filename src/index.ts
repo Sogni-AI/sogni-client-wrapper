@@ -140,5 +140,24 @@ export {
   parseToolCallArguments,
 } from '@sogni-ai/sogni-client';
 
+// Public-safe tool-arg normalization helpers (also reachable via the
+// `./tools` subpath). Re-exported from the root so consumers that already
+// import from `@sogni-ai/sogni-intelligence-client` (e.g. sogni-chat) can
+// pick these up without adding a second import line.
+export {
+  type DynamicPromptBranch,
+  type SceneDynamicPromptValidation,
+  extractDynamicPromptBranches,
+  isolateDynamicPromptSlot,
+  buildDynamicPromptSlotPrompts,
+  validateSceneDynamicPromptBatch,
+  validateSingleDynamicPromptBranch,
+  promptHasStoryboardBatchLanguage,
+  promptHasLinkedVariantBatchLanguage,
+  isStoryboardKeyframeBatchPrompt,
+} from './tools/shared/dynamicPromptBranches.js';
+export { textExplicitlyRequestsMultipleImageOutputs } from './tools/shared/multiImageIntent.js';
+export { maybeAlignNumberOfVariationsToDynamicBranchCount } from './tools/shared/numberOfVariationsAlignment.js';
+
 // Default export
 export { SogniClientWrapper as default } from './client/SogniClientWrapper.js';

@@ -67,3 +67,17 @@ export type {
   ToolResultOk,
 } from './result.js';
 export { expandSingleSourceFanOutForPerClipPrompts } from './normalizeArgs.js';
+export {
+  type DynamicPromptBranch,
+  type SceneDynamicPromptValidation,
+  extractDynamicPromptBranches,
+  isolateDynamicPromptSlot,
+  buildDynamicPromptSlotPrompts,
+  validateSceneDynamicPromptBatch,
+  validateSingleDynamicPromptBranch,
+  promptHasStoryboardBatchLanguage,
+  promptHasLinkedVariantBatchLanguage,
+  isStoryboardKeyframeBatchPrompt,
+} from './shared/dynamicPromptBranches.js';
+export { textExplicitlyRequestsMultipleImageOutputs } from './shared/multiImageIntent.js';
+export { maybeAlignNumberOfVariationsToDynamicBranchCount } from './shared/numberOfVariationsAlignment.js';

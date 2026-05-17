@@ -38,6 +38,7 @@ import {
   type ToolDefinition,
 } from '../src';
 import { SogniClient } from '@sogni-ai/sogni-client';
+import { runToolsSharedTests } from './tools-shared-tests';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -1767,6 +1768,11 @@ async function runTests() {
       }
     }
   })();
+
+  // Tools/shared helper unit tests
+  const sharedResults = runToolsSharedTests();
+  testsPassed += sharedResults.passed;
+  testsFailed += sharedResults.failed;
 
   // Summary
   console.log('\n' + '='.repeat(50));

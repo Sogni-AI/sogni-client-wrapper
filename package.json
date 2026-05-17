@@ -108,7 +108,7 @@
     "build": "npm run codegen && tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package-json.mjs && node scripts/copy-openai-tools-json.mjs && node scripts/copy-schemas-json.mjs",
     "build:watch": "tsc --watch",
     "dev": "tsc --watch",
-    "prepare": "npm run codegen",
+    "prepare": "npm run codegen && husky",
     "prepublishOnly": "npm run build",
     "test": "node --import tsx test/basic-tests.ts",
     "test:e2e": "node --import tsx test/e2e-test.ts",
@@ -151,8 +151,11 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
     "@types/node": "^22.0.0",
     "dotenv": "^17.2.3",
+    "husky": "^9.1.7",
     "tsx": "^4.20.6",
     "typescript": "^5.0.0"
   },

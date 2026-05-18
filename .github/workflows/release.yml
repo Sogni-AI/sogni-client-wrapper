@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,6 +36,14 @@ jobs:
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
         run: npm audit signatures
       - name: Release
+        # Auto-publish to npm via semantic-release is gated behind a manual
+        # workflow_dispatch trigger because npm 2FA is enabled on the package
+        # and the current NPM_TOKEN is a publish token (not an automation
+        # token), so per-push publishing always fails with EOTP. Maintainers
+        # publish manually (npm version + npm publish --otp=...) until the
+        # token is rotated. Triggering this step on demand still works via
+        # the Actions UI or `gh workflow run release.yml`.
+        if: github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

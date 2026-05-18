@@ -18,10 +18,8 @@ For most agent builders this is the recommended starting point. Designed for thi
 ## Installation
 
 ```bash
-npm install @sogni-ai/sogni-intelligence-client@alpha
+npm install @sogni-ai/sogni-intelligence-client
 ```
-
-> **Pre‑release.** Versions ship on the `alpha` dist‑tag; pin to a specific `3.0.0-alpha.N` until `3.0.0` stable is cut. The npm badge above tracks the latest published version.
 
 Requires Node.js ≥ 18.
 

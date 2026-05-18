@@ -106,8 +106,8 @@ scripts/                     — build post-processors and codegen
 ## Key tooling / integrations
 
 - **`@sogni-ai/sogni-client`** — the underlying SDK (currently pinned at
-  `5.0.0-alpha.4`). This repo and `sogni-client` are **circularly
-  interdependent**; keep alpha versions in lockstep.
+  `5.0.0-alpha.6`). This repo depends on the SDK directly; keep the pin
+  aligned with the published SDK release consumed by downstream repos.
 - **`sharp`** — runtime dep for image dimension probing in media helpers.
 - **`tsx`** — used to run TypeScript tests via `node --import tsx`.
 - **OpenAI-shaped tool calling** — `SogniTools.all` (re-exported from the SDK)
@@ -137,8 +137,8 @@ both `dist/<name>/index.js` and `dist-esm/<name>/index.js` are emitted.
   "<query>"` scans this repo prominently. If a helper exists, import it.
 - **Don't break the public surface.** Anything exported from a subpath is a
   consumer contract — `sogni-chat`, `sogni-api`, and `n8n-nodes-sogni` all
-  depend on it. Removing or renaming a public symbol is a breaking change
-  even on the alpha train; coordinate via the sogni-client alpha cadence.
+  depend on it. Removing or renaming a public symbol is a breaking change;
+  coordinate it with a semver-major release and downstream consumer bumps.
 - **Don't bypass redaction.** `RunRecord` data must pass through
   `redactRunRecord` / `redactPayload` from `./replay` before being persisted
   or logged. Signed URLs, bearer tokens, and JWTs leak otherwise.
@@ -148,12 +148,16 @@ both `dist/<name>/index.js` and `dist-esm/<name>/index.js` are emitted.
 - **Validate hosted-tool args before dispatch.** Use
   `validateAndNormalizeHostedToolArguments` from `./contracts` rather than
   passing raw LLM output through.
-- **Publishing is manual.** No semantic-release here; bump `package.json`
-  version, `npm publish --tag alpha`, tag in git. Releases must be
-  coordinated with `sogni-client` alphas — see the `publish-sogni-client`
-  runbook in `~/Documents/git/sogni-agent-knowledge/workflows/`.
-- **Commits are not enforced** (no commitlint, no husky), but conventional-
-  commits is the team norm. Consumers parse the changelog.
+- **Publishing is automatic.** Pushes to `main` run `.github/workflows/release.yml`
+  and `semantic-release`, publishing to npm's `latest` dist-tag. Use
+  Conventional Commits intentionally: `feat:` creates a minor release, `fix:`
+  creates a patch release, and breaking changes create a major release. The
+  release workflow currently uses `NPM_TOKEN`; for CI publish it must be an npm
+  token that can publish without an interactive OTP.
+- **Commits are strict.** Run `sogni commit-check sogni-intelligence-client -F
+  <msg-file>` before committing. The rules match `sogni-client`: Conventional
+  Commits, subject >= 16 characters, body required, blank line after subject,
+  max 120 characters per line.
 - **Examples must typecheck.** When adding or changing a public symbol,
   run `npm run typecheck:examples` — `examples/` is part of the test
   signal.

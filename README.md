@@ -21,13 +21,13 @@ For most agent builders this is the recommended starting point. Designed for thi
 npm install @sogni-ai/sogni-intelligence-client@alpha
 ```
 
-> **Pre‑release.** The current published version is `3.0.0-alpha.0` on the `alpha` dist‑tag. Pin with `@^3.0.0-alpha.0` until `3.0.0` stable is cut.
+> **Pre‑release.** Versions ship on the `alpha` dist‑tag; pin to a specific `3.0.0-alpha.N` until `3.0.0` stable is cut. The npm badge above tracks the latest published version.
 
 Requires Node.js ≥ 18.
 
 ## Package structure
 
-The package exposes nine subpath entry points so consumers import only what they need:
+The package exposes the following subpath entry points so consumers import only what they need:
 
 | Subpath | Purpose |
 |---|---|
@@ -40,6 +40,10 @@ The package exposes nine subpath entry points so consumers import only what they
 | `…/skills/asset_reference_management` | Asset‑reference resolution helpers for hosted media |
 | `…/workflows` | Creative‑workflow type definitions, bindings with embedded‑interpolation support, and a `primitives` namespace of pure helpers for `wf:*` stage tools (LLM judge + `__PASS__`/`__FAIL__` parser, bounded retry‑until‑predicate, storyboard script expander, dialogue duration fitter, SSRF allow‑list for fetched artifact URLs) |
 | `…/media` | Media reference helpers (upload / download URL flows) |
+| `…/chatRun` | Durable hosted `ChatRun` contracts — state machine, events, cost‑approval types |
+| `…/context` | Context‑window primitives — token accounting, message protection, summarization budgeting |
+| `…/openai-tools` | OpenAI‑shaped tool manifests (`app-tools.json`, `composition-tools.json`, `generation-tools.json`) baked into TS so consumers can compile a tool surface without filesystem reads |
+| `…/skill-runtime-source` | Cross‑surface parity helpers (workflow status, Seedance audio windows) shared with the private skill runtime |
 | `…/schemas/*` | Raw JSON Schema artifacts for cross‑language codegen (Swift, Kotlin, Python, etc.) |
 
 Each subpath ships dual CJS + ESM with TypeScript declarations.

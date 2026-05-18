@@ -1,6 +1,6 @@
 {
   "name": "@sogni-ai/sogni-intelligence-client",
-  "version": "3.0.0-alpha.5",
+  "version": "3.0.0-alpha.6",
   "description": "Public Sogni Intelligence client — Node.js convenience wrapper for the Sogni SDK plus the public-safe subset of @sogni/creative-agent contracts (ContractRegistry, AssetManifest, RunRecord, tool envelopes). For agent builders, third-party integrations, and downstream SDKs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -148,7 +148,7 @@
   },
   "homepage": "https://github.com/Sogni-AI/sogni-intelligence-client#readme",
   "dependencies": {
-    "@sogni-ai/sogni-client": "5.0.0-alpha.5",
+    "@sogni-ai/sogni-client": "5.0.0-alpha.6",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

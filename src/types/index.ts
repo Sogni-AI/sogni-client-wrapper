@@ -52,18 +52,15 @@ import type {
   StartCreativeWorkflowOptions,
   StartCreativeWorkflowParams,
   StreamCreativeWorkflowEventsOptions,
-} from '@sogni-ai/sogni-client';
-
-import type {
   ControlNetParams,
   ControlNetName,
   ControlNetMode,
   VideoControlNetName,
   VideoControlNetParams,
-} from '@sogni-ai/sogni-client/dist/Projects/types/ControlNetParams';
-
-import type { InputMedia } from '@sogni-ai/sogni-client/dist/Projects/types';
-import type { ProjectEvent, JobEvent } from '@sogni-ai/sogni-client/dist/Projects/types/events';
+  InputMedia,
+  ProjectEvent,
+  JobEvent,
+} from '@sogni-ai/sogni-client';
 
 // Re-export types from Sogni SDK
 export type {

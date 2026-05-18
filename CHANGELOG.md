@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v2.1.0...v2.2.0) (2026-05-18)
+
+
+### Features
+
+* **contracts:** strengthen generate_image BATCH FAN-OUT rule ([9066104](https://github.com/Sogni-AI/sogni-intelligence-client/commit/9066104a70e7758d2f8168d0ac0e8009d417ebbb))
+
 # [2.1.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v2.0.0...v2.1.0) (2026-05-18)
 
 

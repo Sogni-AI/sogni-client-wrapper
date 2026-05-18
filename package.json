@@ -1,23 +1,47 @@
 {
   "name": "@sogni-ai/sogni-intelligence-client",
-  "version": "3.0.0-alpha.6",
+  "version": "2.1.0",
   "description": "Public Sogni Intelligence client — Node.js convenience wrapper for the Sogni SDK plus the public-safe subset of @sogni/creative-agent contracts (ContractRegistry, AssetManifest, RunRecord, tool envelopes). For agent builders, third-party integrations, and downstream SDKs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "typesVersions": {
     "*": {
-      "contracts": ["./dist/contracts/index.d.ts"],
-      "tools": ["./dist/tools/index.d.ts"],
-      "replay": ["./dist/replay/index.d.ts"],
-      "runtime": ["./dist/runtime/index.d.ts"],
-      "skills/asset_reference_management": ["./dist/skills/asset_reference_management/index.d.ts"],
-      "workflows": ["./dist/workflows/index.d.ts"],
-      "media": ["./dist/media/index.d.ts"],
-      "public-skill-runtime": ["./dist/public-skill-runtime/index.d.ts"],
-      "chatRun": ["./dist/chatRun/index.d.ts"],
-      "context": ["./dist/context/index.d.ts"],
-      "openai-tools": ["./dist/openai-tools/index.d.ts"],
-      "skill-runtime-source": ["./dist/skill-runtime-source/index.d.ts"]
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ],
+      "tools": [
+        "./dist/tools/index.d.ts"
+      ],
+      "replay": [
+        "./dist/replay/index.d.ts"
+      ],
+      "runtime": [
+        "./dist/runtime/index.d.ts"
+      ],
+      "skills/asset_reference_management": [
+        "./dist/skills/asset_reference_management/index.d.ts"
+      ],
+      "workflows": [
+        "./dist/workflows/index.d.ts"
+      ],
+      "media": [
+        "./dist/media/index.d.ts"
+      ],
+      "public-skill-runtime": [
+        "./dist/public-skill-runtime/index.d.ts"
+      ],
+      "chatRun": [
+        "./dist/chatRun/index.d.ts"
+      ],
+      "context": [
+        "./dist/context/index.d.ts"
+      ],
+      "openai-tools": [
+        "./dist/openai-tools/index.d.ts"
+      ],
+      "skill-runtime-source": [
+        "./dist/skill-runtime-source/index.d.ts"
+      ]
     }
   },
   "exports": {

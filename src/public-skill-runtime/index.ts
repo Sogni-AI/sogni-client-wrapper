@@ -4151,8 +4151,13 @@ function applyStoryboardPlanningLayoutContract(
     ?? cellAspectRatio
     ?? fallback.targetVideoAspectRatio;
   const layout = describeStoryboardLayout(boardAspectRatio, cellAspectRatio, frameCount);
-  const boardDimensions = contractOwnsCanvas
+  const contractBoardDimensions = contractOwnsCanvas
     ? normalizeStoryboardBoardDimensions(layoutContract.boardDimensions)
+    : null;
+  const boardDimensions = contractOwnsCanvas
+    ? (storyboardBoardDimensionsMatchAspect(contractBoardDimensions, boardAspectRatio)
+      ? contractBoardDimensions
+      : null)
       ?? (userDefinedCanvas ? fallback.boardDimensions : undefined)
     : fallback.boardDimensions;
 
@@ -4163,6 +4168,33 @@ function applyStoryboardPlanningLayoutContract(
     ...layout,
     ...(boardDimensions ? { boardDimensions } : {}),
   };
+}
+
+/**
+ * True when `boardDimensions` ("WxH") is within ~10% of the orientation
+ * implied by `boardAspectRatio`. Rejects LLM-emitted planning contracts
+ * that put landscape dimensions on a portrait-stated board (or vice
+ * versa), in which case callers should fall back to the computed
+ * canvas. The 10% slack tolerates rounding to multiples of 16.
+ */
+function storyboardBoardDimensionsMatchAspect(
+  boardDimensions: string | null,
+  boardAspectRatio: string | null,
+): boolean {
+  if (!boardDimensions) return false;
+  const match = boardDimensions.match(/^(\d+)x(\d+)$/i);
+  if (!match) return false;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false;
+  const normalized = normalizeAspectRatio(boardAspectRatio);
+  const targetPair = normalized ? parseAspectRatioPair(normalized) : null;
+  if (!targetPair) return true;
+  const targetRatio = targetPair.width / targetPair.height;
+  const actualRatio = width / height;
+  if (!Number.isFinite(targetRatio) || targetRatio <= 0) return true;
+  const ratioError = Math.abs(actualRatio - targetRatio) / targetRatio;
+  return ratioError <= 0.1;
 }
 
 export function inferStoryboardLayoutSpec(

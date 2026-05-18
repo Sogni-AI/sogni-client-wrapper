@@ -4958,8 +4958,13 @@ function extractStoryboardField(section: string, labels: string[]): string {
 
 function removeStoryboardTimingText(value: string): string {
   return value
+    // MM:SS - MM:SS
     .replace(/\b\d{1,2}:\d{2}(?:\.\d+)?\s*(?:-|to|\u2013|\u2014)\s*\d{1,2}:\d{2}(?:\.\d+)?\b/gi, ' ')
-    .replace(/\b\d{1,3}(?:\.\d+)?\s*(?:s|sec|secs|seconds?)?\s*(?:-|to|\u2013|\u2014)\s*\d{1,3}(?:\.\d+)?\s*(?:s|sec|secs|seconds?)?\b/gi, ' ')
+    // Xs - Ys (units on both sides; tolerates whitespace around dash)
+    .replace(/\b\d{1,3}(?:\.\d+)?\s*(?:s|sec|secs|seconds?)\s*(?:-|to|\u2013|\u2014)\s*\d{1,3}(?:\.\d+)?\s*(?:s|sec|secs|seconds?)\b/gi, ' ')
+    // X-Ys (shared trailing unit; require no whitespace around dash so we
+    // do not catch "Slogan 1 - 13s" where the "1" is part of a title)
+    .replace(/\b\d{1,3}(?:\.\d+)?(?:-|\u2013|\u2014)\d{1,3}(?:\.\d+)?\s*(?:s|sec|secs|seconds?)\b/gi, ' ')
     .replace(/\(\s*\)|\[\s*\]/g, ' ')
     .replace(/\s*[|]\s*/g, ' ')
     .replace(/^[-:.\s|]+|[-:.\s|]+$/g, ' ')
@@ -5037,17 +5042,34 @@ function parseStoryboardTimeValue(value: string): number | null {
 }
 
 function extractStoryboardTiming(text: string): { startSec: number; endSec: number; durationSec: number } | null {
-  const match = text.match(/(\d{1,2}:\d{1,2}(?:\.\d+)?|\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)?\s*(?:-|to|\u2013|\u2014)\s*(\d{1,2}:\d{1,2}(?:\.\d+)?|\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)?/i);
-  if (!match) return null;
-  const startSec = parseStoryboardTimeValue(match[1]);
-  const endSec = parseStoryboardTimeValue(match[2]);
-  if (startSec === null || endSec === null) return null;
-  if (!Number.isFinite(startSec) || !Number.isFinite(endSec) || endSec <= startSec) return null;
-  return {
-    startSec,
-    endSec,
-    durationSec: Math.round((endSec - startSec) * 100) / 100,
-  };
+  // Prefer the strictest, most unambiguous pattern first so a number that is
+  // really part of a title ("Slogan 1 - 13s-14s") does not get captured as a
+  // timing range ("1 - 13s"). Patterns in order of strictness:
+  //   1. MM:SS - MM:SS
+  //   2. Xs - Ys  (units on both sides, any spacing)
+  //   3. X-Ys     (shared trailing unit, no whitespace around the dash \u2014
+  //                rejects "Slogan 1 - 13s" because of the spaces)
+  //   4. Permissive fallback for any remaining cases.
+  const patterns = [
+    /(\d{1,2}:\d{1,2}(?:\.\d+)?)\s*(?:-|to|\u2013|\u2014)\s*(\d{1,2}:\d{1,2}(?:\.\d+)?)/i,
+    /(\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)\s*(?:-|to|\u2013|\u2014)\s*(\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)/i,
+    /(\d{1,3}(?:\.\d+)?)(?:-|\u2013|\u2014)(\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)/i,
+    /(\d{1,2}:\d{1,2}(?:\.\d+)?|\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)?\s*(?:-|to|\u2013|\u2014)\s*(\d{1,2}:\d{1,2}(?:\.\d+)?|\d{1,3}(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)?/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const startSec = parseStoryboardTimeValue(match[1]);
+    const endSec = parseStoryboardTimeValue(match[2]);
+    if (startSec === null || endSec === null) continue;
+    if (!Number.isFinite(startSec) || !Number.isFinite(endSec) || endSec <= startSec) continue;
+    return {
+      startSec,
+      endSec,
+      durationSec: Math.round((endSec - startSec) * 100) / 100,
+    };
+  }
+  return null;
 }
 
 function extractStoryboardTimingMarker(text: string): { startSec: number; endSec: number; durationSec: number } | null {

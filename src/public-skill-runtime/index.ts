@@ -2449,15 +2449,57 @@ function timeRangeLooksLikeSourceMediaWindow(text: string, match: RegExpMatchArr
     || /\b(?:audio|music|song|sound|track|clip|file)\b[\s\S]{0,60}\b(?:from|using|between|inside|within|in)\b/i.test(context);
 }
 
+const VIDEO_RUNTIME_OUTPUT_CUE_RE =
+  /\b(?:video|videos|clip|clips|film|movie|animation|animations|storyboard|storyboards|teaser|promo|commercial|ad|advert|seedance|ltx|wan|render|renders?)\b/i;
+const VIDEO_RUNTIME_ACTION_CUE_RE =
+  /\b(?:make|create|generate|render|produce|build|compose|turn|convert)\b/i;
+const VIDEO_RUNTIME_LABEL_CUE_RE =
+  /\b(?:duration|runtime|run\s*time|length|total|overall|final\s+(?:duration|runtime|length))\b/i;
+
+function durationPhraseLooksLikeRequestedVideoRuntime(text: string, match: RegExpMatchArray): boolean {
+  const start = match.index ?? 0;
+  const end = start + match[0].length;
+  const trimmed = text.trim();
+  const left = text.slice(Math.max(0, start - 120), start);
+  const right = text.slice(end, Math.min(text.length, end + 120));
+  const local = `${left}${match[0]}${right}`;
+  const leftTail = left.slice(-80);
+  const rightHead = right.slice(0, 80);
+
+  if (trimmed.length <= 32 && /^\s*\d{1,3}(?:\.\d+)?\s*[- ]?\s*(?:s|sec|secs|seconds?|minutes?|mins?)\b/i.test(trimmed)) {
+    return true;
+  }
+
+  if (VIDEO_RUNTIME_LABEL_CUE_RE.test(leftTail) || VIDEO_RUNTIME_LABEL_CUE_RE.test(rightHead)) return true;
+  if (VIDEO_RUNTIME_OUTPUT_CUE_RE.test(rightHead)) return true;
+  if (
+    VIDEO_RUNTIME_OUTPUT_CUE_RE.test(leftTail)
+    && (VIDEO_RUNTIME_LABEL_CUE_RE.test(local) || /\b(?:long|total|altogether|in\s+all)\b/i.test(rightHead))
+  ) {
+    return true;
+  }
+  if (VIDEO_RUNTIME_ACTION_CUE_RE.test(leftTail) && VIDEO_RUNTIME_OUTPUT_CUE_RE.test(rightHead)) return true;
+  if (VIDEO_RUNTIME_ACTION_CUE_RE.test(leftTail) && /\b(?:looping?\s+)?version\b/i.test(rightHead)) {
+    return true;
+  }
+  if (/\b(?:make|set|change|turn|trim|shorten|lengthen)\s+(?:it|this|that|the\s+(?:video|clip|render|animation))\s*(?:to|as|be)?\s*$/i.test(leftTail)) {
+    return true;
+  }
+
+  return false;
+}
+
 export function inferRequestedTotalVideoDurationSeconds(text: string): number | null {
   const explicitDurations: number[] = [];
   for (const match of text.matchAll(/\b(\d{1,3}(?:\.\d+)?)\s*[- ]?\s*(?:minutes?|mins?)\b/gi)) {
     if (match.index !== undefined && text[match.index - 1] === '%') continue;
+    if (!durationPhraseLooksLikeRequestedVideoRuntime(text, match)) continue;
     const minutes = Number(match[1]);
     if (Number.isFinite(minutes) && minutes > 0) explicitDurations.push(Math.ceil(minutes * 60));
   }
   for (const match of text.matchAll(/\b(\d{1,3}(?:\.\d+)?)\s*[- ]?\s*(?:s|sec|secs|seconds?)\b/gi)) {
     if (match.index !== undefined && text[match.index - 1] === '%') continue;
+    if (!durationPhraseLooksLikeRequestedVideoRuntime(text, match)) continue;
     const seconds = Number(match[1]);
     if (Number.isFinite(seconds) && seconds > 0) explicitDurations.push(seconds);
   }
@@ -4667,7 +4709,7 @@ function normalizeStoryboardAvoidConstraint(value: string): string {
 
 function extractStoryboardRequiredText(text: string): string[] {
   const required = new Set<string>();
-  const inlineProductionLabelPattern = /\b(?:SFX|FX|Audio(?:\s*\/\s*SFX)?|Sound(?:s)?|Music|Foley|Camera(?:\s*\/\s*Motion)?|Motion|Lighting(?:\s*\/\s*Style)?|Style|Transition|Action(?:\s*\/\s*Motion)?|Performance|Beat)\s*:\s*[^a-z0-9]{0,4}$/i;
+  const inlineProductionLabelPattern = /\b(?:SFX|FX|Audio(?:\s*\/\s*SFX)?|Sound(?:s)?|Music|Foley|Dialogue(?:\s*\/\s*VO)?|VO|V\.O\.|Voiceover|Voice-over|Narration|Speech|Camera(?:\s*\/\s*Motion)?|Motion|Lighting(?:\s*\/\s*Style)?|Style|Transition|Action(?:\s*\/\s*Motion)?|Performance|Beat)\s*:\s*[^a-z0-9]{0,4}$/i;
   const visibleTextContextPattern = /\b(?:visible|on[-\s]?screen|in[-\s]?frame|text|copy|cta|tagline|headline|title\s+card|caption|subtitle|super|wordmark|spell(?:ed)?|read(?:s)?|slogan)\b/i;
   const sceneHeadingPattern = /^\s*(?:[-*+]\s*)?(?:#{1,6}\s*)?(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)[\s_#-]*\d{1,2}\b/i;
   const visibleTextRestrictionPattern = /\b(?:only\s+(?:text|copy|words?)|no\s+(?:captions?|subtitles?|overlays?|watermarks?|added\s+logos?|extra\s+logos?|logos?|text|copy)|without\s+(?:captions?|subtitles?|overlays?|watermarks?|added\s+logos?|extra\s+logos?|logos?|text|copy)|do\s+not\s+(?:add|include|render|show|write)\s+(?:captions?|subtitles?|overlays?|watermarks?|logos?|text|copy|words?))\b/i;
@@ -4683,7 +4725,7 @@ function extractStoryboardRequiredText(text: string): string[] {
     const looksLikeAssetHandle = /\.\.\.|(?:^|[./_-])(?:png|jpe?g|webp|gif|svg)$|[a-f0-9]{8}-[a-f0-9-]{8,}/i.test(value);
     const fieldLabel = line.match(/^\s*(?:[-*+]\s*)?(?:[*_]{1,3})?\s*([^:\n]{1,60})\s*:/)?.[1] ?? '';
     const isProductionDirectionField =
-      /\b(?:action|motion|camera|transition|audio|sfx|fx|foley|sound|music|lighting|style|performance|beat)\b/i.test(fieldLabel)
+      /\b(?:action|motion|camera|transition|audio|sfx|fx|foley|sound|music|dialogue|vo|voiceover|voice-over|narration|speech|lighting|style|performance|beat)\b/i.test(fieldLabel)
       && !visibleTextContextPattern.test(fieldLabel);
     const hasExplicitVisibleTextContext = visibleTextContextPattern.test(line);
     const isRestrictionOnlyTextInstruction =
@@ -4764,6 +4806,84 @@ function extractStoryboardRequiredText(text: string): string[] {
     }
     if (value) required.add(value);
   };
+  const splitEndCardCopyCandidates = (rawValue: string): string[] => {
+    const value = stripStoryboardMarkup(rawValue)
+      .replace(/^(?:visible\s+text|on[-\s]?screen\s+text|onscreen\s+text|text|copy|cta|tagline|slogan)\s*:\s*/i, '')
+      .trim();
+    if (!value) return [];
+
+    const quoted = extractQuotedDialogueSegments(value)
+      .map(line => compactStoryboardLine(line))
+      .filter(Boolean);
+    if (quoted.length > 0) return quoted;
+
+    return value
+      .split(/(?<=[.!?])\s+(?=[A-Z0-9])/g)
+      .map(line => compactStoryboardLine(line)
+        .replace(/^["“”'`]+|["“”'`]+$/g, '')
+        .trim())
+      .filter(Boolean);
+  };
+  const endCardCopyCandidateLooksRenderable = (candidate: string, context: string): boolean => {
+    const value = compactStoryboardLine(candidate)
+      .replace(/^["“”'`]+|["“”'`]+$/g, '')
+      .trim();
+    if (!value || value.length > 120) return false;
+    if (/^(?:none|n\/a|not\s+specified|no\s+(?:visible\s+)?text)\.?$/i.test(value)) return false;
+    if (storyboardTextCandidateLooksLikeGenericProductionLabel(value)) return false;
+
+    const contextNamesText =
+      /\b(?:slogans?|taglines?|cta|copy|text|words?|wordmark|brand|logo|end\s+card|final\s+card|end\s+scene|final\s+scene|closing\s+card)\b/i
+        .test(context);
+    if (!contextNamesText) return false;
+
+    const copySignal =
+      /\b[a-z0-9-]+\.(?:ai|app|com|io|net|org)\b/i.test(value)
+      || /^(?:powered|made|built|created|generated|rendered|presented)\s+by\b/i.test(value)
+      || (
+        value.split(/\s+/).length <= 8
+        && /^[A-Z0-9][^:|]*[.!?]?$/.test(value)
+      );
+    if (!copySignal) return false;
+
+    const productionDirection =
+      /\b(?:fade|cut|camera|shot|zoom|pan|dolly|transition|sfx|audio|music|visual|scene|beat|appears?|pulses?|background|black\s+screen)\b/i
+        .test(value);
+    const copyOverridesProduction =
+      /\b[a-z0-9-]+\.(?:ai|app|com|io|net|org)\b/i.test(value)
+      || /^(?:powered|made|built|created|generated|rendered|presented)\s+by\b/i.test(value);
+    return !productionDirection || copyOverridesProduction;
+  };
+  const endCardLabelPattern = /^\s*(?:[-*+]\s*)?(?:end|final|closing)\s+(?:scene|card|frame|shot|cta|logo(?:\s+lockup)?)\s*:\s*([^\n]*)$/gim;
+  for (const match of text.matchAll(endCardLabelPattern)) {
+    const matchIndex = match.index ?? 0;
+    const lineEnd = text.indexOf('\n', matchIndex);
+    const afterLineIndex = lineEnd >= 0 ? lineEnd + 1 : text.length;
+    const followingLines: string[] = [];
+    for (const line of text.slice(afterLineIndex).split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed) break;
+      if (/^(?:#{1,6}\s+|\|\s*|(?:Scene|Shot|Beat|Panel|Frame)\s*\d{1,2}\b)/i.test(trimmed)) break;
+      if (followingLines.length >= 5) break;
+      followingLines.push(trimmed);
+    }
+    const blockLines = [
+      match[1] || '',
+      ...followingLines,
+    ].filter(Boolean);
+    if (blockLines.length === 0) continue;
+    const context = [
+      text.slice(Math.max(0, matchIndex - 320), matchIndex),
+      match[0],
+      ...blockLines,
+    ].join('\n');
+    for (const line of blockLines) {
+      for (const candidate of splitEndCardCopyCandidates(line)) {
+        if (!endCardCopyCandidateLooksRenderable(candidate, context)) continue;
+        addRequiredText(candidate, matchIndex, { precedingText: context });
+      }
+    }
+  }
   const exactTextPattern = /\b(?:render|show|include|text|copy|cta|tagline|headline|title|brand|logo|wordmark|words?|say(?:s)?|spell(?:ed)?)\b[^"“`\n]{0,120}(?:"([^"]{1,160})"|“([^”]{1,160})”|`([^`]{1,160})`)/gi;
   for (const match of text.matchAll(exactTextPattern)) {
     const fullMatch = match[0];
@@ -6471,26 +6591,52 @@ function finalStoryboardSceneVisibleText(scenes: SceneSpec[]): string[] {
   return [];
 }
 
+function storyboardRequiredTextKey(value: string): string {
+  return compactStoryboardLine(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function storyboardTextEqualsSceneDialogue(value: string, scenes: SceneSpec[]): boolean {
+  const key = storyboardRequiredTextKey(value);
+  if (!key) return false;
+  return scenes.some(scene => storyboardRequiredTextKey(scene.dialogue) === key);
+}
+
 function storyboardRequiredTextForProject(
   options: StoryboardPromptCompileOptions,
   userConstraintSource: string,
   scenes: SceneSpec[],
 ): { mustIncludeText: string[]; endCardText: string[] } {
   const contractEndCardText = normalizeStoryboardContractTextArray(options.planningContract?.endCard?.visibleText);
+  const userRequiredText = extractStoryboardRequiredText(options.userIntentText);
   const extractedRequiredText = extractStoryboardRequiredText(userConstraintSource);
+  const assistantDraftRequiredText = options.promptAuthorship === 'assistant'
+    ? extractedRequiredText.filter(text =>
+      userRequiredText.includes(text) || !storyboardTextEqualsSceneDialogue(text, scenes),
+    )
+    : extractedRequiredText;
   const sceneVisibleText = uniqueStoryboardStrings(scenes.flatMap(scene => scene.textInImage));
 
   if (options.promptAuthorship === 'assistant' && sceneVisibleText.length > 0) {
     const scopedEndCardText = finalStoryboardSceneVisibleText(scenes);
-    const endCardText = scopedEndCardText.length > 0 ? scopedEndCardText : contractEndCardText;
+    const endCardText = scopedEndCardText.length > 0
+      ? uniqueStoryboardStrings([...scopedEndCardText, ...contractEndCardText, ...assistantDraftRequiredText])
+      : uniqueStoryboardStrings([...contractEndCardText, ...assistantDraftRequiredText]);
     return {
-      mustIncludeText: uniqueStoryboardStrings([...sceneVisibleText, ...contractEndCardText]),
+      mustIncludeText: uniqueStoryboardStrings([
+        ...sceneVisibleText,
+        ...contractEndCardText,
+        ...assistantDraftRequiredText,
+      ]),
       endCardText,
     };
   }
 
   const requiredText = uniqueStoryboardStrings([
-    ...extractedRequiredText,
+    ...assistantDraftRequiredText,
     ...contractEndCardText,
   ]);
   return {

@@ -48,7 +48,7 @@ export interface GenerationJobOverrides {
 
 export interface GenerationCostConfirmResult {
   confirmed: boolean;
-  action?: 'confirm' | 'apply_overrides';
+  action?: 'confirm' | 'apply_overrides' | 'timeout';
   overrides?: GenerationJobOverrides;
   thresholdUsd?: number;
   dontAskAgainForSession?: boolean;

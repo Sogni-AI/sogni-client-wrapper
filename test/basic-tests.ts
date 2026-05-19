@@ -1592,6 +1592,67 @@ async function runTests() {
     }
   })();
 
+  await test('Should preserve user end-scene copy from assistant storyboard drafts', () => {
+    const userIntent = [
+      'Generate a fun 420p 10s video storyboard using this mascot image.',
+      'The commercial should end on our Sogni logo and slogans.',
+      'Let us construct this using 12 beats.',
+      'End scene:',
+      'Seedance 2.0 on Sogni.ai',
+      'Create anything.',
+      'Powered by the people.',
+    ].join('\n');
+    const assistantDraft = [
+      '### Timecoded Storyboard Plan (12 Beats)',
+      '| Beat | Time | Purpose | Visual / Action | Audio / Dialogue |',
+      '| :--- | :--- | :--- | :--- | :--- |',
+      '| **1** | 00:00 - 00:01 | Setup | Sloth at a boring desk. | SFX: office hum. |',
+      '| **2** | 00:01 - 00:02 | Setup | Papers pile up. | SFX: paper rustle. |',
+      '| **3** | 00:02 - 00:03 | Turn | Sloth looks to camera. | VO: "Ever since I was young" |',
+      '| **4** | 00:03 - 00:04 | Action | Horn glows. | VO: "I have always wanted to" |',
+      '| **5** | 00:04 - 00:05 | Action | Desk melts. | SFX: whoosh. |',
+      '| **6** | 00:05 - 00:06 | Escalation | Art orbs appear. | VO: "convert unstructured data" |',
+      '| **7** | 00:06 - 00:07 | Escalation | Psychedelic ribbons wrap the sloth. | SFX: synth swell. |',
+      '| **8** | 00:07 - 00:08 | Climax | Fractals explode. | VO: "into actionable insight" |',
+      '| **9** | 00:08 - 00:09 | Reveal | Sloth freezes happy in art. | SFX: record scratch. |',
+      '| **10** | 00:09 - 00:10 | Reveal | Text slams on screen: "Syke!" | VO: "Syke! I wanted to make wild art." |',
+      '| **11** | 00:10 - 00:12 | Payoff | Sloth winks near logo area. | VO: "Anything I can imagine." |',
+      '| **12** | 00:12 - 00:15 | End Card | Sogni Logo appears with the tagline below it. | VO: "And it is finally here." |',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    if (project.durationSec !== 10) {
+      throw new Error(`Expected user duration 10s, got ${project.durationSec}`);
+    }
+    for (const text of ['Seedance 2.0 on Sogni.ai', 'Create anything.', 'Powered by the people.']) {
+      if (!project.endCard.requiredText.includes(text)) {
+        throw new Error(`Missing required end-card text: ${text}`);
+      }
+    }
+    if (project.endCard.requiredText.includes('And it is finally here.')) {
+      throw new Error('Spoken final VO was incorrectly promoted to required visible text');
+    }
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    if (!prompt.includes('Target duration: 10 seconds.')) {
+      throw new Error('Compiled prompt did not preserve the explicit 10s duration');
+    }
+    if (!prompt.includes('Required exact visible text: "Powered by the people."')) {
+      throw new Error('Compiled prompt did not preserve final slogan text');
+    }
+  })();
+
   await test('Should classify Seedance provider timeouts explicitly', () => {
     const payload = seedanceTerminalGenerationFailurePayloadFromError(
       new Error('Seedance rejected the request: Vendor job failed: Vendor task cgt-20260518193419-5s2bv timed out after 600000ms'),

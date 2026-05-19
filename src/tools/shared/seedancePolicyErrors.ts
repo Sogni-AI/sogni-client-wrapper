@@ -20,6 +20,8 @@ export const SEEDANCE_PROVIDER_CONTENT_POLICY_MESSAGE =
 
 export const SEEDANCE_VENDOR_GENERATION_FAILED_MESSAGE =
   "Seedance couldn't complete this video after it started, so no media was generated. The provider did not return a specific reason. Please retry once; if it fails again, report the issue from this message.";
+export const SEEDANCE_VENDOR_TIMEOUT_MESSAGE =
+  "Seedance timed out while rendering this video, so no media was generated. Please retry once; if it times out again, report the issue from this message.";
 
 export const SEEDANCE_REFERENCE_AUDIO_TOO_LONG_MESSAGE =
   'Seedance rejected the reference audio because it is longer than this video mode allows. Use an audio clip at or below the provider limit, or retry with the audio trimmed to that length.';
@@ -317,6 +319,18 @@ export function seedanceTerminalGenerationFailurePayloadFromError(
       nextAction: 'wait_for_user',
       vendorErrorCode: 'InvalidParameter',
       vendorError: shaped.vendorMessage.slice(0, 500),
+    };
+  }
+  if (/\b(?:timed?\s*out|timeout|deadline\s+exceeded)\b/i.test(text)) {
+    return {
+      error: 'seedance_generation_failed',
+      message: SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
+      retryPolicy: 'manual_user_confirmation',
+      nextAction: 'wait_for_user',
+      reportIssue: true,
+      reportIssueReason: 'Seedance provider job timed out after starting.',
+      vendorErrorCode: 'PROVIDER_TIMEOUT',
+      ...(text ? { vendorError: text.slice(0, 500) } : {}),
     };
   }
   return {

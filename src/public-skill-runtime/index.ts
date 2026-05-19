@@ -4670,6 +4670,7 @@ function extractStoryboardRequiredText(text: string): string[] {
   const inlineProductionLabelPattern = /\b(?:SFX|FX|Audio(?:\s*\/\s*SFX)?|Sound(?:s)?|Music|Foley|Camera(?:\s*\/\s*Motion)?|Motion|Lighting(?:\s*\/\s*Style)?|Style|Transition|Action(?:\s*\/\s*Motion)?|Performance|Beat)\s*:\s*[^a-z0-9]{0,4}$/i;
   const visibleTextContextPattern = /\b(?:visible|on[-\s]?screen|in[-\s]?frame|text|copy|cta|tagline|headline|title\s+card|caption|subtitle|super|wordmark|spell(?:ed)?|read(?:s)?|slogan)\b/i;
   const sceneHeadingPattern = /^\s*(?:[-*+]\s*)?(?:#{1,6}\s*)?(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)[\s_#-]*\d{1,2}\b/i;
+  const visibleTextRestrictionPattern = /\b(?:only\s+(?:text|copy|words?)|no\s+(?:captions?|subtitles?|overlays?|watermarks?|added\s+logos?|extra\s+logos?|logos?|text|copy)|without\s+(?:captions?|subtitles?|overlays?|watermarks?|added\s+logos?|extra\s+logos?|logos?|text|copy)|do\s+not\s+(?:add|include|render|show|write)\s+(?:captions?|subtitles?|overlays?|watermarks?|logos?|text|copy|words?))\b/i;
   const shouldIgnoreRequiredText = (
     value: string,
     matchIndex: number,
@@ -4685,6 +4686,10 @@ function extractStoryboardRequiredText(text: string): string[] {
       /\b(?:action|motion|camera|transition|audio|sfx|fx|foley|sound|music|lighting|style|performance|beat)\b/i.test(fieldLabel)
       && !visibleTextContextPattern.test(fieldLabel);
     const hasExplicitVisibleTextContext = visibleTextContextPattern.test(line);
+    const isRestrictionOnlyTextInstruction =
+      visibleTextContextPattern.test(fieldLabel || line)
+      && visibleTextRestrictionPattern.test(value)
+      && !/["“”`]/.test(value);
     const looksLikeActionOrSfxCallout =
       /^[a-z][a-z-]{1,24}[!?.]?$/i.test(value.trim())
       && /\b(?:action|motion|transition|audio|sfx|fx|foley|sound|music|camera|performance|beat|pop(?:s|ped|ping)?|snap(?:s|ped|ping)?|whoosh(?:es)?|thud(?:s|ded|ding)?|ding(?:s|ed|ing)?|boom(?:s|ed|ing)?|impact(?:s|ed|ing)?|hit(?:s|ting)?|slam(?:s|med|ming)?|wipe(?:s|d|ing)?|glitch(?:es|ed|ing)?|morph(?:s|ed|ing)?|bounce(?:s|d|ing)?|zoom(?:s|ed|ing)?)\b/i.test(line);
@@ -4710,6 +4715,10 @@ function extractStoryboardRequiredText(text: string): string[] {
     }
 
     if (isNestedSceneHeadingField) {
+      return true;
+    }
+
+    if (isRestrictionOnlyTextInstruction) {
       return true;
     }
 
@@ -4904,6 +4913,33 @@ function selectStoryboardSourceBrief(prompt: string, userIntentText: string): st
   return promptCore || priorBrief || cleanUserIntentText.trim();
 }
 
+function selectStoryboardSourceBriefForCompile(
+  options: {
+    prompt: string;
+    promptAuthorship?: StoryboardPromptCompileOptions['promptAuthorship'];
+    frameCount?: number;
+  },
+  userIntentText: string,
+): string {
+  const selectedBrief = selectStoryboardSourceBrief(options.prompt, userIntentText);
+  if (options.promptAuthorship !== 'assistant') return selectedBrief;
+
+  const cleanUserIntentText = cleanStoryboardNarrativeSourceText(userIntentText);
+  const selectedSectionCount = splitStoryboardSections(selectedBrief).length;
+  const userSectionCount = splitStoryboardSections(cleanUserIntentText).length;
+  const userBriefHasRequestedSceneCount = options.frameCount
+    ? userSectionCount === options.frameCount
+    : userSectionCount > 0;
+  if (
+    userBriefHasRequestedSceneCount
+    && userSectionCount > selectedSectionCount
+  ) {
+    return cleanUserIntentText;
+  }
+
+  return selectedBrief;
+}
+
 function storyboardBriefContains(haystack: string, needle: string): boolean {
   const haystackKey = normalizeStoryboardBriefKey(haystack);
   const needleKey = normalizeStoryboardBriefKey(needle);
@@ -4916,7 +4952,10 @@ function buildStoryboardSourceBriefForPrompt(
   approvedScriptContext?: string | null,
   promptAuthorship?: StoryboardPromptCompileOptions['promptAuthorship'],
 ): string {
-  const selectedBrief = selectStoryboardSourceBrief(prompt, userIntentText);
+  const selectedBrief = selectStoryboardSourceBriefForCompile(
+    { prompt, promptAuthorship, frameCount: undefined },
+    userIntentText,
+  );
   const originalBrief = latestSubstantiveStoryboardUserBrief(userIntentText, selectedBrief);
   const canonicalApprovedScriptContext = canonicalStoryboardScriptContext(approvedScriptContext);
   const includeSelectedBrief = selectedBrief && !(promptAuthorship === 'assistant' && canonicalApprovedScriptContext);
@@ -5496,6 +5535,63 @@ function splitStoryboardSceneSections(text: string): Array<{ number: number; hea
   }).filter(section => Number.isInteger(section.number) && section.number > 0);
 }
 
+function splitStoryboardNumberedListSceneSections(text: string): Array<{ number: number; heading: string; body: string }> {
+  const headerPattern = /^[ \t]*(?:#{1,6}[ \t]*)?(?:[*_]{1,3})?(?:SCENES?|SHOTS?|BEATS?|PANELS?|FRAMES?|SHOT\s+LIST|SCENE\s+LIST)[ \t]*:[ \t]*(?:[*_]{1,3})?[ \t]*$/gim;
+  const headerMatches = Array.from(text.matchAll(headerPattern));
+  if (headerMatches.length === 0) return [];
+
+  for (const headerMatch of headerMatches) {
+    const blockStart = (headerMatch.index ?? 0) + headerMatch[0].length;
+    const block = text.slice(blockStart);
+    if (!block) continue;
+
+    const allMatches = Array.from(block.matchAll(
+      /^[ \t]*(\d{1,2})[ \t]*[.)][ \t]*([^\n]{0,220})/gim,
+    )).filter(match => {
+      const value = Number(match[1]);
+      return Number.isInteger(value) && value > 0;
+    });
+    const firstSceneIndex = allMatches.findIndex(match => Number(match[1]) === 1);
+    const matches: RegExpMatchArray[] = [];
+    for (let index = firstSceneIndex; index >= 0 && index < allMatches.length; index += 1) {
+      const expected = matches.length + 1;
+      if (Number(allMatches[index][1]) !== expected) break;
+      matches.push(allMatches[index]);
+    }
+    if (matches.length < 2) continue;
+
+    const sections = matches.map((match, index) => {
+      const number = Number(match[1]);
+      const lineStart = match.index ?? 0;
+      const lineEnd = block.indexOf('\n', lineStart);
+      const firstLineEnd = lineEnd >= 0 ? lineEnd : block.length;
+      const firstLineRemainder = compactStoryboardLine(match[2]);
+      const globalTailStart = firstLineEnd;
+      const globalTailSection = block.slice(globalTailStart).search(
+        /^\s{0,2}(?:CONSISTENCY|NEGATIVE(?:\s*\/\s*AVOID)?|AVOID|CRITICAL\s+REQUIREMENTS|REQUIREMENTS|NOTES|OUTPUT|REFERENCE\s+IMAGES|CANVAS\s*\/\s*LAYOUT)\s*:/im,
+      );
+      const finalSceneEnd = globalTailSection >= 0
+        ? globalTailStart + globalTailSection
+        : block.length;
+      const nextStart = index + 1 < matches.length ? matches[index + 1].index ?? block.length : finalSceneEnd;
+      const trailingBody = block.slice(firstLineEnd, nextStart).trim();
+      const titleDescription = firstLineRemainder.match(/^(.{1,80}?)(?:\s+[–—-]\s+|\s*:\s+)([\s\S]{12,})$/);
+      const title = compactStoryboardLine(titleDescription?.[1] || firstLineRemainder, `Scene ${String(number).padStart(2, '0')}`);
+      const firstBodyLine = compactStoryboardLine(titleDescription?.[2] || firstLineRemainder);
+      const body = [firstBodyLine, trailingBody].filter(Boolean).join('\n').trim();
+      return {
+        number,
+        heading: `Scene ${number} - ${title}`,
+        body,
+      };
+    }).filter(section => section.body.length >= 24);
+
+    if (sections.length >= 2) return sections;
+  }
+
+  return [];
+}
+
 function splitStoryboardInlineSceneSections(text: string): Array<{ number: number; heading: string; body: string }> {
   const markerPattern = /(^|[\s.;])((?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})(?:\s*,\s*(?:Scene|Shot|Beat|Panel|Frame)\s*\d{1,2})?\s*(?:\([^)]{0,120}\))?\s*(?:[:\-–—]\s*)?)/gi;
   const matches = Array.from(text.matchAll(markerPattern))
@@ -5533,15 +5629,22 @@ function splitStoryboardInlineSceneSections(text: string): Array<{ number: numbe
 function splitStoryboardSections(text: string): Array<{ number: number; heading: string; body: string }> {
   const sectionHeadings = splitStoryboardSceneSections(text);
   const tableSections = splitStoryboardTableSections(text);
-  const inlineSections = sectionHeadings.length === 0 && tableSections.length === 0
+  const numberedListSections = splitStoryboardNumberedListSceneSections(text);
+  const inlineSections = sectionHeadings.length === 0 && tableSections.length === 0 && numberedListSections.length === 0
     ? splitStoryboardInlineSceneSections(text)
     : [];
   const explicitFrameCount = inferExplicitStoryboardFrameCountFromText(text);
   if (tableSections.length > 0 && explicitFrameCount !== null && tableSections.length === explicitFrameCount) {
     return tableSections;
   }
+  if (numberedListSections.length > 0 && explicitFrameCount !== null && numberedListSections.length === explicitFrameCount) {
+    return numberedListSections;
+  }
   if (tableSections.length > 0 && tableSections.length >= sectionHeadings.length) {
     return tableSections;
+  }
+  if (numberedListSections.length > 0 && numberedListSections.length >= sectionHeadings.length) {
+    return numberedListSections;
   }
   if (inlineSections.length > 0) return inlineSections;
   return sectionHeadings.length > 0 ? sectionHeadings : tableSections;
@@ -6402,7 +6505,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const userIntentText = canonicalStoryboardScriptContext(rawUserIntentText) || rawUserIntentText;
   const narrativeUserIntentText = cleanStoryboardNarrativeSourceText(userIntentText);
   const approvedScriptContext = cleanStoryboardNarrativeSourceText(canonicalStoryboardScriptContext(options.approvedScriptContext));
-  const primarySourceBrief = selectStoryboardSourceBrief(prompt, userIntentText);
+  const primarySourceBrief = selectStoryboardSourceBriefForCompile(options, userIntentText);
   const sourceText = stripGenericStoryboardVisibleTextMetadata(sanitizeStoryboardExternalAudioReferences([
     cleanStoryboardNarrativeSourceText(primarySourceBrief),
     approvedScriptContext
@@ -6972,7 +7075,7 @@ export function compileVideoStoryboardImagePrompt(
   const project = buildStoryboardProject(options);
   const compiledFrameCount = Math.max(1, options.frameCount || project.scenes.length);
   const layout = storyboardLayoutSpecFromProject(project, compiledFrameCount);
-  const selectedBrief = selectStoryboardSourceBrief(options.prompt.trim(), userIntentText);
+  const selectedBrief = selectStoryboardSourceBriefForCompile(options, userIntentText);
   const avoidSource = buildStoryboardUserConstraintSource(
     cleanStoryboardNarrativeSourceText(userIntentText),
     cleanStoryboardNarrativeSourceText(selectedBrief),

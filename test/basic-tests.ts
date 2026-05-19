@@ -37,6 +37,15 @@ import {
   type ToolCall,
   type ToolDefinition,
 } from '../src';
+import {
+  auditCompiledStoryboardImagePrompt,
+  buildStoryboardProject,
+  compileVideoStoryboardImagePrompt,
+} from '../src/public-skill-runtime/index.js';
+import {
+  SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
+  seedanceTerminalGenerationFailurePayloadFromError,
+} from '../src/tools/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 
@@ -1515,6 +1524,84 @@ async function runTests() {
     const parsedInvalid = parseToolCallArguments(invalidCall);
     if (Object.keys(parsedInvalid).length !== 0) {
       throw new Error('Invalid JSON should return an empty object');
+    }
+  })();
+
+  await test('Should compile numbered SCENES storyboard lists', () => {
+    const brief = [
+      'TASK: Generate a single tall portrait storyboard image with 3 cinematic frames.',
+      'STYLE: bright commercial anime stills.',
+      "TEXT: The only text in the image is the product's own label and the small corner number badges. No captions, subtitles, overlays, watermarks, or added logos.",
+      '',
+      'SCENES:',
+      '1. ESTABLISHING - Golden-hour Singapore skyline with Marina Bay Sands and glowing clouds. No people. High-angle drone shot.',
+      '2. DISCOVERY - Extreme macro of a lemon tea bottle half-buried in crushed ice, condensation and amber liquid glow. Top-down macro.',
+      '3. HERO PRODUCT - Final clean hero shot of the bottle on a white surface with lemon slices and garden bokeh. Static slow push-in.',
+      '',
+      'CONSISTENCY: Identical product and palette in all panels.',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: brief,
+      userIntentText: brief,
+      frameCount: 3,
+      promptAuthorship: 'user',
+    });
+    if (project.scenes.length !== 3) {
+      throw new Error(`Expected 3 parsed scenes, got ${project.scenes.length}`);
+    }
+    if (project.scenes[0].title !== 'ESTABLISHING') {
+      throw new Error(`Unexpected first scene title: ${project.scenes[0].title}`);
+    }
+    if (/\b1\.\s+ESTABLISHING\b/.test(project.scenes[0].visual)) {
+      throw new Error(`Numbered-list marker leaked into first scene visual: ${project.scenes[0].visual}`);
+    }
+
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: brief,
+      userIntentText: brief,
+      frameCount: 3,
+      promptAuthorship: 'user',
+    });
+    const audit = auditCompiledStoryboardImagePrompt({ prompt, expectedFrameCount: 3 });
+    if (!audit.ok) {
+      throw new Error(`Storyboard audit failed: ${audit.fatalIssues.map(issue => issue.code).join(', ')}`);
+    }
+    if (!prompt.includes('SCENE_01 - ESTABLISHING')) {
+      throw new Error('Compiled prompt did not include SCENE_01 from numbered list');
+    }
+    if (/\bHigh-angle drone shot\.\s+1\.\s+ESTABLISHING\b/.test(prompt)) {
+      throw new Error('Compiled prompt duplicated the first numbered scene line');
+    }
+    if (prompt.includes('Required exact visible text: "The only text in the image')) {
+      throw new Error('Compiled prompt turned a text restriction into required visible text');
+    }
+
+    const assistantPrompt = [
+      'Create one tall portrait storyboard sheet with ten numbered panels.',
+      'Keep the user-provided product, tennis character, anime style, and no-extra-text rules.',
+    ].join(' ');
+    const assistantProject = buildStoryboardProject({
+      prompt: assistantPrompt,
+      userIntentText: brief,
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    if (assistantProject.scenes.length !== 3) {
+      throw new Error(`Assistant-authored prompt dropped user scenes; got ${assistantProject.scenes.length}`);
+    }
+  })();
+
+  await test('Should classify Seedance provider timeouts explicitly', () => {
+    const payload = seedanceTerminalGenerationFailurePayloadFromError(
+      new Error('Seedance rejected the request: Vendor job failed: Vendor task cgt-20260518193419-5s2bv timed out after 600000ms'),
+    );
+    if (!payload) throw new Error('Expected Seedance generation failure payload');
+    if (payload.message !== SEEDANCE_VENDOR_TIMEOUT_MESSAGE) {
+      throw new Error(`Unexpected timeout message: ${payload.message}`);
+    }
+    if (payload.vendorErrorCode !== 'PROVIDER_TIMEOUT') {
+      throw new Error(`Unexpected vendor error code: ${payload.vendorErrorCode}`);
     }
   })();
 

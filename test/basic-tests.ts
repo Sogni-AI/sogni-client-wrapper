@@ -1917,6 +1917,61 @@ async function runTests() {
     }
   })();
 
+  // extractToolCallProgressUpdate — typed narrowing for the
+  // `tool_call_progress.payload` shape the durable cloud chat emits.
+  await test('extractToolCallProgressUpdate narrows overall progress + status', async () => {
+    const { extractToolCallProgressUpdate } = await import('../src/chatRun/index.js');
+    const update = extractToolCallProgressUpdate({
+      toolCallId: 'call_1',
+      progress: 0.5,
+      status: 'processing',
+    });
+    if (update.toolCallId !== 'call_1') throw new Error('toolCallId not extracted');
+    if (update.progress !== 0.5) throw new Error('progress not extracted');
+    if (update.status !== 'processing') throw new Error('status not extracted');
+    if (update.jobIndex !== undefined) throw new Error('jobIndex should be absent');
+  })();
+
+  await test('extractToolCallProgressUpdate narrows per-job fields (progress/ETA/result)', async () => {
+    const { extractToolCallProgressUpdate } = await import('../src/chatRun/index.js');
+    const update = extractToolCallProgressUpdate({
+      toolCallId: 'call_2',
+      jobIndex: 3,
+      jobProgress: 0.75,
+      jobEtaSeconds: 12,
+      resultUrl: 'https://cdn.sogni.ai/foo.mp4',
+      isVideoResult: true,
+    });
+    if (update.jobIndex !== 3) throw new Error('jobIndex not extracted');
+    if (update.jobProgress !== 0.75) throw new Error('jobProgress not extracted');
+    if (update.jobEtaSeconds !== 12) throw new Error('jobEtaSeconds not extracted');
+    if (update.resultUrl !== 'https://cdn.sogni.ai/foo.mp4') throw new Error('resultUrl not extracted');
+    if (update.isVideoResult !== true) throw new Error('isVideoResult not extracted');
+    if (update.progress !== undefined) throw new Error('progress should be absent on per-job tick');
+  })();
+
+  await test('extractToolCallProgressUpdate drops invalid fields without throwing', async () => {
+    const { extractToolCallProgressUpdate } = await import('../src/chatRun/index.js');
+    const update = extractToolCallProgressUpdate({
+      toolCallId: 42,                // wrong type
+      progress: Number.NaN,          // not finite
+      jobEtaSeconds: 'soon',         // wrong type
+      jobError: '',                  // empty string filtered out
+      mediaUrls: [{ url: 'https://x' }],
+    });
+    if (update.toolCallId !== undefined) throw new Error('toolCallId should be dropped');
+    if (update.progress !== undefined) throw new Error('NaN progress should be dropped');
+    if (update.jobEtaSeconds !== undefined) throw new Error('non-numeric ETA should be dropped');
+    if (update.jobError !== undefined) throw new Error('empty error string should be dropped');
+    if (!Array.isArray(update.mediaUrls)) throw new Error('mediaUrls array should pass through');
+  })();
+
+  await test('extractToolCallProgressUpdate returns empty object for undefined payload', async () => {
+    const { extractToolCallProgressUpdate } = await import('../src/chatRun/index.js');
+    const update = extractToolCallProgressUpdate(undefined);
+    if (Object.keys(update).length !== 0) throw new Error('expected empty object');
+  })();
+
   // Tools/shared helper unit tests
   const sharedResults = runToolsSharedTests();
   testsPassed += sharedResults.passed;

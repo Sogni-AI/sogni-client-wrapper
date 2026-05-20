@@ -525,6 +525,108 @@ export function extractChatRunMediaFromEventPayload(
 }
 
 /**
+ * Typed view of a `tool_call_progress.payload` after defensive
+ * narrowing. Consumers (sogni-chat, sogni-creative-agent-skill, future
+ * dashboard tooling) call this instead of reinventing the `typeof x ===
+ * 'number' && Number.isFinite(x)` checks per call site.
+ *
+ * Fields are all optional because the same event type is reused for
+ * both project-level overall progress ticks (`progress` + `status`) and
+ * per-job ticks (`jobIndex` + per-job fields fanned out from the SDK's
+ * `sogni.projects.on('job', …)` event bus). Discriminate by checking
+ * `jobIndex !== undefined`.
+ */
+export interface ToolCallProgressUpdate {
+  /** Tool call this update belongs to. */
+  toolCallId?: string;
+  /** Project-level overall progress (0-1). Present on overall ticks. */
+  progress?: number;
+  /** Project status string (`queued`, `processing`, etc.). */
+  status?: string;
+  /**
+   * Aggregate per-tool ETA seconds (matched to whichever job last
+   * surfaced an ETA when not all jobs have one). Drives the floating
+   * countdown / chip ETA.
+   */
+  etaSeconds?: number;
+  /** Sub-step label shown alongside the chip (e.g. "Analyzing image…"). */
+  stepLabel?: string;
+  /** Per-job label (e.g. "Clip 3 of 9"). */
+  jobLabel?: string;
+  /** Per-job index when this is a job-level tick. */
+  jobIndex?: number;
+  /** Per-job progress fraction (0-1). */
+  jobProgress?: number;
+  /**
+   * Per-job ETA seconds. Sogni-socket emits a `jobETA` once per second
+   * for external-API jobs (GPT, Seedance) and during the worker-boot
+   * window — primary driver of the per-slot countdown.
+   */
+  jobEtaSeconds?: number;
+  /** Per-job partial result URL when the job has resolved. */
+  resultUrl?: string;
+  /** True when `resultUrl` points at a video artifact. */
+  isVideoResult?: boolean;
+  /** Per-job error message when the SDK surfaced a `JobError`. */
+  jobError?: string;
+  /**
+   * Final `mediaUrls` array attached to the terminal-progress tick by
+   * the round adapter. Use `extractChatRunMediaFromEventPayload` to
+   * extract typed `ChatRunMediaItem[]`; this raw form is preserved here
+   * for callers that want the unparsed payload field.
+   */
+  mediaUrls?: unknown[];
+}
+
+/**
+ * Narrow a `tool_call_progress` SSE event payload into the typed
+ * `ToolCallProgressUpdate` shape. Drops fields that fail their type
+ * check; never throws. Safe to call on event payloads from any
+ * sogni-api build — fields that aren't present (because the server
+ * isn't enriched yet) come back as `undefined`.
+ */
+export function extractToolCallProgressUpdate(
+  payload: Record<string, unknown> | undefined,
+): ToolCallProgressUpdate {
+  if (!payload) return {};
+  const result: ToolCallProgressUpdate = {};
+  const toolCallId = optionalString(payload.toolCallId);
+  if (toolCallId !== undefined) result.toolCallId = toolCallId;
+  if (typeof payload.progress === 'number' && Number.isFinite(payload.progress)) {
+    result.progress = payload.progress;
+  }
+  const status = optionalString(payload.status);
+  if (status !== undefined) result.status = status;
+  if (typeof payload.etaSeconds === 'number' && Number.isFinite(payload.etaSeconds)) {
+    result.etaSeconds = payload.etaSeconds;
+  }
+  const stepLabel = optionalString(payload.stepLabel);
+  if (stepLabel !== undefined) result.stepLabel = stepLabel;
+  const jobLabel = optionalString(payload.jobLabel);
+  if (jobLabel !== undefined) result.jobLabel = jobLabel;
+  if (typeof payload.jobIndex === 'number' && Number.isFinite(payload.jobIndex)) {
+    result.jobIndex = payload.jobIndex;
+  }
+  if (typeof payload.jobProgress === 'number' && Number.isFinite(payload.jobProgress)) {
+    result.jobProgress = payload.jobProgress;
+  }
+  if (typeof payload.jobEtaSeconds === 'number' && Number.isFinite(payload.jobEtaSeconds)) {
+    result.jobEtaSeconds = payload.jobEtaSeconds;
+  }
+  const resultUrl = optionalString(payload.resultUrl);
+  if (resultUrl !== undefined) result.resultUrl = resultUrl;
+  if (typeof payload.isVideoResult === 'boolean') {
+    result.isVideoResult = payload.isVideoResult;
+  }
+  const jobError = optionalString(payload.jobError);
+  if (jobError !== undefined) result.jobError = jobError;
+  if (Array.isArray(payload.mediaUrls)) {
+    result.mediaUrls = payload.mediaUrls;
+  }
+  return result;
+}
+
+/**
  * Extract renderable media from a durable chat-run snapshot. Kept
  * structural so SDK records and persistence records can both use it.
  */

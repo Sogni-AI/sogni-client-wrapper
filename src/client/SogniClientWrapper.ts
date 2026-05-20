@@ -80,6 +80,7 @@ interface InternalConfig {
   username: string;
   password: string;
   apiKey?: string;
+  appSource?: string;
   appId: string;
   network: 'fast' | 'relaxed';
   testnet?: boolean;
@@ -129,6 +130,7 @@ export class SogniClientWrapper extends EventEmitter {
       username: config.username || '',
       password: config.password || '',
       apiKey: config.apiKey,
+      appSource: config.appSource?.trim() || undefined,
       appId: config.appId || generateAppId(),
       network: config.network || 'fast',
       testnet: config.testnet,
@@ -190,18 +192,23 @@ export class SogniClientWrapper extends EventEmitter {
         this.log('TLS verification disabled (allowInsecureTLS=true)');
       }
 
-      // Create client instance with auth type
-      this.client = await SogniClient.createInstance({
+      const clientConfig = {
         appId: this.config.appId,
         network: this.config.network,
         authType: this.config.authType,
         apiKey: this.config.apiKey,
+        appSource: this.config.appSource,
         testnet: this.config.testnet,
         socketEndpoint: this.config.socketEndpoint,
         restEndpoint: this.config.restEndpoint,
         disableSocket: this.config.disableSocket,
         multiInstance: this.config.multiInstance,
-      });
+      } as Parameters<typeof SogniClient.createInstance>[0] & {
+        appSource?: string;
+      };
+
+      // Create client instance with auth type
+      this.client = await SogniClient.createInstance(clientConfig);
 
       // Authentication depends on authType
       if (this.config.authType === 'cookies') {

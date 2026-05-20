@@ -129,6 +129,10 @@ export function validateClientConfig(config: SogniClientConfig): void {
     throw new SogniValidationError('Network must be either "fast" or "relaxed"');
   }
 
+  if (config.appSource !== undefined && typeof config.appSource !== 'string') {
+    throw new SogniValidationError('appSource must be a string');
+  }
+
   if (config.testnet !== undefined && typeof config.testnet !== 'boolean') {
     throw new SogniValidationError('testnet must be a boolean');
   }

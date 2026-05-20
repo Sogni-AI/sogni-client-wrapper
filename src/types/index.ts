@@ -139,6 +139,9 @@ interface BaseClientConfig {
   /** API key for API key authentication mode */
   apiKey?: string;
 
+  /** Optional client app/source label for server-side attribution */
+  appSource?: string;
+
   /** Network type to use */
   network?: SupernetType;
 

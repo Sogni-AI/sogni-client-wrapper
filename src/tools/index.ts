@@ -17,6 +17,16 @@ export {
 export type { ModelOption } from './shared/modelRegistry.js';
 export * from './shared/policyChecks.js';
 export * from './shared/seedancePolicyErrors.js';
+export {
+  SEEDANCE_REFERENCE_LIMITS,
+  SeedanceReferenceLimitError,
+  validateSeedanceReferenceCounts,
+} from './shared/seedanceReferences.js';
+export type {
+  SeedanceReferenceLimits,
+  SeedanceReferenceLimitKind,
+  SeedanceReferenceCounts,
+} from './shared/seedanceReferences.js';
 export * from './shared/llmHelpers.js';
 export * from './shared/promptRefinementCache.js';
 export * from './shared/imageEncoding.js';

@@ -10,8 +10,9 @@ dist/
 dist-esm/
 *.tsbuildinfo
 
-# Generated source (regenerated from src/openai-tools/*.json by `npm run codegen`)
+# Generated source (regenerated from @sogni-ai/sogni-protocol by `npm run codegen`)
 src/openai-tools/_manifests.generated.ts
+src/tools/shared/_catalogs.generated.ts
 
 # Environment files
 .env

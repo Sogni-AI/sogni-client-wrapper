@@ -14,28 +14,15 @@ export const definition: ToolDefinition = {
   function: {
     name: 'stitch_video',
     description:
-      'Combine multiple videos into a single continuous video. Sources can be ' +
-      'previously generated clips (non-negative indices into the session video-result array, ' +
-      'populated by animate_photo, generate_video, sound_to_video, video_to_video, dance_montage — ' +
-      'use videoStartIndex from their results to find the indices) and/or uploaded videos ' +
-      '(negative indices: -1 = first uploaded video, -2 = second, etc.). Mix and match in any ' +
-      'playback order — for example, pass [0, -1] to play the first generated clip followed by the ' +
-      'first uploaded video (a generated bumper followed by the user\'s existing footage). ' +
-      'Use when the user wants to join, merge, concatenate, or combine clips, including when they ' +
-      'ask to add a generated bumper / intro / outro / tag / sting to an uploaded video. ' +
-      'When the user asks to stitch "these" or all uploaded videos and does not name a different ' +
-      'playback order, use the current upload/UI order exactly: [-1, -2, ...]. If the user explicitly ' +
-      'asks for a different order, honor that requested order. ' +
-      'Requires at least 2 source videos in total. Never ask the user to re-upload videos that were ' +
-      'already generated or that are already attached to the session. ' +
-      'When the user generated music with generate_music in this same session and wants it on the stitch ' +
-      '(or asked for a music video / soundtrack), pass a non-negative audioIndex to attach that generated track. ' +
-      'When the user uploaded an audio file and wants it overlaid on the stitched video (e.g. "stitch the audio after", ' +
-      '"overlay the audio", "audio on top of the video"), pass a negative audioIndex (-1 = first uploaded audio, ' +
-      '-2 = second, etc.). In both cases the source clips\' own audio is replaced by the chosen track. ' +
-      'When the user asks for a fade, dissolve, wipe, or slide between clips, pass `transition`; ' +
-      'omit `transition` for a hard cut (the default). ' +
-      'Do not use this for alternating/interleaved time slices such as "alternate 1 second from each video"; this tool only concatenates whole clips end-to-end. Use repeated replace_video_segment calls with replacementVideoIndex and replacementStartSeconds/replacementEndSeconds for existing-video interleaving.',
+      'Concatenate whole videos end-to-end into one continuous video. This tool joins each source clip in full, in the order you pass — it does NOT interleave time slices, insert one clip inside another, or replace part of a video. ' +
+      'WHEN TO USE: the user wants clips played one after another (whole clip A, then whole clip B), including adding a generated bumper / intro / outro / tag / sting before or after another video. Plain language: "stitch these together", "stitch A and B", "combine these clips", "join these into one video", "play the bumper before this clip". ' +
+      'WHEN NOT TO USE — prefer replace_video_segment instead: any request to put one clip inside another, replace a window inside a video, alternate / interleave / splice short slices of multiple videos, insert clip X "into the middle of" clip Y, or swap out part of an existing video while keeping the rest. The word "stitch" in the user request does not by itself decide this tool — read what they actually want. If the user asks to "stitch X into the middle of Y" or "stitch X into Y starting at 5s", that is splice-into-middle and belongs to replace_video_segment. ' +
+      'SOURCES: previously generated clips (non-negative indices into the session video-result array, populated by animate_photo, generate_video, sound_to_video, video_to_video, dance_montage — use videoStartIndex from their results to find the indices) and/or uploaded videos (negative indices: -1 = first uploaded video, -2 = second, etc.). Mix and match in any playback order — for example, pass [0, -1] to play the first generated clip followed by the first uploaded video (a generated bumper followed by the user\'s existing footage). ' +
+      'When the user asks to stitch "these" or all uploaded videos and does not name a different playback order, use the current upload/UI order exactly: [-1, -2, ...]. If the user explicitly asks for a different order, honor that requested order. ' +
+      'Requires at least 2 source videos in total. Never ask the user to re-upload videos that were already generated or that are already attached to the session. ' +
+      'When the user generated music with generate_music in this same session and wants it on the stitch (or asked for a music video / soundtrack), pass a non-negative audioIndex to attach that generated track. ' +
+      'When the user uploaded an audio file and wants it overlaid on the stitched video (e.g. "stitch the audio after", "overlay the audio", "audio on top of the video"), pass a negative audioIndex (-1 = first uploaded audio, -2 = second, etc.). In both cases the source clips\' own audio is replaced by the chosen track. ' +
+      'When the user asks for a fade, dissolve, wipe, or slide between clips, pass `transition`; omit `transition` for a hard cut (the default).',
     parameters: {
       type: 'object',
       properties: {

@@ -11,6 +11,7 @@ export {
   type SpendGateScope,
   type SpendGateTokenType,
   type SpendGateDecision,
+  type NormalizedSpendGateDecision,
   type SpendGateCostBreakdownEntry,
   type SpendGatePendingToolCallRef,
   type SpendGatePendingWorkflowPlanRef,
@@ -27,6 +28,7 @@ export {
   isSpendGateEstimate,
   isSpendGateRequest,
   isSpendGate,
+  normalizeSpendDecision,
   validateSpendGateRequest,
 } from './spendGate.js';
 

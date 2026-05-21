@@ -2073,11 +2073,70 @@ async function runTests() {
     }
   })();
 
-  await test('SpendGate rejects unknown decision values', async () => {
+  await test('SpendGate accepts both canonical and legacy decision vocabularies', async () => {
     const { isSpendGateDecision } = await import('../src/billing/index.js');
     if (!isSpendGateDecision('confirm')) throw new Error('confirm should be a valid decision');
     if (!isSpendGateDecision('cancel')) throw new Error('cancel should be a valid decision');
-    if (isSpendGateDecision('approved')) throw new Error('approved is not a canonical decision');
+    if (!isSpendGateDecision('approved')) {
+      throw new Error('approved is a historical alias and should validate');
+    }
+    if (!isSpendGateDecision('rejected')) {
+      throw new Error('rejected is a historical alias and should validate');
+    }
+    if (isSpendGateDecision('maybe')) throw new Error('maybe is not a valid decision');
+    if (isSpendGateDecision(42)) throw new Error('non-string values must not validate');
+  })();
+
+  await test('normalizeSpendDecision collapses legacy aliases to canonical pair', async () => {
+    const { normalizeSpendDecision } = await import('../src/billing/index.js');
+    if (normalizeSpendDecision('confirm') !== 'confirm') {
+      throw new Error('confirm should normalize to confirm');
+    }
+    if (normalizeSpendDecision('cancel') !== 'cancel') {
+      throw new Error('cancel should normalize to cancel');
+    }
+    if (normalizeSpendDecision('approved') !== 'confirm') {
+      throw new Error('approved should normalize to confirm');
+    }
+    if (normalizeSpendDecision('rejected') !== 'cancel') {
+      throw new Error('rejected should normalize to cancel');
+    }
+    let threw = false;
+    try {
+      normalizeSpendDecision('mystery' as unknown as 'confirm');
+    } catch {
+      threw = true;
+    }
+    if (!threw) throw new Error('normalizeSpendDecision should throw on unknown values');
+  })();
+
+  await test('SpendGateScope accepts parallel_batch alongside tool_call and workflow_run', async () => {
+    const { isSpendGateScope, isSpendGate } = await import('../src/billing/index.js');
+    if (!isSpendGateScope('tool_call')) throw new Error('tool_call should be a valid scope');
+    if (!isSpendGateScope('parallel_batch')) {
+      throw new Error('parallel_batch should be a valid scope (audit 2026-05-21)');
+    }
+    if (!isSpendGateScope('workflow_run')) throw new Error('workflow_run should be a valid scope');
+    if (isSpendGateScope('bogus_scope')) throw new Error('unknown scope must be rejected');
+    const batchGate = {
+      gateId: 'gate_batch_1',
+      scope: 'parallel_batch' as const,
+      state: 'waiting_for_user' as const,
+      estimate: {
+        capacityUnits: 16,
+        breakdown: [{ model: 'flux-1-schnell', units: 16, tokenType: 'spark' as const }],
+        tokenType: 'spark' as const,
+      },
+      pendingToolCalls: [
+        { toolCallId: 'call_a', toolName: 'generate_image' },
+        { toolCallId: 'call_b', toolName: 'generate_image' },
+      ],
+      createdAt: '2026-05-21T00:00:00.000Z',
+      updatedAt: '2026-05-21T00:00:00.000Z',
+    };
+    if (!isSpendGate(batchGate)) {
+      throw new Error('parallel_batch SpendGate should validate');
+    }
   })();
 
   await test('RunEvent superset includes spend_gate_opened and workflow stage events', async () => {

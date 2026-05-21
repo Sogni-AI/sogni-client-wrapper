@@ -31,18 +31,68 @@ export type SpendGateState =
   | 'safety_review_required'
   | 'failed';
 
-/** What the gate is authorizing. */
-export type SpendGateScope = 'tool_call' | 'workflow_run';
+/**
+ * What the gate is authorizing.
+ *
+ * - `tool_call` — single tool call (default for chat runs).
+ * - `parallel_batch` — grouped concurrent dispatches (e.g. a mass
+ *   image-generation fan-out of N variations). Promoted to the canonical
+ *   set on 2026-05-21 so consumers stop stubbing it locally. Surfaces a
+ *   single gate that covers every tool call in the group; the
+ *   `pendingToolCalls[]` array carries the constituent calls.
+ * - `workflow_run` — whole workflow umbrella (per-stage settlement still
+ *   flows through the existing sogni-socket project + N jobs path).
+ */
+export type SpendGateScope = 'tool_call' | 'parallel_batch' | 'workflow_run';
 
 /** Capacity unit denomination. */
 export type SpendGateTokenType = 'spark' | 'sogni';
 
 /**
  * Decision recorded on the gate when the user (or an authorization
- * umbrella) resolves it. Mirrors the `SpendGateDecision` enum in the
- * canonical JSON schema (`confirm` / `cancel`).
+ * umbrella) resolves it.
+ *
+ * Two historical vocabularies are accepted:
+ *
+ * - `'confirm'` / `'cancel'` — canonical 2026-05-20 form. New producers
+ *   MUST use these values.
+ * - `'approved'` / `'rejected'` — pre-2026-05-20 form still emitted by
+ *   `sogni-api` and `sogni-creative-agent` durable runs. Accepted as
+ *   aliases so existing payloads keep validating during the cutover.
+ *
+ * Consumers reading the field MUST go through {@link normalizeSpendDecision}
+ * so business logic only ever sees the canonical pair.
  */
-export type SpendGateDecision = 'confirm' | 'cancel';
+export type SpendGateDecision = 'confirm' | 'cancel' | 'approved' | 'rejected';
+
+/** Canonical post-normalization decision shape. */
+export type NormalizedSpendGateDecision = 'confirm' | 'cancel';
+
+/**
+ * Map a {@link SpendGateDecision} (either vocabulary) to its canonical
+ * form. `'approved'` collapses to `'confirm'`; `'rejected'` collapses to
+ * `'cancel'`. Pass-through for the canonical pair. Throws on unknown
+ * values so silent misroutes are impossible — callers SHOULD validate
+ * with {@link isSpendGateDecision} before normalizing if the input is
+ * untrusted.
+ */
+export function normalizeSpendDecision(
+  decision: SpendGateDecision,
+): NormalizedSpendGateDecision {
+  switch (decision) {
+    case 'confirm':
+    case 'cancel':
+      return decision;
+    case 'approved':
+      return 'confirm';
+    case 'rejected':
+      return 'cancel';
+    default: {
+      const exhaustive: never = decision;
+      throw new Error(`Unknown SpendGateDecision value: ${String(exhaustive)}`);
+    }
+  }
+}
 
 /** One line item in the cost breakdown surfaced to the user. */
 export interface SpendGateCostBreakdownEntry {
@@ -118,7 +168,13 @@ export interface SpendGateRequest {
  */
 export interface SpendGate {
   state: SpendGateState;
-  /** Stable id for the gate. Required at the wire level. */
+  /**
+   * Stable id for the gate. Optional at the TypeScript level (legacy
+   * `{state, request}` producers may omit it) but every canonical-shape
+   * producer — `sogni-api`, `sogni-creative-agent-v2`, `sogni-chat` —
+   * always populates it, and the canonical JSON schema marks it
+   * required. New code MUST set this.
+   */
   gateId?: string;
   /** What the gate is authorizing. Required at the wire level. */
   scope?: SpendGateScope;
@@ -164,6 +220,7 @@ const SPEND_GATE_STATES: ReadonlySet<SpendGateState> = new Set<SpendGateState>([
 
 const SPEND_GATE_SCOPES: ReadonlySet<SpendGateScope> = new Set<SpendGateScope>([
   'tool_call',
+  'parallel_batch',
   'workflow_run',
 ]);
 
@@ -175,6 +232,8 @@ const SPEND_GATE_TOKEN_TYPES: ReadonlySet<SpendGateTokenType> = new Set<SpendGat
 const SPEND_GATE_DECISIONS: ReadonlySet<SpendGateDecision> = new Set<SpendGateDecision>([
   'confirm',
   'cancel',
+  'approved',
+  'rejected',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

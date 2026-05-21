@@ -92,13 +92,102 @@ export interface IntentInputRecentTurn {
 }
 
 /**
+ * Surfaces a producer can run on. Promoted to the canonical union on
+ * 2026-05-21 so chat-v2 and api-v2 can stop stubbing the type locally.
+ *
+ * - `'browser'` — in-process chat loop, browser runner.
+ * - `'hosted_chat'` — synchronous `/v1/chat/completions` durable adapter.
+ * - `'durable_chat'` — long-running cloud chat (`/v1/chat/runs`).
+ * - `'workflow'` — workflow runner (template-driven).
+ * - `'native'` — first-party native client (Sogni Studio app, etc.).
+ * - `'skill'` — public skill runtime / third-party hosts.
+ */
+export type IntentInputSurface =
+  | 'browser'
+  | 'hosted_chat'
+  | 'durable_chat'
+  | 'workflow'
+  | 'native'
+  | 'skill';
+
+/**
+ * Structured form of the user's latest message. Optional alternate to
+ * the primary `currentMessage: string` field — producers MAY emit either
+ * form, but consumers MUST handle BOTH. `text` is required so the
+ * planner can always derive the same string-level view.
+ */
+export interface IntentInputCurrentMessageDetails {
+  /** Stable id for the message (e.g. IndexedDB row id). */
+  id?: string;
+  /** Source role. `'system'` covers synthetic message injection. */
+  role?: 'user' | 'system';
+  /** Text body. Must equal the top-level `currentMessage` when both are set. */
+  text: string;
+  /** ISO timestamp the message was created. */
+  createdAt?: string;
+  /**
+   * BCP-47 locale hint surfaced by the host (e.g. `'en'`, `'ja-JP'`).
+   * The planner uses this for language-aware tool selection without
+   * having to keyword-classify the text.
+   */
+  localeHint?: string;
+}
+
+/**
+ * Runtime feature flags the planner reads to decide tool surface and
+ * confirmation policy. All fields are optional at the canonical type
+ * level for backwards compat; chat-v2 stubs this as REQUIRED but the
+ * canonical mirror stays permissive so legacy producers (browser
+ * runner pre-2026-05-21) keep validating without changes.
+ *
+ * Promoted to canonical 2026-05-21 so consumers stop stubbing it
+ * locally — see audit followup notes.
+ */
+export interface IntentInputRuntimeFlags {
+  /** What surface the request originated from. */
+  surface?: IntentInputSurface;
+  /**
+   * `true` when the host permits paid tools without an extra prompt
+   * (e.g. user already approved with "stay in flow" toggle). Default
+   * `false` when omitted.
+   */
+  allowPaidTools?: boolean;
+  /**
+   * `true` when the host permits tools that mutate persistent session
+   * state (e.g. `update_persona`, `delete_artifact`). Default `false`.
+   */
+  allowMutatingTools?: boolean;
+  /**
+   * `true` when the request MUST be served by a durable cloud run
+   * (offline reach, long-running pipeline, etc.). Forces the planner
+   * into hosted-chat mode even when the browser path is available.
+   */
+  durableRequired?: boolean;
+}
+
+/**
  * Top-level IntentInput packet. Captured once per new user turn before any
  * tool surface is composed. Field names + required set match
  * `schemas/agent/intent-input.schema.json` 2026-05-20.1 verbatim.
  */
 export interface IntentInput {
-  /** The user's latest text turn (already trimmed of tool-call markers). */
+  /**
+   * The user's latest text turn (already trimmed of tool-call markers).
+   * This is the canonical primary form. When
+   * {@link currentMessageDetails} is also set, `currentMessage` MUST
+   * equal `currentMessageDetails.text` so any consumer that reads only
+   * the string field still sees the right body.
+   */
   currentMessage: string;
+  /**
+   * Optional structured form of {@link currentMessage}. Producers MAY
+   * emit either; consumers MUST handle BOTH the bare string and this
+   * structured form. Promoted from chat-v2 / api-v2 stubs to canonical
+   * 2026-05-21 so the structured carriers (message id, role,
+   * created-at, locale hint) flow through the planner without
+   * lossy string-only round-trips.
+   */
+  currentMessageDetails?: IntentInputCurrentMessageDetails;
   activeState: IntentInputActiveState;
   artifactState: IntentInputArtifactState;
   /**
@@ -123,6 +212,13 @@ export interface IntentInput {
    * the schema, so the schema sets `additionalProperties: true` here.
    */
   userPreferences?: Record<string, unknown>;
+  /**
+   * Optional runtime feature flags. Chat-v2 treats this as REQUIRED on
+   * its internal stub; canonical keeps it optional so legacy browser
+   * producers keep validating during the cutover. Promoted to canonical
+   * 2026-05-21.
+   */
+  runtimeFlags?: IntentInputRuntimeFlags;
 }
 
 /**
@@ -172,6 +268,20 @@ const ARTIFACT_TYPES: ReadonlySet<ArtifactType> = new Set([
 
 const TURN_ROLES: ReadonlySet<IntentInputRecentTurn['role']> = new Set(['user', 'assistant']);
 
+const INTENT_INPUT_SURFACES: ReadonlySet<IntentInputSurface> = new Set<IntentInputSurface>([
+  'browser',
+  'hosted_chat',
+  'durable_chat',
+  'workflow',
+  'native',
+  'skill',
+]);
+
+const CURRENT_MESSAGE_DETAILS_ROLES: ReadonlySet<'user' | 'system'> = new Set<'user' | 'system'>([
+  'user',
+  'system',
+]);
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
@@ -182,6 +292,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function isArtifactType(value: unknown): value is ArtifactType {
   return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType);
+}
+
+export function isIntentInputSurface(value: unknown): value is IntentInputSurface {
+  return typeof value === 'string' && INTENT_INPUT_SURFACES.has(value as IntentInputSurface);
+}
+
+export function isIntentInputCurrentMessageDetails(
+  value: unknown,
+): value is IntentInputCurrentMessageDetails {
+  if (!isRecord(value)) return false;
+  if (typeof value.text !== 'string') return false;
+  if (value.id !== undefined && typeof value.id !== 'string') return false;
+  if (
+    value.role !== undefined &&
+    !(typeof value.role === 'string' && CURRENT_MESSAGE_DETAILS_ROLES.has(value.role as 'user' | 'system'))
+  ) {
+    return false;
+  }
+  if (value.createdAt !== undefined && typeof value.createdAt !== 'string') return false;
+  if (value.localeHint !== undefined && typeof value.localeHint !== 'string') return false;
+  return true;
+}
+
+export function isIntentInputRuntimeFlags(value: unknown): value is IntentInputRuntimeFlags {
+  if (!isRecord(value)) return false;
+  if (value.surface !== undefined && !isIntentInputSurface(value.surface)) return false;
+  if (value.allowPaidTools !== undefined && typeof value.allowPaidTools !== 'boolean') return false;
+  if (value.allowMutatingTools !== undefined && typeof value.allowMutatingTools !== 'boolean') return false;
+  if (value.durableRequired !== undefined && typeof value.durableRequired !== 'boolean') return false;
+  return true;
 }
 
 export function isIntentInputPendingActionRef(value: unknown): value is IntentInputPendingActionRef {
@@ -252,6 +392,12 @@ export function isIntentInputRecentTurn(value: unknown): value is IntentInputRec
 export function isIntentInput(value: unknown): value is IntentInput {
   if (!isRecord(value)) return false;
   if (typeof value.currentMessage !== 'string') return false;
+  if (
+    value.currentMessageDetails !== undefined &&
+    !isIntentInputCurrentMessageDetails(value.currentMessageDetails)
+  ) {
+    return false;
+  }
   if (!isIntentInputActiveState(value.activeState)) return false;
   if (!isIntentInputArtifactState(value.artifactState)) return false;
   if (!Array.isArray(value.recentTurns) || !value.recentTurns.every(isIntentInputRecentTurn)) {
@@ -260,6 +406,9 @@ export function isIntentInput(value: unknown): value is IntentInput {
   if (typeof value.conversationSummary !== 'string') return false;
   if (!isStringArray(value.availableCapabilitiesSummary)) return false;
   if (value.userPreferences !== undefined && !isRecord(value.userPreferences)) return false;
+  if (value.runtimeFlags !== undefined && !isIntentInputRuntimeFlags(value.runtimeFlags)) {
+    return false;
+  }
   return true;
 }
 

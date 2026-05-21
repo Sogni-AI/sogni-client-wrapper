@@ -2031,6 +2031,92 @@ async function runTests() {
     if (!mod || !legacy) throw new Error('LegacyIntentInputV0 import missing');
   })();
 
+  await test('IntentInput accepts optional currentMessageDetails + runtimeFlags', async () => {
+    const {
+      isIntentInput,
+      isIntentInputCurrentMessageDetails,
+      isIntentInputRuntimeFlags,
+      isIntentInputSurface,
+    } = await import('../src/agent/index.js');
+    const packet = {
+      currentMessage: 'Make me a sunset over Tokyo.',
+      currentMessageDetails: {
+        id: 'msg_01',
+        role: 'user' as const,
+        text: 'Make me a sunset over Tokyo.',
+        createdAt: '2026-05-21T00:00:00.000Z',
+        localeHint: 'en',
+      },
+      activeState: {},
+      artifactState: { selectedArtifactIds: [], artifactIds: [] },
+      recentTurns: [],
+      conversationSummary: '',
+      availableCapabilitiesSummary: [],
+      runtimeFlags: {
+        surface: 'browser' as const,
+        allowPaidTools: true,
+        allowMutatingTools: false,
+        durableRequired: false,
+      },
+    };
+    if (!isIntentInputCurrentMessageDetails(packet.currentMessageDetails)) {
+      throw new Error('Structured currentMessageDetails rejected');
+    }
+    if (!isIntentInputRuntimeFlags(packet.runtimeFlags)) {
+      throw new Error('runtimeFlags rejected');
+    }
+    if (!isIntentInputSurface(packet.runtimeFlags.surface)) {
+      throw new Error('browser surface rejected');
+    }
+    if (!isIntentInput(packet)) {
+      throw new Error('IntentInput with structured details + flags rejected');
+    }
+  })();
+
+  await test('IntentInput still validates when currentMessageDetails / runtimeFlags omitted', async () => {
+    const { isIntentInput } = await import('../src/agent/index.js');
+    const packet = {
+      currentMessage: 'Hi',
+      activeState: {},
+      artifactState: { selectedArtifactIds: [], artifactIds: [] },
+      recentTurns: [],
+      conversationSummary: '',
+      availableCapabilitiesSummary: [],
+    };
+    if (!isIntentInput(packet)) {
+      throw new Error('Bare IntentInput should still validate (back-compat)');
+    }
+  })();
+
+  await test('IntentInput rejects malformed currentMessageDetails / runtimeFlags', async () => {
+    const { isIntentInput, isIntentInputCurrentMessageDetails, isIntentInputRuntimeFlags } =
+      await import('../src/agent/index.js');
+    if (isIntentInputCurrentMessageDetails({ id: 'x' })) {
+      throw new Error('details must require text');
+    }
+    if (isIntentInputCurrentMessageDetails({ text: 'ok', role: 'assistant' })) {
+      throw new Error('details role must be user|system');
+    }
+    if (isIntentInputRuntimeFlags({ surface: 'mystery' })) {
+      throw new Error('unknown surface should be rejected');
+    }
+    if (isIntentInputRuntimeFlags({ allowPaidTools: 'yes' })) {
+      throw new Error('non-boolean flag should be rejected');
+    }
+    const bad = {
+      currentMessage: 'hi',
+      currentMessageDetails: { id: 7 },
+      activeState: {},
+      artifactState: { selectedArtifactIds: [], artifactIds: [] },
+      recentTurns: [],
+      conversationSummary: '',
+      availableCapabilitiesSummary: [],
+    };
+    if (isIntentInput(bad)) {
+      throw new Error('IntentInput with bad details should be rejected');
+    }
+  })();
+
   await test('SpendGate accepts the canonical schema-aligned shape', async () => {
     const { isSpendGate, isSpendGateEstimate } = await import('../src/billing/index.js');
     const gate = {

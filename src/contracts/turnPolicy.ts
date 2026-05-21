@@ -1,4 +1,40 @@
-export type SignalSource = 'planner' | 'regex' | 'classifier' | 'session_state';
+/**
+ * Provenance of a v1 `Signal`. The new tail entries (`runtime_state`,
+ * `artifact_graph`, `user_explicit`) align with the v2 `SignalProvenance`
+ * union in `agent/turnAnalysis.ts`.
+ *
+ * The legacy literal `'regex'` is retained as a deprecated alias for
+ * `'fact_extractor'` so existing producers keep type-checking. New code
+ * should emit `'fact_extractor'` directly and route raw strings through
+ * `normalizeSignalSource()` before comparison.
+ */
+export type SignalSource =
+  | 'planner'
+  | 'fact_extractor'
+  | 'classifier'
+  | 'session_state'
+  | 'runtime_state'
+  | 'artifact_graph'
+  | 'user_explicit'
+  | 'regex';
+
+/**
+ * Normalize a possibly-legacy signal source string into the canonical
+ * v2 form. The literal `'regex'` is accepted for one release as a
+ * deprecated alias for `'fact_extractor'` and emits a one-line console
+ * warning. All other values pass through unchanged.
+ */
+export function normalizeSignalSource(value: string): SignalSource {
+  if (value === 'regex') {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn(
+        '[Contracts] SignalSource "regex" is deprecated; use "fact_extractor" instead. The old name will be removed in a future release.',
+      );
+    }
+    return 'fact_extractor';
+  }
+  return value as SignalSource;
+}
 
 /**
  * A Signal is a typed observation about the current turn, emitted by
@@ -10,7 +46,11 @@ export interface Signal {
   kind: string;
   /** Optional matched value (e.g. '16:9' for an aspect-ratio signal). */
   value?: string;
-  /** Where the signal came from. Regex must remain advisory; planner/runtime state owns decisions. */
+  /**
+   * Where the signal came from. `fact_extractor` (formerly `'regex'`)
+   * must remain advisory; semantic decisions require planner /
+   * runtime_state / artifact_graph / user_explicit provenance.
+   */
   source: SignalSource;
 }
 

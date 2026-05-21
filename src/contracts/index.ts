@@ -12,7 +12,7 @@ export type { RepairRecipe, RepairRecipeMode } from './repairRecipe.js';
 export { isRepairRecipe } from './repairRecipe.js';
 
 export type { Signal, SignalSource, ContextHint, TurnPolicy } from './turnPolicy.js';
-export { emptyTurnPolicy } from './turnPolicy.js';
+export { emptyTurnPolicy, normalizeSignalSource } from './turnPolicy.js';
 
 export { ContractRegistry } from './registry.js';
 
@@ -42,6 +42,7 @@ export type {
   ContractToolDefinitionLike,
 } from './toolSurface.js';
 export {
+  CONTROL_TOOL_SET,
   DEFAULT_CONTRACT_CONTEXT_PREFIX,
   appendContractsContextToSystemContent,
   buildContractTurnPolicy,

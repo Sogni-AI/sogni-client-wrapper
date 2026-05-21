@@ -40,9 +40,14 @@ function isStringArray(value: unknown): value is string[] {
 
 function isSignalSource(value: unknown): value is SignalSource {
   return value === 'planner'
-    || value === 'regex'
+    || value === 'fact_extractor'
     || value === 'classifier'
-    || value === 'session_state';
+    || value === 'session_state'
+    || value === 'runtime_state'
+    || value === 'artifact_graph'
+    || value === 'user_explicit'
+    // Deprecated alias for 'fact_extractor'; kept for one release.
+    || value === 'regex';
 }
 
 function isSourceConstraintMap(value: unknown): value is Record<string, SignalSource | SignalSource[]> {

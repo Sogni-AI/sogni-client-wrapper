@@ -51,6 +51,32 @@ export interface CompiledContractToolSurface extends CompiledToolset {
 export const DEFAULT_CONTRACT_CONTEXT_PREFIX =
   'Sogni Creative Agent tool policy for this turn:';
 
+/**
+ * Control-set tool names. These are always safe to expose because they
+ * end the tool loop rather than spend credits or mutate state. The v2
+ * default empty-policy result is exactly this set — see
+ * `turnPolicyWithDefaultVisibleTools` for details.
+ */
+export const CONTROL_TOOL_SET: ReadonlyArray<string> = [
+  'ask_clarifying_question',
+  'finalize_response',
+];
+
+/**
+ * Resolve the legacy empty-policy environment flag. When set to `true`,
+ * `turnPolicyWithDefaultVisibleTools` reverts to the pre-v2 behavior of
+ * exposing every available tool when no gating policy matches. This
+ * exists as a one-release safety net for consumers that depend on the
+ * old surface; the flag will be removed in a future release.
+ */
+function isLegacyEmptyPolicyEnabled(): boolean {
+  if (typeof process === 'undefined' || !process || !process.env) return false;
+  const value = process.env.INTEL_EMPTY_POLICY_LEGACY;
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
 export function normalizeContractMessages(
   messages: ReadonlyArray<ContractMessageLike>,
 ): ClassifyTurnInput['messages'] {
@@ -166,6 +192,27 @@ function normalizeContractToolDefinition(
   };
 }
 
+/**
+ * Apply the v2 default when a caller supplies a TurnPolicy that no
+ * gating-policy entry filled in.
+ *
+ * v1 behavior (pre-2026-05-20): an empty TurnPolicy was treated as
+ * "expose every available tool". With 30+ tools registered, this
+ * blew past the §9 tool-surface budget (1–5 ideal / 5–10 acceptable /
+ * 20+ avoid) every turn that no policy matched.
+ *
+ * v2 behavior: an empty TurnPolicy yields the CONTROL_TOOL_SET only —
+ * `ask_clarifying_question` and `finalize_response`. External
+ * creative tools must come from an explicit gating-policy match
+ * driven by `TurnAnalysis`. This makes "no policy matched" mean
+ * "ask the user / wrap up", not "expose everything".
+ *
+ * Backwards compatibility: set `INTEL_EMPTY_POLICY_LEGACY=true` to
+ * temporarily restore the v1 behavior for one release cycle. The
+ * flag will be removed once all consumers migrate. The applied
+ * policy id is `legacy_empty_policy_default` so audits can spot
+ * leftover dependencies.
+ */
 function turnPolicyWithDefaultVisibleTools(
   turnPolicy: TurnPolicy,
   availableTools: ReadonlyArray<string>,
@@ -180,8 +227,21 @@ function turnPolicyWithDefaultVisibleTools(
     return turnPolicy;
   }
 
+  if (isLegacyEmptyPolicyEnabled()) {
+    return {
+      ...turnPolicy,
+      visibleTools: [...availableTools],
+      appliedPolicies: ['legacy_empty_policy_default'],
+      rationale:
+        'Empty policy: legacy default (all available tools) — INTEL_EMPTY_POLICY_LEGACY is enabled.',
+    };
+  }
+
+  const visibleControl = availableTools.filter((tool) => CONTROL_TOOL_SET.includes(tool));
   return {
     ...turnPolicy,
-    visibleTools: [...availableTools],
+    visibleTools: visibleControl,
+    appliedPolicies: ['default_control_set'],
+    rationale: 'Empty policy: control-set-only (v2 default).',
   };
 }

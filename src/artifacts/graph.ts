@@ -92,16 +92,36 @@ export interface ArtifactNode {
  * In-memory artifact graph. Uses `Map<string, ArtifactNode>` so insertion
  * order is preserved (matters for `resolveReference` integer lookup).
  * Query helpers live in `./queries.ts` to keep this type pure data.
+ *
+ * The optional `*NodeIds` arrays are **projection caches**: consumers
+ * that need O(k) `projectImageUrls` / `projectVideoUrls` /
+ * `projectAudioUrls` can maintain a per-kind id list rather than
+ * walking `nodes.values()` every call. Canonical does NOT require them
+ * — call sites SHOULD verify the cache is in sync (or rebuild from
+ * `nodes` on each call) before trusting it. Promoted to canonical
+ * 2026-05-21 so consumers stop stubbing the same caches locally.
  */
 export interface ArtifactGraph {
   nodes: Map<string, ArtifactNode>;
   selectedId?: string;
+  /** OPTIONAL projection cache for `kind === 'image'` nodes. */
+  imageNodeIds?: string[];
+  /** OPTIONAL projection cache for `kind === 'video'` nodes. */
+  videoNodeIds?: string[];
+  /** OPTIONAL projection cache for `kind === 'audio'` nodes. */
+  audioNodeIds?: string[];
 }
 
-/** JSON-transport shape of the graph; `nodes` flattened into an array. */
+/**
+ * JSON-transport shape of the graph; `nodes` flattened into an array.
+ * Optional projection caches mirror {@link ArtifactGraph}.
+ */
 export interface ArtifactGraphSerializable {
   nodes: ArtifactNode[];
   selectedId?: string;
+  imageNodeIds?: string[];
+  videoNodeIds?: string[];
+  audioNodeIds?: string[];
 }
 
 const ARTIFACT_KINDS: ReadonlySet<ArtifactKind> = new Set([
@@ -224,6 +244,143 @@ export function isArtifactId(value: unknown): value is string {
   );
 }
 
+/**
+ * Strict ULID validator. Use at write time when the caller wants to
+ * enforce that newly-minted ids are ULID-form (the preferred shape per
+ * the canonical schema). Read-side acceptance still flows through
+ * {@link isArtifactId} so legacy UUID-form ids in the wild keep
+ * validating.
+ *
+ * Promoted to canonical 2026-05-21 so consumers can flip producers to
+ * ULID independently of readers, without inventing their own validator.
+ */
+export function preferUlid(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  return ULID_ARTIFACT_ID_PATTERN.test(value);
+}
+
+/**
+ * Crockford base32 alphabet used by ULID. Excludes I, L, O, U to avoid
+ * visual ambiguity with 1 / 0 / V.
+ */
+const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** Minimal subset of the Web Crypto API used by `generateUlidArtifactId`. */
+interface MinimalCrypto {
+  getRandomValues<T extends ArrayBufferView | null>(array: T): T;
+}
+
+let lastUlidTimestamp = -1;
+let lastUlidRandomness: Uint8Array = new Uint8Array(10);
+
+function encodeTimestamp(ms: number): string {
+  let value = ms;
+  const out = new Array<string>(10);
+  for (let i = 9; i >= 0; i -= 1) {
+    const mod = value % 32;
+    out[i] = CROCKFORD_BASE32[mod] ?? '0';
+    value = (value - mod) / 32;
+  }
+  return out.join('');
+}
+
+function getCryptoOrThrow(): MinimalCrypto {
+  const cryptoRef = (globalThis as { crypto?: MinimalCrypto }).crypto;
+  if (!cryptoRef || typeof cryptoRef.getRandomValues !== 'function') {
+    throw new Error(
+      'generateUlidArtifactId requires globalThis.crypto.getRandomValues (Node >= 18 / modern browsers). Refusing to silently fall back to Math.random.',
+    );
+  }
+  return cryptoRef;
+}
+
+function incrementRandomnessMonotonic(buf: Uint8Array): Uint8Array {
+  // Increment 80-bit randomness as big-endian integer, with overflow
+  // protection. Matches the ULID monotonic specification: when called
+  // twice in the same millisecond, the randomness must strictly
+  // increase. If the byte already overflows, callers should advance
+  // the timestamp by 1ms instead.
+  const next = new Uint8Array(buf);
+  for (let i = next.length - 1; i >= 0; i -= 1) {
+    const current = next[i] ?? 0;
+    if (current === 0xff) {
+      next[i] = 0;
+      continue;
+    }
+    next[i] = current + 1;
+    return next;
+  }
+  // All bytes were 0xff — overflow. Caller advances timestamp instead.
+  throw new Error('ULID monotonic randomness overflow; advance timestamp');
+}
+
+function encodeRandomness(bytes: Uint8Array): string {
+  // 80 bits in 16 Crockford base32 characters. Manual 5-bit packing.
+  const out = new Array<string>(16);
+  let bitBuffer = 0;
+  let bitCount = 0;
+  let outIndex = 0;
+  for (let i = 0; i < bytes.length; i += 1) {
+    bitBuffer = (bitBuffer << 8) | (bytes[i] ?? 0);
+    bitCount += 8;
+    while (bitCount >= 5) {
+      bitCount -= 5;
+      const idx = (bitBuffer >> bitCount) & 0x1f;
+      out[outIndex] = CROCKFORD_BASE32[idx] ?? '0';
+      outIndex += 1;
+    }
+  }
+  if (bitCount > 0) {
+    const idx = (bitBuffer << (5 - bitCount)) & 0x1f;
+    out[outIndex] = CROCKFORD_BASE32[idx] ?? '0';
+  }
+  return out.join('');
+}
+
+/**
+ * Generate a fresh ULID-form artifact id (`art_` + 26 char Crockford
+ * base32 body). Uses `globalThis.crypto.getRandomValues` for the 80-bit
+ * randomness component and throws (does NOT silently fall back to
+ * `Math.random`) when crypto isn't available — silent-fallback would
+ * give an attacker predictable ids in a degraded environment.
+ *
+ * When called multiple times within the same millisecond the randomness
+ * is monotonically incremented per the ULID spec so newly-minted ids
+ * remain lexicographically sortable.
+ *
+ * Promoted to canonical 2026-05-21 so consumers stop reimplementing
+ * (and quietly diverging on) the ULID generator.
+ */
+export function generateUlidArtifactId(now?: number): string {
+  const cryptoRef = getCryptoOrThrow();
+  let timestamp = typeof now === 'number' && Number.isFinite(now) ? Math.floor(now) : Date.now();
+  if (timestamp < 0) {
+    throw new Error('generateUlidArtifactId requires a non-negative timestamp');
+  }
+  if (timestamp > 0xffffffffffff) {
+    throw new Error('generateUlidArtifactId timestamp exceeds 48 bits');
+  }
+
+  let randomness: Uint8Array;
+  if (timestamp === lastUlidTimestamp) {
+    try {
+      randomness = incrementRandomnessMonotonic(lastUlidRandomness);
+    } catch {
+      timestamp += 1;
+      randomness = new Uint8Array(10);
+      cryptoRef.getRandomValues(randomness);
+    }
+  } else {
+    randomness = new Uint8Array(10);
+    cryptoRef.getRandomValues(randomness);
+  }
+
+  lastUlidTimestamp = timestamp;
+  lastUlidRandomness = randomness;
+
+  return `art_${encodeTimestamp(timestamp)}${encodeRandomness(randomness)}`;
+}
+
 export function isArtifactNode(value: unknown): value is ArtifactNode {
   if (!isRecord(value)) return false;
   if (!isArtifactId(value.artifactId)) return false;
@@ -316,6 +473,9 @@ export function serializeGraph(graph: ArtifactGraph): ArtifactGraphSerializable 
   return {
     nodes: Array.from(graph.nodes.values()),
     ...(graph.selectedId !== undefined ? { selectedId: graph.selectedId } : {}),
+    ...(graph.imageNodeIds !== undefined ? { imageNodeIds: [...graph.imageNodeIds] } : {}),
+    ...(graph.videoNodeIds !== undefined ? { videoNodeIds: [...graph.videoNodeIds] } : {}),
+    ...(graph.audioNodeIds !== undefined ? { audioNodeIds: [...graph.audioNodeIds] } : {}),
   };
 }
 
@@ -328,6 +488,9 @@ export function deserializeGraph(data: ArtifactGraphSerializable): ArtifactGraph
   return {
     nodes,
     ...(data.selectedId !== undefined ? { selectedId: data.selectedId } : {}),
+    ...(data.imageNodeIds !== undefined ? { imageNodeIds: [...data.imageNodeIds] } : {}),
+    ...(data.videoNodeIds !== undefined ? { videoNodeIds: [...data.videoNodeIds] } : {}),
+    ...(data.audioNodeIds !== undefined ? { audioNodeIds: [...data.audioNodeIds] } : {}),
   };
 }
 

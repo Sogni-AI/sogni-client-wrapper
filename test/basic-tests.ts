@@ -2458,6 +2458,80 @@ async function runTests() {
     }
   })();
 
+  await test('generateUlidArtifactId emits a 26-char Crockford base32 id under the art_ prefix', async () => {
+    const { generateUlidArtifactId, isArtifactId, preferUlid } = await import(
+      '../src/artifacts/index.js'
+    );
+    const id = generateUlidArtifactId();
+    if (!isArtifactId(id)) throw new Error(`Generated id failed isArtifactId: ${id}`);
+    if (!preferUlid(id)) throw new Error(`Generated id failed preferUlid: ${id}`);
+    if (!/^art_[0-9A-Z]{26}$/.test(id)) {
+      throw new Error(`Generated id does not match ULID pattern: ${id}`);
+    }
+  })();
+
+  await test('generateUlidArtifactId monotonic within the same millisecond', async () => {
+    const { generateUlidArtifactId } = await import('../src/artifacts/index.js');
+    const fixed = 1_700_000_000_000;
+    const a = generateUlidArtifactId(fixed);
+    const b = generateUlidArtifactId(fixed);
+    const c = generateUlidArtifactId(fixed);
+    if (a >= b || b >= c) {
+      throw new Error(`Monotonic ULIDs not strictly increasing: ${a} ${b} ${c}`);
+    }
+    // Same timestamp prefix (10 chars after art_)
+    if (a.slice(0, 14) !== b.slice(0, 14) || b.slice(0, 14) !== c.slice(0, 14)) {
+      throw new Error('Same-ms ULIDs should share the timestamp prefix');
+    }
+  })();
+
+  await test('preferUlid rejects legacy UUID-form ids that isArtifactId still accepts', async () => {
+    const { preferUlid, isArtifactId } = await import('../src/artifacts/index.js');
+    const legacyHyphen = 'art_abcdef01-2345-6789-abcd-ef0123456789';
+    const legacyHex = 'art_abcdef0123456789abcdef0123456789';
+    if (!isArtifactId(legacyHyphen) || !isArtifactId(legacyHex)) {
+      throw new Error('Legacy ids must keep validating under isArtifactId');
+    }
+    if (preferUlid(legacyHyphen) || preferUlid(legacyHex)) {
+      throw new Error('preferUlid must reject legacy UUID-form ids');
+    }
+    if (!preferUlid('art_01HZABCDEFGHJKMNPQRSTVWXYZ')) {
+      throw new Error('preferUlid must accept canonical ULID form');
+    }
+  })();
+
+  await test('ArtifactGraph round-trips optional side indices through serialize/deserialize', async () => {
+    const { serializeGraph, deserializeGraph } = await import('../src/artifacts/index.js');
+    const graph = {
+      nodes: new Map(),
+      selectedId: 'art_01HZABCDEFGHJKMNPQRSTVWXYZ',
+      imageNodeIds: ['art_01HZIMG0000000000000000000'],
+      videoNodeIds: ['art_01HZVID0000000000000000000'],
+      audioNodeIds: ['art_01HZAUD0000000000000000000'],
+    };
+    const serialized = serializeGraph(graph as never);
+    if (!serialized.imageNodeIds || serialized.imageNodeIds[0] !== graph.imageNodeIds[0]) {
+      throw new Error('imageNodeIds lost during serializeGraph');
+    }
+    if (!serialized.videoNodeIds || !serialized.audioNodeIds) {
+      throw new Error('video/audioNodeIds lost during serializeGraph');
+    }
+    const round = deserializeGraph(serialized);
+    if (
+      !round.imageNodeIds ||
+      round.imageNodeIds[0] !== graph.imageNodeIds[0] ||
+      !round.videoNodeIds ||
+      !round.audioNodeIds
+    ) {
+      throw new Error('Side indices lost during deserializeGraph');
+    }
+    // Serialize without side indices should yield no projection cache keys
+    const bare = serializeGraph({ nodes: new Map() });
+    if ('imageNodeIds' in bare || 'videoNodeIds' in bare || 'audioNodeIds' in bare) {
+      throw new Error('Bare ArtifactGraph should not include projection caches');
+    }
+  })();
+
   await test('normalizeSignalSource warns only once per process for the same legacy value', async () => {
     const { normalizeSignalSource } = await import('../src/contracts/turnPolicy.js');
     const originalWarn = console.warn;

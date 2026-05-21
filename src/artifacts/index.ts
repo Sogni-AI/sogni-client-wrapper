@@ -14,6 +14,8 @@ export {
   type ArtifactGraph,
   type ArtifactGraphSerializable,
   isArtifactId,
+  preferUlid,
+  generateUlidArtifactId,
   isArtifactKind,
   isArtifactRelation,
   isArtifactVersionReason,

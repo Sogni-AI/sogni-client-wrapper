@@ -20,7 +20,7 @@
  *   - UPLOADED_BASE_VIDEO_SUBTITLES force subtitles for uploaded-video captions
  *   - UPLOADED_BASE_VIDEO_TRANSFORM force video_to_video for uploaded-video transforms
  *   - UPLOADED_BASE_VIDEO_STITCH    force stitch_video for uploaded-video stitching
- *   - HAS_PERSONA_AND_REQUESTS_VIDEO  require resolve_personas + edit_image first
+ *   - HAS_PERSONA_AND_REQUESTS_VIDEO  require resolve_personas + edit_image first only when persona is explicit
  *   - HAS_PERSONA_AND_REQUESTS_PERSONA_IMAGE  require edit_image (not generate_image)
  */
 
@@ -225,12 +225,12 @@ export const GATING_POLICIES: ReadonlyArray<ToolGatingPolicy> = [
     trigger: {
       allOf: [
         'has_active_persona',
-        'requests_video_generation',
+        'requests_persona_video_generation',
         'no_persona_image_in_session',
       ],
       sources: {
         has_active_persona: 'session_state',
-        requests_video_generation: 'planner',
+        requests_persona_video_generation: 'planner',
         no_persona_image_in_session: 'session_state',
       },
     },

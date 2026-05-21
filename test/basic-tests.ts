@@ -1972,6 +1972,161 @@ async function runTests() {
     if (Object.keys(update).length !== 0) throw new Error('expected empty object');
   })();
 
+  // -------------------------------------------------------------------------
+  // Commit 1: canonical agent/billing/events contract alignment regression
+  // -------------------------------------------------------------------------
+
+  await test('IntentInput accepts schema-aligned currentMessage/activeState/artifactState shape', async () => {
+    const { isIntentInput } = await import('../src/agent/index.js');
+    const packet = {
+      currentMessage: 'Make a 5s clip from this image',
+      activeState: {
+        activeArtifactId: 'art_abcdef1234567890abcdef1234567890',
+        activeArtifactType: 'image' as const,
+        lastToolResult: {
+          toolName: 'generate_image',
+          toolCallId: 'call_1',
+          status: 'ok',
+        },
+      },
+      artifactState: {
+        selectedArtifactIds: ['art_abcdef1234567890abcdef1234567890'],
+        artifactIds: ['art_abcdef1234567890abcdef1234567890'],
+        lastGeneratedArtifactId: 'art_abcdef1234567890abcdef1234567890',
+      },
+      recentTurns: [
+        { role: 'user' as const, content: 'hi', sequence: 0 },
+        { role: 'assistant' as const, content: 'hello', sequence: 1 },
+      ],
+      conversationSummary: '',
+      availableCapabilitiesSummary: ['generate_image', 'generate_video'],
+    };
+    if (!isIntentInput(packet)) {
+      throw new Error('Schema-aligned IntentInput packet rejected by isIntentInput');
+    }
+  })();
+
+  await test('IntentInput rejects the legacy v0 shape via the canonical type guard', async () => {
+    const { isIntentInput } = await import('../src/agent/index.js');
+    const legacyPacket = {
+      userText: 'still legacy',
+      recentTurns: [],
+      active: { pendingActions: [], recentToolResults: [] },
+      artifacts: { artifactIds: [] },
+    };
+    if (isIntentInput(legacyPacket)) {
+      throw new Error('Legacy IntentInput shape should not validate against the canonical guard');
+    }
+  })();
+
+  await test('LegacyIntentInputV0 type still type-checks (one-release deprecation)', async () => {
+    const mod = await import('../src/agent/index.js');
+    // Compile-time check: alias is exported. Runtime no-op.
+    const legacy: import('../src/agent/index.js').LegacyIntentInputV0 = {
+      userText: 'legacy',
+      recentTurns: [],
+      active: { pendingActions: [], recentToolResults: [] },
+      artifacts: { artifactIds: [] },
+    };
+    if (!mod || !legacy) throw new Error('LegacyIntentInputV0 import missing');
+  })();
+
+  await test('SpendGate accepts the canonical schema-aligned shape', async () => {
+    const { isSpendGate, isSpendGateEstimate } = await import('../src/billing/index.js');
+    const gate = {
+      gateId: 'gate_abc123',
+      scope: 'tool_call' as const,
+      runId: 'run_xyz',
+      state: 'waiting_for_user' as const,
+      reason: 'Approve 12 sparks for generate_video',
+      estimate: {
+        capacityUnits: 12,
+        breakdown: [{ model: 'seedance-2-0', units: 12, tokenType: 'spark' as const }],
+        tokenType: 'spark' as const,
+        maxAcceptableUnits: 20,
+      },
+      pendingToolCalls: [{ toolCallId: 'call_1', toolName: 'generate_video' }],
+      createdAt: '2026-05-20T00:00:00.000Z',
+      updatedAt: '2026-05-20T00:00:01.000Z',
+    };
+    if (!isSpendGateEstimate(gate.estimate)) {
+      throw new Error('Canonical SpendGate estimate rejected');
+    }
+    if (!isSpendGate(gate)) {
+      throw new Error('Canonical SpendGate rejected');
+    }
+  })();
+
+  await test('SpendGate still accepts legacy minimal {state, request?} shape', async () => {
+    const { isSpendGate } = await import('../src/billing/index.js');
+    const legacy = {
+      state: 'preview_required' as const,
+      request: {
+        scope: 'tool_call' as const,
+        toolCallId: 'call_legacy',
+        estimateCapacityUnits: 5,
+        estimateCostBreakdown: [{ model: 'flux-1-schnell', units: 5, tokenType: 'spark' as const }],
+      },
+    };
+    if (!isSpendGate(legacy)) {
+      throw new Error('Legacy SpendGate {state, request} payload rejected');
+    }
+  })();
+
+  await test('SpendGate rejects unknown decision values', async () => {
+    const { isSpendGateDecision } = await import('../src/billing/index.js');
+    if (!isSpendGateDecision('confirm')) throw new Error('confirm should be a valid decision');
+    if (!isSpendGateDecision('cancel')) throw new Error('cancel should be a valid decision');
+    if (isSpendGateDecision('approved')) throw new Error('approved is not a canonical decision');
+  })();
+
+  await test('RunEvent superset includes spend_gate_opened and workflow stage events', async () => {
+    const { isRunEventType } = await import('../src/events/index.js');
+    for (const t of [
+      'spend_gate_opened',
+      'stage_started',
+      'stage_completed',
+      'stage_failed',
+      'stage_waiting_for_user',
+    ]) {
+      if (!isRunEventType(t)) throw new Error(`Superset missing event type: ${t}`);
+    }
+  })();
+
+  await test('RunEvent carries optional runKind discriminator (chat | workflow | tool_batch)', async () => {
+    const { isRunEvent, isRunKind } = await import('../src/events/index.js');
+    for (const k of ['chat', 'workflow', 'tool_batch']) {
+      if (!isRunKind(k)) throw new Error(`Run kind ${k} not recognized`);
+    }
+    const chatEvent = {
+      runId: 'run_1',
+      runKind: 'chat' as const,
+      sequence: 0,
+      type: 'spend_gate_opened' as const,
+      payload: { gateId: 'gate_1' },
+      createdAt: '2026-05-20T00:00:00.000Z',
+    };
+    if (!isRunEvent(chatEvent)) throw new Error('Canonical RunEvent with runKind rejected');
+    const legacyEvent = {
+      runId: 'run_2',
+      sequence: 1,
+      type: 'tool_call_progress' as const,
+      payload: {},
+      createdAt: '2026-05-20T00:00:01.000Z',
+    };
+    if (!isRunEvent(legacyEvent)) throw new Error('Legacy RunEvent without runKind rejected');
+  })();
+
+  await test('stage_waiting_for_user is treated as a resumable event type', async () => {
+    const { isResumableEventType } = await import('../src/events/index.js');
+    if (!isResumableEventType('stage_waiting_for_user')) {
+      throw new Error('stage_waiting_for_user must be resumable');
+    }
+    if (!isResumableEventType('run_waiting_for_user')) {
+      throw new Error('run_waiting_for_user must be resumable');
+    }
+  })();
+
   // Tools/shared helper unit tests
   const sharedResults = runToolsSharedTests();
   testsPassed += sharedResults.passed;

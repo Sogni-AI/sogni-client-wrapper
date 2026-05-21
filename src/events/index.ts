@@ -4,9 +4,11 @@
  */
 
 export {
+  type RunKind,
   type RunEventType,
   type RunWaitingReason,
   type RunEvent,
+  isRunKind,
   isRunEventType,
   isRunWaitingReason,
   isRunEvent,

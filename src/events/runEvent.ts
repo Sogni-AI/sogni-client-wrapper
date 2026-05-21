@@ -9,12 +9,33 @@
  * `chatRun/index.ts`; v2 keeps the same wire names so durable consumers
  * can migrate in place without touching the network layer.
  *
+ * Drift fix (audit 2026-05-20): pre-fix the canonical union was missing
+ * `spend_gate_opened`, the workflow-stage events (`stage_started`,
+ * `stage_completed`, `stage_failed`, `stage_waiting_for_user`), and the
+ * `runKind` discriminator. Consumers were emitting those event types and
+ * carrying a `runKind` (notably `'tool_batch'` from
+ * `sogni-creative-agent-v2/src/agent/sharedTypes.ts`) without canonical
+ * coverage. The union is now a SUPERSET of every event type any current
+ * consumer emits, and `runKind` is a first-class field on `RunEvent`.
+ *
  * Plan: docs/superpowers/plans/2026-05-20-sogni-chat-v2-execution-architecture-plan-final.md §7 + §11 + §12 + §13.1.
  */
 
 /**
+ * Substrate discriminator (plan §13.5). `chat` and `workflow` runs share
+ * persistence, lease, heartbeat, event log, waiting semantics,
+ * cancellation, cost confirmation, and resume. `tool_batch` is used by
+ * `sogni-creative-agent-v2` for fan-out tool-call runs that share the
+ * same event substrate without being a full chat or workflow run.
+ */
+export type RunKind = 'chat' | 'workflow' | 'tool_batch';
+
+/**
  * All event types in the v2 unified vocabulary. Grouped here by purpose
- * for readability; consumers may treat the union as opaque strings.
+ * for readability; consumers may treat the union as opaque strings. The
+ * superset includes every event type emitted by any current consumer
+ * (`sogni-creative-agent-v2`, `sogni-chat`, `sogni-api`) plus the
+ * schema-mandated set.
  */
 export type RunEventType =
   // Lifecycle
@@ -49,12 +70,18 @@ export type RunEventType =
   | 'run_waiting_for_user'
   // Spend / billing
   | 'billing_preview_updated'
+  | 'spend_gate_opened'
   | 'spend_preview_emitted'
   | 'spend_confirmed'
   | 'spend_cancelled'
   | 'spend_insufficient'
   | 'run_awaiting_cost_confirmation'
   | 'run_cost_confirmation_resolved'
+  // Workflow stages
+  | 'stage_started'
+  | 'stage_completed'
+  | 'stage_failed'
+  | 'stage_waiting_for_user'
   // Audit
   | 'audit_evaluated'
   | 'repair_requested';
@@ -75,10 +102,18 @@ export type RunWaitingReason =
 /**
  * One event in a run's SSE-replayable event log. `sequence` is monotonic
  * within a single `runId`. `payload` is opaque — typed payloads are
- * declared per event-type elsewhere.
+ * declared per event-type elsewhere. `runKind` is the substrate
+ * discriminator so consumers don't have to look up the parent run to
+ * tell a chat tick from a workflow stage tick.
  */
 export interface RunEvent {
   runId: string;
+  /**
+   * Substrate discriminator. Optional on the in-memory type so legacy
+   * producers stay valid for one release; required at the wire level per
+   * `schemas/events/run-event.schema.json`.
+   */
+  runKind?: RunKind;
   sequence: number;
   type: RunEventType;
   /** Optional status string (e.g. tool dispatch status, run status snapshot). */
@@ -119,12 +154,17 @@ const RUN_EVENT_TYPES: ReadonlySet<RunEventType> = new Set<RunEventType>([
   'asset_manifest_updated',
   'run_waiting_for_user',
   'billing_preview_updated',
+  'spend_gate_opened',
   'spend_preview_emitted',
   'spend_confirmed',
   'spend_cancelled',
   'spend_insufficient',
   'run_awaiting_cost_confirmation',
   'run_cost_confirmation_resolved',
+  'stage_started',
+  'stage_completed',
+  'stage_failed',
+  'stage_waiting_for_user',
   'audit_evaluated',
   'repair_requested',
 ]);
@@ -138,14 +178,21 @@ const TERMINAL_EVENT_TYPES: ReadonlySet<RunEventType> = new Set<RunEventType>([
 
 const RESUMABLE_EVENT_TYPES: ReadonlySet<RunEventType> = new Set<RunEventType>([
   'run_waiting_for_user',
+  'stage_waiting_for_user',
   'run_queued',
   'run_started',
   'run_resumed',
   'llm_round_started',
 ]);
 
+const RUN_KINDS: ReadonlySet<RunKind> = new Set<RunKind>(['chat', 'workflow', 'tool_batch']);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function isRunKind(value: unknown): value is RunKind {
+  return typeof value === 'string' && RUN_KINDS.has(value as RunKind);
 }
 
 export function isRunEventType(value: unknown): value is RunEventType {
@@ -177,6 +224,7 @@ export function isRunWaitingReason(value: unknown): value is RunWaitingReason {
 export function isRunEvent(value: unknown): value is RunEvent {
   if (!isRecord(value)) return false;
   if (typeof value.runId !== 'string') return false;
+  if (value.runKind !== undefined && !isRunKind(value.runKind)) return false;
   if (typeof value.sequence !== 'number' || !Number.isFinite(value.sequence)) return false;
   if (!isRunEventType(value.type)) return false;
   if (value.status !== undefined && typeof value.status !== 'string') return false;

@@ -18,7 +18,11 @@
  *     until a predicate passes
  *   - `validateWithRubric` — LLM-judge an artifact against a rubric,
  *     with an SSRF allow-list for `artifactUrl`
+ *   - `sanitizer` — canonical untrusted-input sanitizer +
+ *     `<UNTRUSTED_USER_INPUT>` wrapper (replaces drifted local
+ *     implementations in sogni-api + sogni-creative-agent)
  */
 
 export * from './retryUntilCondition.js';
 export * from './validateWithRubric.js';
+export * from './sanitizer.js';

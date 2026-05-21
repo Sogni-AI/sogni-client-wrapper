@@ -166,5 +166,18 @@ export * from './artifacts/index.js';
 export * from './events/index.js';
 export * from './billing/index.js';
 
+// Canonical untrusted-input sanitizer (audit follow-up 2026-05-21).
+// Re-exported from the root so api-v2 and creative-agent-v2 can drop
+// their local copies and import the strict union from one place
+// without traversing the workflows subpath.
+export {
+  SanitizerError,
+  HARD_STRIP_PATTERNS,
+  sanitizeUntrustedString,
+  escapeAttribute,
+  wrapAsUntrustedUserInput,
+} from './workflows/primitives/sanitizer.js';
+export type { SanitizeUntrustedStringOptions } from './workflows/primitives/sanitizer.js';
+
 // Default export
 export { SogniClientWrapper as default } from './client/SogniClientWrapper.js';

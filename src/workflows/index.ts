@@ -26,3 +26,15 @@ export type {
   ValidateRubricInput,
   RubricJudgement,
 } from './primitives/validateWithRubric.js';
+
+// Sanitizer is a public canonical helper — surface its functions +
+// types at the top level so consumers can drop their local copies
+// without traversing the `primitives` namespace.
+export {
+  SanitizerError,
+  HARD_STRIP_PATTERNS,
+  sanitizeUntrustedString,
+  escapeAttribute,
+  wrapAsUntrustedUserInput,
+} from './primitives/sanitizer.js';
+export type { SanitizeUntrustedStringOptions } from './primitives/sanitizer.js';

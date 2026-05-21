@@ -2127,6 +2127,145 @@ async function runTests() {
     }
   })();
 
+  // -------------------------------------------------------------------------
+  // Commit 2: TurnPlan + ToolMetadata canonical-type regressions
+  // -------------------------------------------------------------------------
+
+  await test('TurnPlan accepts a minimal valid plan with empty tools', async () => {
+    const { isTurnPlan } = await import('../src/agent/index.js');
+    const plan = {
+      proposedTools: [],
+      resolvedReferences: [],
+      confidence: 0,
+    };
+    if (!isTurnPlan(plan)) throw new Error('Minimal TurnPlan rejected by isTurnPlan');
+  })();
+
+  await test('TurnPlan accepts a rich plan with workflow + spend estimate + clarification', async () => {
+    const { isTurnPlan, isPlannerSpendEstimate, isPlannerProposedWorkflow } = await import(
+      '../src/agent/index.js'
+    );
+    const plan = {
+      proposedTools: ['generate_video'],
+      proposedWorkflow: {
+        templateId: 'wf_storyboard_to_video',
+        inputs: { duration: 5 },
+        reason: 'multi-stage with stitch',
+      },
+      resolvedReferences: [
+        { artifactId: 'art_xyz123', artifactType: 'image' as const },
+      ],
+      needsClarification: { question: 'Vertical or square?' },
+      spendEstimate: {
+        tokenCost: 12,
+        usdCost: 0.08,
+        estimateAvailable: true,
+        preferredModel: 'seedance-2-0',
+      },
+      confidence: 0.7,
+    };
+    if (!isPlannerProposedWorkflow(plan.proposedWorkflow)) {
+      throw new Error('Workflow guard rejected its own canonical shape');
+    }
+    if (!isPlannerSpendEstimate(plan.spendEstimate)) {
+      throw new Error('SpendEstimate guard rejected its own canonical shape');
+    }
+    if (!isTurnPlan(plan)) throw new Error('Rich TurnPlan rejected by isTurnPlan');
+  })();
+
+  await test('TurnPlan rejects confidence out of [0, 1]', async () => {
+    const { isTurnPlan } = await import('../src/agent/index.js');
+    if (
+      isTurnPlan({
+        proposedTools: [],
+        resolvedReferences: [],
+        confidence: 1.5,
+      })
+    ) {
+      throw new Error('confidence > 1 should be rejected');
+    }
+    if (
+      isTurnPlan({
+        proposedTools: [],
+        resolvedReferences: [],
+        confidence: -0.1,
+      })
+    ) {
+      throw new Error('confidence < 0 should be rejected');
+    }
+  })();
+
+  await test('PlannerSpendEstimate tolerates null cost fields when estimateAvailable=false', async () => {
+    const { isPlannerSpendEstimate } = await import('../src/agent/index.js');
+    if (
+      !isPlannerSpendEstimate({
+        tokenCost: null,
+        usdCost: null,
+        estimateAvailable: false,
+      })
+    ) {
+      throw new Error('Null cost fields should be accepted when estimateAvailable=false');
+    }
+  })();
+
+  await test('ToolMetadata accepts a fully populated record matching the JSON schema', async () => {
+    const { isToolMetadata } = await import('../src/agent/index.js');
+    const meta = {
+      name: 'generate_image',
+      family: 'creative' as const,
+      executionMode: 'hosted' as const,
+      inputSchemaRef: 'schemas/tools/generate_image.schema.json',
+      outputSchemaRef: 'schemas/tools/generate_image.result.schema.json',
+      costClass: 'medium' as const,
+      latencyClass: 'interactive' as const,
+      mutatesData: false,
+      producesArtifacts: true,
+      requiresConfirmation: 'paid' as const,
+      retrySafety: 'dedupe_key_required' as const,
+    };
+    if (!isToolMetadata(meta)) throw new Error('Canonical ToolMetadata rejected');
+  })();
+
+  await test('ToolMetadata accepts hiddenFromModel flag on hidden L1 tools', async () => {
+    const { isToolMetadata } = await import('../src/agent/index.js');
+    const meta = {
+      name: 'resolve_personas',
+      family: 'analysis' as const,
+      executionMode: 'internal' as const,
+      inputSchemaRef: 'schemas/tools/resolve_personas.schema.json',
+      outputSchemaRef: 'schemas/tools/resolve_personas.result.schema.json',
+      costClass: 'free' as const,
+      latencyClass: 'inline' as const,
+      mutatesData: false,
+      producesArtifacts: false,
+      requiresConfirmation: 'never' as const,
+      retrySafety: 'idempotent' as const,
+      hiddenFromModel: true,
+    };
+    if (!isToolMetadata(meta)) throw new Error('Hidden-from-model ToolMetadata rejected');
+  })();
+
+  await test('ToolMetadata rejects unknown enum values', async () => {
+    const { isToolMetadata } = await import('../src/agent/index.js');
+    if (
+      isToolMetadata({
+        name: 'bad_tool',
+        family: 'nonsense',
+        executionMode: 'hosted',
+        inputSchemaRef: 'schemas/x.schema.json',
+        outputSchemaRef: 'schemas/x.schema.json',
+        costClass: 'medium',
+        latencyClass: 'inline',
+        mutatesData: false,
+        producesArtifacts: false,
+        requiresConfirmation: 'never',
+        retrySafety: 'idempotent',
+      })
+    ) {
+      throw new Error('Unknown family value should be rejected');
+    }
+  })();
+
   // Tools/shared helper unit tests
   const sharedResults = runToolsSharedTests();
   testsPassed += sharedResults.passed;

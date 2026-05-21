@@ -35,3 +35,33 @@ export {
   isTurnAnalysis,
   validateTurnAnalysis,
 } from './turnAnalysis.js';
+
+export {
+  type PlannerArtifactRef,
+  type PlannerProposedWorkflow,
+  type PlannerSpendEstimate,
+  type TurnPlan,
+  isPlannerArtifactRef,
+  isPlannerProposedWorkflow,
+  isPlannerSpendEstimate,
+  isTurnPlan,
+  validateTurnPlan,
+} from './turnPlan.js';
+
+export {
+  type ToolFamily,
+  type ToolExecutionMode,
+  type ToolCostClass,
+  type ToolLatencyClass,
+  type ToolConfirmationPolicy,
+  type ToolRetrySafety,
+  type ToolMetadata,
+  isToolFamily,
+  isToolExecutionMode,
+  isToolCostClass,
+  isToolLatencyClass,
+  isToolConfirmationPolicy,
+  isToolRetrySafety,
+  isToolMetadata,
+  validateToolMetadata,
+} from './toolMetadata.js';

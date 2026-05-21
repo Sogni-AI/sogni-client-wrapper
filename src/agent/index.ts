@@ -26,6 +26,8 @@ export {
   isIntentInputRuntimeFlags,
   isIntentInput,
   validateIntentInput,
+  type IntentInputValidationError,
+  type IntentInputValidationResult,
 } from './intentInput.js';
 
 export {
@@ -40,6 +42,8 @@ export {
   isSignalProvenance,
   isTurnAnalysis,
   validateTurnAnalysis,
+  type TurnAnalysisValidationError,
+  type TurnAnalysisValidationResult,
 } from './turnAnalysis.js';
 
 export {
@@ -52,6 +56,8 @@ export {
   isPlannerSpendEstimate,
   isTurnPlan,
   validateTurnPlan,
+  type TurnPlanValidationError,
+  type TurnPlanValidationResult,
 } from './turnPlan.js';
 
 export {
@@ -70,4 +76,6 @@ export {
   isToolRetrySafety,
   isToolMetadata,
   validateToolMetadata,
+  type ToolMetadataValidationError,
+  type ToolMetadataValidationResult,
 } from './toolMetadata.js';

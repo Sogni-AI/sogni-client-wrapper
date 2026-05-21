@@ -236,11 +236,70 @@ export function isRunEvent(value: unknown): value is RunEvent {
   return true;
 }
 
+/** One structured validation error (see intentInput for shape rationale). */
+export interface RunEventValidationError {
+  path: string;
+  message: string;
+}
+
+export interface RunEventValidationResult {
+  valid: boolean;
+  errors: RunEventValidationError[];
+}
+
+function pushError(
+  errors: RunEventValidationError[],
+  path: string,
+  message: string,
+): void {
+  errors.push({ path, message });
+}
+
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema.
+ * Walk a {@link RunEvent} and report each missing or wrong-typed field
+ * as `{ path, message }`.
  */
-export function validateRunEvent(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export function validateRunEvent(value: unknown): RunEventValidationResult {
+  const errors: RunEventValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  if (typeof (value as { runId?: unknown }).runId !== 'string') {
+    pushError(errors, '/runId', 'must be a string');
+  }
+  const runKind = (value as { runKind?: unknown }).runKind;
+  if (runKind !== undefined && !isRunKind(runKind)) {
+    pushError(errors, '/runKind', 'must be a valid RunKind when present');
+  }
+  const sequence = (value as { sequence?: unknown }).sequence;
+  if (typeof sequence !== 'number' || !Number.isFinite(sequence)) {
+    pushError(errors, '/sequence', 'must be a finite number');
+  }
+  if (!isRunEventType((value as { type?: unknown }).type)) {
+    pushError(errors, '/type', 'must be a valid RunEventType');
+  }
+  const status = (value as { status?: unknown }).status;
+  if (status !== undefined && typeof status !== 'string') {
+    pushError(errors, '/status', 'must be a string when present');
+  }
+  const payload = (value as { payload?: unknown }).payload;
+  if (!isRecord(payload)) {
+    pushError(errors, '/payload', 'must be an object');
+  }
+  if (typeof (value as { createdAt?: unknown }).createdAt !== 'string') {
+    pushError(errors, '/createdAt', 'must be a string');
+  }
+  const resumable = (value as { resumable?: unknown }).resumable;
+  if (resumable !== undefined && typeof resumable !== 'boolean') {
+    pushError(errors, '/resumable', 'must be a boolean when present');
+  }
+  const terminal = (value as { terminal?: unknown }).terminal;
+  if (terminal !== undefined && typeof terminal !== 'boolean') {
+    pushError(errors, '/terminal', 'must be a boolean when present');
+  }
+  const idempotencyKey = (value as { idempotencyKey?: unknown }).idempotencyKey;
+  if (idempotencyKey !== undefined && typeof idempotencyKey !== 'string') {
+    pushError(errors, '/idempotencyKey', 'must be a string when present');
+  }
+  return { valid: errors.length === 0, errors };
 }

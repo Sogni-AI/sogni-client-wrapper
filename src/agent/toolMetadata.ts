@@ -204,12 +204,74 @@ export function isToolMetadata(value: unknown): value is ToolMetadata {
   return true;
 }
 
+/** One structured validation error (see intentInput for shape rationale). */
+export interface ToolMetadataValidationError {
+  path: string;
+  message: string;
+}
+
+export interface ToolMetadataValidationResult {
+  valid: boolean;
+  errors: ToolMetadataValidationError[];
+}
+
+function pushError(
+  errors: ToolMetadataValidationError[],
+  path: string,
+  message: string,
+): void {
+  errors.push({ path, message });
+}
+
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema. Signature is stable so
- * downstream consumers can adopt it now without a churn cycle later.
+ * Walk {@link ToolMetadata} and report each missing or wrong-typed
+ * field as `{ path, message }`. Mirrors the field order of the
+ * canonical JSON schema.
  */
-export function validateToolMetadata(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export function validateToolMetadata(value: unknown): ToolMetadataValidationResult {
+  const errors: ToolMetadataValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  const name = (value as { name?: unknown }).name;
+  if (typeof name !== 'string' || name.length === 0) {
+    pushError(errors, '/name', 'must be a non-empty string');
+  }
+  if (!isToolFamily((value as { family?: unknown }).family)) {
+    pushError(errors, '/family', 'must be a valid ToolFamily');
+  }
+  if (!isToolExecutionMode((value as { executionMode?: unknown }).executionMode)) {
+    pushError(errors, '/executionMode', 'must be a valid ToolExecutionMode');
+  }
+  const inputRef = (value as { inputSchemaRef?: unknown }).inputSchemaRef;
+  if (typeof inputRef !== 'string' || inputRef.length === 0) {
+    pushError(errors, '/inputSchemaRef', 'must be a non-empty string');
+  }
+  const outputRef = (value as { outputSchemaRef?: unknown }).outputSchemaRef;
+  if (typeof outputRef !== 'string' || outputRef.length === 0) {
+    pushError(errors, '/outputSchemaRef', 'must be a non-empty string');
+  }
+  if (!isToolCostClass((value as { costClass?: unknown }).costClass)) {
+    pushError(errors, '/costClass', 'must be a valid ToolCostClass');
+  }
+  if (!isToolLatencyClass((value as { latencyClass?: unknown }).latencyClass)) {
+    pushError(errors, '/latencyClass', 'must be a valid ToolLatencyClass');
+  }
+  if (typeof (value as { mutatesData?: unknown }).mutatesData !== 'boolean') {
+    pushError(errors, '/mutatesData', 'must be a boolean');
+  }
+  if (typeof (value as { producesArtifacts?: unknown }).producesArtifacts !== 'boolean') {
+    pushError(errors, '/producesArtifacts', 'must be a boolean');
+  }
+  if (!isToolConfirmationPolicy((value as { requiresConfirmation?: unknown }).requiresConfirmation)) {
+    pushError(errors, '/requiresConfirmation', 'must be a valid ToolConfirmationPolicy');
+  }
+  if (!isToolRetrySafety((value as { retrySafety?: unknown }).retrySafety)) {
+    pushError(errors, '/retrySafety', 'must be a valid ToolRetrySafety');
+  }
+  const hidden = (value as { hiddenFromModel?: unknown }).hiddenFromModel;
+  if (hidden !== undefined && typeof hidden !== 'boolean') {
+    pushError(errors, '/hiddenFromModel', 'must be a boolean when present');
+  }
+  return { valid: errors.length === 0, errors };
 }

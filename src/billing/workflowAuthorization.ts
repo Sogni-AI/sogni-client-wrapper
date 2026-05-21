@@ -212,20 +212,184 @@ export function isWorkflowAuthorization(value: unknown): value is WorkflowAuthor
   return true;
 }
 
-/**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema.
- */
-export function validateWorkflowCostPreview(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+/** One structured validation error (see intentInput for shape rationale). */
+export interface WorkflowAuthorizationValidationError {
+  path: string;
+  message: string;
+}
+
+export interface WorkflowAuthorizationValidationResult {
+  valid: boolean;
+  errors: WorkflowAuthorizationValidationError[];
+}
+
+function pushError(
+  errors: WorkflowAuthorizationValidationError[],
+  path: string,
+  message: string,
+): void {
+  errors.push({ path, message });
+}
+
+function validateStageBreakdownEntryInternal(
+  value: unknown,
+  basePath: string,
+  errors: WorkflowAuthorizationValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { stageId?: unknown }).stageId !== 'string') {
+    pushError(errors, `${basePath}/stageId`, 'must be a string');
+  }
+  const units = (value as { units?: unknown }).units;
+  if (typeof units !== 'number' || !Number.isFinite(units)) {
+    pushError(errors, `${basePath}/units`, 'must be a finite number');
+  }
+  const assumptions = (value as { assumptions?: unknown }).assumptions;
+  if (!Array.isArray(assumptions)) {
+    pushError(errors, `${basePath}/assumptions`, 'must be an array');
+  } else {
+    assumptions.forEach((a, idx) => {
+      if (typeof a !== 'string') {
+        pushError(errors, `${basePath}/assumptions/${idx}`, 'must be a string');
+      }
+    });
+  }
 }
 
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema.
+ * Walk a {@link WorkflowCostPreview} and report each missing or
+ * wrong-typed field as `{ path, message }`. `templateId` and `inputs`
+ * are required — a missing field surfaces a specific error rather
+ * than a generic "shape mismatch".
  */
-export function validateWorkflowAuthorization(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export function validateWorkflowCostPreview(
+  value: unknown,
+): WorkflowAuthorizationValidationResult {
+  const errors: WorkflowAuthorizationValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  if (typeof (value as { templateId?: unknown }).templateId !== 'string') {
+    pushError(errors, '/templateId', 'must be a string');
+  }
+  const inputs = (value as { inputs?: unknown }).inputs;
+  if (!isRecord(inputs)) {
+    pushError(errors, '/inputs', 'must be an object');
+  }
+  const total = (value as { totalEstimatedCapacityUnits?: unknown }).totalEstimatedCapacityUnits;
+  if (typeof total !== 'number' || !Number.isFinite(total)) {
+    pushError(errors, '/totalEstimatedCapacityUnits', 'must be a finite number');
+  }
+  const perStage = (value as { perStageBreakdown?: unknown }).perStageBreakdown;
+  if (!Array.isArray(perStage)) {
+    pushError(errors, '/perStageBreakdown', 'must be an array');
+  } else {
+    perStage.forEach((entry, idx) =>
+      validateStageBreakdownEntryInternal(entry, `/perStageBreakdown/${idx}`, errors),
+    );
+  }
+  if (!isWorkflowSpendTokenType((value as { tokenType?: unknown }).tokenType)) {
+    pushError(errors, '/tokenType', 'must be a valid WorkflowSpendTokenType');
+  }
+  const maxAcc = (value as { maxAcceptableUnits?: unknown }).maxAcceptableUnits;
+  if (maxAcc !== undefined && (typeof maxAcc !== 'number' || !Number.isFinite(maxAcc))) {
+    pushError(errors, '/maxAcceptableUnits', 'must be a finite number when present');
+  }
+  const dur = (value as { expectedDurationSeconds?: unknown }).expectedDurationSeconds;
+  if (typeof dur !== 'number' || !Number.isFinite(dur)) {
+    pushError(errors, '/expectedDurationSeconds', 'must be a finite number');
+  }
+  if (typeof (value as { validityUntil?: unknown }).validityUntil !== 'string') {
+    pushError(errors, '/validityUntil', 'must be a string');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+function validateStageSettlementInternal(
+  value: unknown,
+  basePath: string,
+  errors: WorkflowAuthorizationValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { stageId?: unknown }).stageId !== 'string') {
+    pushError(errors, `${basePath}/stageId`, 'must be a string');
+  }
+  const projectId = (value as { projectId?: unknown }).projectId;
+  if (projectId !== undefined && typeof projectId !== 'string') {
+    pushError(errors, `${basePath}/projectId`, 'must be a string when present');
+  }
+  const jobIds = (value as { jobIds?: unknown }).jobIds;
+  if (!Array.isArray(jobIds)) {
+    pushError(errors, `${basePath}/jobIds`, 'must be an array');
+  } else {
+    jobIds.forEach((id, idx) => {
+      if (typeof id !== 'string') {
+        pushError(errors, `${basePath}/jobIds/${idx}`, 'must be a string');
+      }
+    });
+  }
+  const est = (value as { estimatedUnits?: unknown }).estimatedUnits;
+  if (typeof est !== 'number' || !Number.isFinite(est)) {
+    pushError(errors, `${basePath}/estimatedUnits`, 'must be a finite number');
+  }
+  const settled = (value as { settledUnits?: unknown }).settledUnits;
+  if (settled !== undefined && (typeof settled !== 'number' || !Number.isFinite(settled))) {
+    pushError(errors, `${basePath}/settledUnits`, 'must be a finite number when present');
+  }
+  if (!isStageSettlementStatus((value as { status?: unknown }).status)) {
+    pushError(errors, `${basePath}/status`, 'must be a valid StageSettlementStatus');
+  }
+}
+
+/**
+ * Walk a {@link WorkflowAuthorization} and report each missing or
+ * wrong-typed field as `{ path, message }`. `workflowRunId` is the
+ * required umbrella key — a missing one surfaces a specific error.
+ */
+export function validateWorkflowAuthorization(
+  value: unknown,
+): WorkflowAuthorizationValidationResult {
+  const errors: WorkflowAuthorizationValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  if (typeof (value as { workflowRunId?: unknown }).workflowRunId !== 'string') {
+    pushError(errors, '/workflowRunId', 'must be a string');
+  }
+  const authCap = (value as { authorizedCapacityUnits?: unknown }).authorizedCapacityUnits;
+  if (typeof authCap !== 'number' || !Number.isFinite(authCap)) {
+    pushError(errors, '/authorizedCapacityUnits', 'must be a finite number');
+  }
+  if (!isWorkflowSpendTokenType((value as { tokenType?: unknown }).tokenType)) {
+    pushError(errors, '/tokenType', 'must be a valid WorkflowSpendTokenType');
+  }
+  if (typeof (value as { authorizedAt?: unknown }).authorizedAt !== 'string') {
+    pushError(errors, '/authorizedAt', 'must be a string');
+  }
+  if (typeof (value as { expiresAt?: unknown }).expiresAt !== 'string') {
+    pushError(errors, '/expiresAt', 'must be a string');
+  }
+  const cumSettled = (value as { cumulativeSettledUnits?: unknown }).cumulativeSettledUnits;
+  if (typeof cumSettled !== 'number' || !Number.isFinite(cumSettled)) {
+    pushError(errors, '/cumulativeSettledUnits', 'must be a finite number');
+  }
+  const cumRes = (value as { cumulativeReservedUnits?: unknown }).cumulativeReservedUnits;
+  if (typeof cumRes !== 'number' || !Number.isFinite(cumRes)) {
+    pushError(errors, '/cumulativeReservedUnits', 'must be a finite number');
+  }
+  const stages = (value as { stageSettlements?: unknown }).stageSettlements;
+  if (!Array.isArray(stages)) {
+    pushError(errors, '/stageSettlements', 'must be an array');
+  } else {
+    stages.forEach((s, idx) =>
+      validateStageSettlementInternal(s, `/stageSettlements/${idx}`, errors),
+    );
+  }
+  return { valid: errors.length === 0, errors };
 }

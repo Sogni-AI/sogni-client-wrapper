@@ -52,18 +52,22 @@ export type SpendGateTokenType = 'spark' | 'sogni';
  * Decision recorded on the gate when the user (or an authorization
  * umbrella) resolves it.
  *
- * Two historical vocabularies are accepted:
+ * Three historical vocabularies are accepted:
  *
  * - `'confirm'` / `'cancel'` — canonical 2026-05-20 form. New producers
  *   MUST use these values.
  * - `'approved'` / `'rejected'` — pre-2026-05-20 form still emitted by
  *   `sogni-api` and `sogni-creative-agent` durable runs. Accepted as
  *   aliases so existing payloads keep validating during the cutover.
+ * - `'cancelled'` — alternate past-tense spelling some legacy producers
+ *   emit (collapses to `'cancel'`). Added 2026-05-21 after the audit
+ *   flagged that `normalizeSpendDecision` was throwing on this value
+ *   even though several persisted payloads use it.
  *
  * Consumers reading the field MUST go through {@link normalizeSpendDecision}
  * so business logic only ever sees the canonical pair.
  */
-export type SpendGateDecision = 'confirm' | 'cancel' | 'approved' | 'rejected';
+export type SpendGateDecision = 'confirm' | 'cancel' | 'approved' | 'rejected' | 'cancelled';
 
 /** Canonical post-normalization decision shape. */
 export type NormalizedSpendGateDecision = 'confirm' | 'cancel';
@@ -86,6 +90,7 @@ export function normalizeSpendDecision(
     case 'approved':
       return 'confirm';
     case 'rejected':
+    case 'cancelled':
       return 'cancel';
     default: {
       const exhaustive: never = decision;
@@ -234,6 +239,7 @@ const SPEND_GATE_DECISIONS: ReadonlySet<SpendGateDecision> = new Set<SpendGateDe
   'cancel',
   'approved',
   'rejected',
+  'cancelled',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -348,11 +354,198 @@ export function isSpendGate(value: unknown): value is SpendGate {
   return true;
 }
 
+/** One structured validation error (see intentInput for shape rationale). */
+export interface SpendGateValidationError {
+  path: string;
+  message: string;
+}
+
+export interface SpendGateValidationResult {
+  valid: boolean;
+  errors: SpendGateValidationError[];
+}
+
+function pushError(
+  errors: SpendGateValidationError[],
+  path: string,
+  message: string,
+): void {
+  errors.push({ path, message });
+}
+
+function validateBreakdownEntryInternal(
+  value: unknown,
+  basePath: string,
+  errors: SpendGateValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { model?: unknown }).model !== 'string') {
+    pushError(errors, `${basePath}/model`, 'must be a string');
+  }
+  const units = (value as { units?: unknown }).units;
+  if (typeof units !== 'number' || !Number.isFinite(units)) {
+    pushError(errors, `${basePath}/units`, 'must be a finite number');
+  }
+  if (!isSpendGateTokenType((value as { tokenType?: unknown }).tokenType)) {
+    pushError(errors, `${basePath}/tokenType`, 'must be a valid SpendGateTokenType');
+  }
+}
+
+function validateEstimateInternal(
+  value: unknown,
+  basePath: string,
+  errors: SpendGateValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const cap = (value as { capacityUnits?: unknown }).capacityUnits;
+  if (typeof cap !== 'number' || !Number.isFinite(cap)) {
+    pushError(errors, `${basePath}/capacityUnits`, 'must be a finite number');
+  }
+  const breakdown = (value as { breakdown?: unknown }).breakdown;
+  if (!Array.isArray(breakdown)) {
+    pushError(errors, `${basePath}/breakdown`, 'must be an array');
+  } else {
+    breakdown.forEach((entry, idx) =>
+      validateBreakdownEntryInternal(entry, `${basePath}/breakdown/${idx}`, errors),
+    );
+  }
+  if (!isSpendGateTokenType((value as { tokenType?: unknown }).tokenType)) {
+    pushError(errors, `${basePath}/tokenType`, 'must be a valid SpendGateTokenType');
+  }
+  const maxAcc = (value as { maxAcceptableUnits?: unknown }).maxAcceptableUnits;
+  if (maxAcc !== undefined && (typeof maxAcc !== 'number' || !Number.isFinite(maxAcc))) {
+    pushError(errors, `${basePath}/maxAcceptableUnits`, 'must be a finite number when present');
+  }
+}
+
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema.
+ * Walk a {@link SpendGateRequest} and report each missing or wrong-typed
+ * field as `{ path, message }`. Mirrors the field set of the canonical
+ * pre-2026-05-20 request payload.
  */
-export function validateSpendGateRequest(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export function validateSpendGateRequest(value: unknown): SpendGateValidationResult {
+  const errors: SpendGateValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  if (!isSpendGateScope((value as { scope?: unknown }).scope)) {
+    pushError(errors, '/scope', 'must be a valid SpendGateScope');
+  }
+  const toolCallId = (value as { toolCallId?: unknown }).toolCallId;
+  if (toolCallId !== undefined && typeof toolCallId !== 'string') {
+    pushError(errors, '/toolCallId', 'must be a string when present');
+  }
+  const workflowRunId = (value as { workflowRunId?: unknown }).workflowRunId;
+  if (workflowRunId !== undefined && typeof workflowRunId !== 'string') {
+    pushError(errors, '/workflowRunId', 'must be a string when present');
+  }
+  const est = (value as { estimateCapacityUnits?: unknown }).estimateCapacityUnits;
+  if (typeof est !== 'number' || !Number.isFinite(est)) {
+    pushError(errors, '/estimateCapacityUnits', 'must be a finite number');
+  }
+  const breakdown = (value as { estimateCostBreakdown?: unknown }).estimateCostBreakdown;
+  if (!Array.isArray(breakdown)) {
+    pushError(errors, '/estimateCostBreakdown', 'must be an array');
+  } else {
+    breakdown.forEach((entry, idx) =>
+      validateBreakdownEntryInternal(entry, `/estimateCostBreakdown/${idx}`, errors),
+    );
+  }
+  const maxAcc = (value as { maxAcceptableUnits?: unknown }).maxAcceptableUnits;
+  if (maxAcc !== undefined && (typeof maxAcc !== 'number' || !Number.isFinite(maxAcc))) {
+    pushError(errors, '/maxAcceptableUnits', 'must be a finite number when present');
+  }
+  const reason = (value as { reason?: unknown }).reason;
+  if (reason !== undefined && typeof reason !== 'string') {
+    pushError(errors, '/reason', 'must be a string when present');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Walk a live {@link SpendGate} record and report each missing or
+ * wrong-typed field as `{ path, message }`. Canonical fields (`gateId`,
+ * `scope`, `estimate`, timestamps) are still optional at the
+ * TypeScript level for backwards-compat with the legacy
+ * `{ state, request? }` producers; only their types are checked when
+ * present.
+ */
+export function validateSpendGate(value: unknown): SpendGateValidationResult {
+  const errors: SpendGateValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  if (!isSpendGateState((value as { state?: unknown }).state)) {
+    pushError(errors, '/state', 'must be a valid SpendGateState');
+  }
+  for (const key of ['gateId', 'runId', 'reason', 'createdAt', 'updatedAt', 'decidedAt'] as const) {
+    const v = (value as Record<string, unknown>)[key];
+    if (v !== undefined && typeof v !== 'string') {
+      pushError(errors, `/${key}`, 'must be a string when present');
+    }
+  }
+  const scope = (value as { scope?: unknown }).scope;
+  if (scope !== undefined && !isSpendGateScope(scope)) {
+    pushError(errors, '/scope', 'must be a valid SpendGateScope when present');
+  }
+  const estimate = (value as { estimate?: unknown }).estimate;
+  if (estimate !== undefined) {
+    validateEstimateInternal(estimate, '/estimate', errors);
+  }
+  const pendingTools = (value as { pendingToolCalls?: unknown }).pendingToolCalls;
+  if (pendingTools !== undefined) {
+    if (!Array.isArray(pendingTools)) {
+      pushError(errors, '/pendingToolCalls', 'must be an array when present');
+    } else {
+      pendingTools.forEach((ref, idx) => {
+        if (!isRecord(ref)) {
+          pushError(errors, `/pendingToolCalls/${idx}`, 'must be an object');
+          return;
+        }
+        if (typeof (ref as { toolCallId?: unknown }).toolCallId !== 'string') {
+          pushError(errors, `/pendingToolCalls/${idx}/toolCallId`, 'must be a string');
+        }
+        if (typeof (ref as { toolName?: unknown }).toolName !== 'string') {
+          pushError(errors, `/pendingToolCalls/${idx}/toolName`, 'must be a string');
+        }
+      });
+    }
+  }
+  const pendingPlan = (value as { pendingWorkflowPlan?: unknown }).pendingWorkflowPlan;
+  if (pendingPlan !== undefined) {
+    if (!isRecord(pendingPlan)) {
+      pushError(errors, '/pendingWorkflowPlan', 'must be an object when present');
+    } else {
+      if (typeof (pendingPlan as { workflowRunId?: unknown }).workflowRunId !== 'string') {
+        pushError(errors, '/pendingWorkflowPlan/workflowRunId', 'must be a string');
+      }
+      if (typeof (pendingPlan as { templateId?: unknown }).templateId !== 'string') {
+        pushError(errors, '/pendingWorkflowPlan/templateId', 'must be a string');
+      }
+    }
+  }
+  const decision = (value as { decision?: unknown }).decision;
+  if (decision !== undefined && !isSpendGateDecision(decision)) {
+    pushError(errors, '/decision', 'must be a valid SpendGateDecision when present');
+  }
+  const request = (value as { request?: unknown }).request;
+  if (request !== undefined) {
+    const nested = validateSpendGateRequest(request);
+    if (!nested.valid) {
+      for (const e of nested.errors) {
+        pushError(errors, `/request${e.path === '/' ? '' : e.path}`, e.message);
+      }
+    }
+  }
+  const failureReason = (value as { failureReason?: unknown }).failureReason;
+  if (failureReason !== undefined && typeof failureReason !== 'string') {
+    pushError(errors, '/failureReason', 'must be a string when present');
+  }
+  return { valid: errors.length === 0, errors };
 }

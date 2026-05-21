@@ -15,4 +15,6 @@ export {
   isTerminalEventType,
   isResumableEventType,
   validateRunEvent,
+  type RunEventValidationError,
+  type RunEventValidationResult,
 } from './runEvent.js';

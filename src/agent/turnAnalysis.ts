@@ -175,12 +175,83 @@ export function isTurnAnalysis(value: unknown): value is TurnAnalysis {
   return true;
 }
 
+/** One structured validation error (see intentInput for shape rationale). */
+export interface TurnAnalysisValidationError {
+  path: string;
+  message: string;
+}
+
+export interface TurnAnalysisValidationResult {
+  valid: boolean;
+  errors: TurnAnalysisValidationError[];
+}
+
+function pushError(
+  errors: TurnAnalysisValidationError[],
+  path: string,
+  message: string,
+): void {
+  errors.push({ path, message });
+}
+
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema. Signature is stable so
- * downstream consumers can adopt it now without a churn cycle later.
+ * Walk a {@link TurnAnalysis} and report each missing or wrong-typed
+ * field as `{ path, message }`. `confidence` is type-checked as a finite
+ * number; the runtime caller may add a `[0, 1]` range check on top if
+ * it cares.
  */
-export function validateTurnAnalysis(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export function validateTurnAnalysis(value: unknown): TurnAnalysisValidationResult {
+  const errors: TurnAnalysisValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  if (!isTurnKind((value as { domain?: unknown }).domain)) {
+    pushError(errors, '/domain', 'must be a valid TurnKind');
+  }
+  if (!isTurnIntent((value as { intent?: unknown }).intent)) {
+    pushError(errors, '/intent', 'must be a valid TurnIntent');
+  }
+  if (!isTurnExecutionMode((value as { executionMode?: unknown }).executionMode)) {
+    pushError(errors, '/executionMode', 'must be a valid TurnExecutionMode');
+  }
+  for (const key of [
+    'userWantsExecution',
+    'isCapabilityQuestion',
+    'isFutureInstruction',
+    'isReferenceOnly',
+    'needsPriorContext',
+    'needsClarification',
+  ] as const) {
+    if (typeof (value as Record<string, unknown>)[key] !== 'boolean') {
+      pushError(errors, `/${key}`, 'must be a boolean');
+    }
+  }
+  const refs = (value as { referencedArtifacts?: unknown }).referencedArtifacts;
+  if (!Array.isArray(refs)) {
+    pushError(errors, '/referencedArtifacts', 'must be an array');
+  } else {
+    refs.forEach((ref, idx) => {
+      if (typeof ref !== 'string') {
+        pushError(errors, `/referencedArtifacts/${idx}`, 'must be a string');
+      }
+    });
+  }
+  const caps = (value as { requiredCapabilities?: unknown }).requiredCapabilities;
+  if (!Array.isArray(caps)) {
+    pushError(errors, '/requiredCapabilities', 'must be an array');
+  } else {
+    caps.forEach((cap, idx) => {
+      if (typeof cap !== 'string') {
+        pushError(errors, `/requiredCapabilities/${idx}`, 'must be a string');
+      }
+    });
+  }
+  const conf = (value as { confidence?: unknown }).confidence;
+  if (typeof conf !== 'number' || !Number.isFinite(conf)) {
+    pushError(errors, '/confidence', 'must be a finite number');
+  }
+  if (!isSignalProvenance((value as { provenance?: unknown }).provenance)) {
+    pushError(errors, '/provenance', 'must be a valid SignalProvenance');
+  }
+  return { valid: errors.length === 0, errors };
 }

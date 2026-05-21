@@ -413,11 +413,304 @@ export function isIntentInput(value: unknown): value is IntentInput {
 }
 
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema. Signature is stable so
- * downstream consumers can adopt it now without a churn cycle later.
+ * One structured validation error. `path` is JSON-Pointer-ish rooted at
+ * the validated value (`'/'` for the root, `/recentTurns/2/role` for a
+ * nested field); `message` is a short reason.
  */
-export function validateIntentInput(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export interface IntentInputValidationError {
+  path: string;
+  message: string;
+}
+
+/** Result returned by every agent `validate*` helper. */
+export interface IntentInputValidationResult {
+  valid: boolean;
+  errors: IntentInputValidationError[];
+}
+
+function pushError(errors: IntentInputValidationError[], path: string, message: string): void {
+  errors.push({ path, message });
+}
+
+function validatePendingActionInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { kind?: unknown }).kind !== 'string') {
+    pushError(errors, `${basePath}/kind`, 'must be a string');
+  }
+  for (const key of ['toolName', 'toolCallId', 'workflowRunId'] as const) {
+    const v = (value as Record<string, unknown>)[key];
+    if (v !== undefined && typeof v !== 'string') {
+      pushError(errors, `${basePath}/${key}`, 'must be a string when present');
+    }
+  }
+  const payload = (value as { payload?: unknown }).payload;
+  if (payload !== undefined && !isRecord(payload)) {
+    pushError(errors, `${basePath}/payload`, 'must be an object when present');
+  }
+}
+
+function validateLastToolResultInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { toolName?: unknown }).toolName !== 'string') {
+    pushError(errors, `${basePath}/toolName`, 'must be a string');
+  }
+  if (typeof (value as { toolCallId?: unknown }).toolCallId !== 'string') {
+    pushError(errors, `${basePath}/toolCallId`, 'must be a string');
+  }
+  if (typeof (value as { status?: unknown }).status !== 'string') {
+    pushError(errors, `${basePath}/status`, 'must be a string');
+  }
+}
+
+function validateActiveStateInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const activeArtifactId = (value as { activeArtifactId?: unknown }).activeArtifactId;
+  if (activeArtifactId !== undefined && typeof activeArtifactId !== 'string') {
+    pushError(errors, `${basePath}/activeArtifactId`, 'must be a string when present');
+  }
+  const activeArtifactType = (value as { activeArtifactType?: unknown }).activeArtifactType;
+  if (activeArtifactType !== undefined && !isArtifactType(activeArtifactType)) {
+    pushError(errors, `${basePath}/activeArtifactType`, 'must be a valid ArtifactType');
+  }
+  const pendingAction = (value as { pendingAction?: unknown }).pendingAction;
+  if (pendingAction !== undefined) {
+    validatePendingActionInternal(pendingAction, `${basePath}/pendingAction`, errors);
+  }
+  const awaiting = (value as { awaitingConfirmation?: unknown }).awaitingConfirmation;
+  if (awaiting !== undefined && typeof awaiting !== 'boolean') {
+    pushError(errors, `${basePath}/awaitingConfirmation`, 'must be a boolean when present');
+  }
+  const lastToolResult = (value as { lastToolResult?: unknown }).lastToolResult;
+  if (lastToolResult !== undefined) {
+    validateLastToolResultInternal(lastToolResult, `${basePath}/lastToolResult`, errors);
+  }
+  const activeWorkflowRunId = (value as { activeWorkflowRunId?: unknown }).activeWorkflowRunId;
+  if (activeWorkflowRunId !== undefined && typeof activeWorkflowRunId !== 'string') {
+    pushError(errors, `${basePath}/activeWorkflowRunId`, 'must be a string when present');
+  }
+}
+
+function validateArtifactStateInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const selected = (value as { selectedArtifactIds?: unknown }).selectedArtifactIds;
+  if (!Array.isArray(selected)) {
+    pushError(errors, `${basePath}/selectedArtifactIds`, 'must be an array');
+  } else {
+    selected.forEach((id, idx) => {
+      if (typeof id !== 'string') {
+        pushError(errors, `${basePath}/selectedArtifactIds/${idx}`, 'must be a string');
+      }
+    });
+  }
+  const all = (value as { artifactIds?: unknown }).artifactIds;
+  if (!Array.isArray(all)) {
+    pushError(errors, `${basePath}/artifactIds`, 'must be an array');
+  } else {
+    all.forEach((id, idx) => {
+      if (typeof id !== 'string') {
+        pushError(errors, `${basePath}/artifactIds/${idx}`, 'must be a string');
+      }
+    });
+  }
+  const lastGen = (value as { lastGeneratedArtifactId?: unknown }).lastGeneratedArtifactId;
+  if (lastGen !== undefined && typeof lastGen !== 'string') {
+    pushError(errors, `${basePath}/lastGeneratedArtifactId`, 'must be a string when present');
+  }
+  const lastEdit = (value as { lastEditedArtifactId?: unknown }).lastEditedArtifactId;
+  if (lastEdit !== undefined && typeof lastEdit !== 'string') {
+    pushError(errors, `${basePath}/lastEditedArtifactId`, 'must be a string when present');
+  }
+}
+
+function validateRecentTurnInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const role = (value as { role?: unknown }).role;
+  if (typeof role !== 'string' || !TURN_ROLES.has(role as IntentInputRecentTurn['role'])) {
+    pushError(errors, `${basePath}/role`, "must be 'user' | 'assistant'");
+  }
+  if (typeof (value as { content?: unknown }).content !== 'string') {
+    pushError(errors, `${basePath}/content`, 'must be a string');
+  }
+  const seq = (value as { sequence?: unknown }).sequence;
+  if (typeof seq !== 'number' || !Number.isFinite(seq) || seq < 0) {
+    pushError(errors, `${basePath}/sequence`, 'must be a non-negative finite number');
+  }
+}
+
+function validateCurrentMessageDetailsInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { text?: unknown }).text !== 'string') {
+    pushError(errors, `${basePath}/text`, 'must be a string');
+  }
+  const id = (value as { id?: unknown }).id;
+  if (id !== undefined && typeof id !== 'string') {
+    pushError(errors, `${basePath}/id`, 'must be a string when present');
+  }
+  const role = (value as { role?: unknown }).role;
+  if (
+    role !== undefined &&
+    !(typeof role === 'string' && CURRENT_MESSAGE_DETAILS_ROLES.has(role as 'user' | 'system'))
+  ) {
+    pushError(errors, `${basePath}/role`, "must be 'user' | 'system' when present");
+  }
+  const createdAt = (value as { createdAt?: unknown }).createdAt;
+  if (createdAt !== undefined && typeof createdAt !== 'string') {
+    pushError(errors, `${basePath}/createdAt`, 'must be a string when present');
+  }
+  const localeHint = (value as { localeHint?: unknown }).localeHint;
+  if (localeHint !== undefined && typeof localeHint !== 'string') {
+    pushError(errors, `${basePath}/localeHint`, 'must be a string when present');
+  }
+}
+
+function validateRuntimeFlagsInternal(
+  value: unknown,
+  basePath: string,
+  errors: IntentInputValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const surface = (value as { surface?: unknown }).surface;
+  if (surface !== undefined && !isIntentInputSurface(surface)) {
+    pushError(errors, `${basePath}/surface`, 'must be a valid IntentInputSurface when present');
+  }
+  for (const key of ['allowPaidTools', 'allowMutatingTools', 'durableRequired'] as const) {
+    const v = (value as Record<string, unknown>)[key];
+    if (v !== undefined && typeof v !== 'boolean') {
+      pushError(errors, `${basePath}/${key}`, 'must be a boolean when present');
+    }
+  }
+}
+
+/**
+ * Walk an {@link IntentInput} and report each missing or wrong-typed
+ * field as `{ path, message }`. Enforces the `currentMessage` ===
+ * `currentMessageDetails.text` invariant when both are present (the
+ * schema's MUST equal constraint).
+ */
+export function validateIntentInput(value: unknown): IntentInputValidationResult {
+  const errors: IntentInputValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+
+  const currentMessage = (value as { currentMessage?: unknown }).currentMessage;
+  if (typeof currentMessage !== 'string') {
+    pushError(errors, '/currentMessage', 'must be a string');
+  }
+
+  const currentMessageDetails = (value as { currentMessageDetails?: unknown }).currentMessageDetails;
+  if (currentMessageDetails !== undefined) {
+    validateCurrentMessageDetailsInternal(
+      currentMessageDetails,
+      '/currentMessageDetails',
+      errors,
+    );
+    if (
+      typeof currentMessage === 'string' &&
+      isRecord(currentMessageDetails) &&
+      typeof (currentMessageDetails as { text?: unknown }).text === 'string' &&
+      (currentMessageDetails as { text: string }).text !== currentMessage
+    ) {
+      pushError(
+        errors,
+        '/currentMessageDetails/text',
+        'must equal /currentMessage when both are set',
+      );
+    }
+  }
+
+  const activeState = (value as { activeState?: unknown }).activeState;
+  if (activeState === undefined) {
+    pushError(errors, '/activeState', 'is required');
+  } else {
+    validateActiveStateInternal(activeState, '/activeState', errors);
+  }
+
+  const artifactState = (value as { artifactState?: unknown }).artifactState;
+  if (artifactState === undefined) {
+    pushError(errors, '/artifactState', 'is required');
+  } else {
+    validateArtifactStateInternal(artifactState, '/artifactState', errors);
+  }
+
+  const recentTurns = (value as { recentTurns?: unknown }).recentTurns;
+  if (!Array.isArray(recentTurns)) {
+    pushError(errors, '/recentTurns', 'must be an array');
+  } else {
+    recentTurns.forEach((turn, idx) =>
+      validateRecentTurnInternal(turn, `/recentTurns/${idx}`, errors),
+    );
+  }
+
+  if (typeof (value as { conversationSummary?: unknown }).conversationSummary !== 'string') {
+    pushError(errors, '/conversationSummary', 'must be a string');
+  }
+
+  const capabilities = (value as { availableCapabilitiesSummary?: unknown }).availableCapabilitiesSummary;
+  if (!Array.isArray(capabilities)) {
+    pushError(errors, '/availableCapabilitiesSummary', 'must be an array');
+  } else {
+    capabilities.forEach((cap, idx) => {
+      if (typeof cap !== 'string') {
+        pushError(errors, `/availableCapabilitiesSummary/${idx}`, 'must be a string');
+      }
+    });
+  }
+
+  const userPreferences = (value as { userPreferences?: unknown }).userPreferences;
+  if (userPreferences !== undefined && !isRecord(userPreferences)) {
+    pushError(errors, '/userPreferences', 'must be an object when present');
+  }
+
+  const runtimeFlags = (value as { runtimeFlags?: unknown }).runtimeFlags;
+  if (runtimeFlags !== undefined) {
+    validateRuntimeFlagsInternal(runtimeFlags, '/runtimeFlags', errors);
+  }
+
+  return { valid: errors.length === 0, errors };
 }

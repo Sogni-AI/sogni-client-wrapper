@@ -30,6 +30,9 @@ export {
   isSpendGate,
   normalizeSpendDecision,
   validateSpendGateRequest,
+  validateSpendGate,
+  type SpendGateValidationError,
+  type SpendGateValidationResult,
 } from './spendGate.js';
 
 export {
@@ -47,4 +50,6 @@ export {
   isWorkflowAuthorization,
   validateWorkflowCostPreview,
   validateWorkflowAuthorization,
+  type WorkflowAuthorizationValidationError,
+  type WorkflowAuthorizationValidationResult,
 } from './workflowAuthorization.js';

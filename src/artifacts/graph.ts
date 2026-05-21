@@ -495,10 +495,260 @@ export function deserializeGraph(data: ArtifactGraphSerializable): ArtifactGraph
 }
 
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema.
+ * One structured validation error. `path` is a JSON-Pointer-ish path
+ * rooted at the validated value (`'/'` for the root, `/parents/2/relation`
+ * for a nested field). `message` is a short human-readable reason.
+ *
+ * The shape is intentionally tiny so consumers can adopt it without
+ * pulling Ajv at the call site; the runtime cost is one object per
+ * failing field, never per scanned field on a happy path.
  */
-export function validateArtifactNode(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export interface ArtifactValidationError {
+  path: string;
+  message: string;
+}
+
+/** Result returned by every `validate*` helper in this module. */
+export interface ArtifactValidationResult {
+  valid: boolean;
+  errors: ArtifactValidationError[];
+}
+
+function pushError(errors: ArtifactValidationError[], path: string, message: string): void {
+  errors.push({ path, message });
+}
+
+function isPlainArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function validateArtifactSourceInternal(
+  value: unknown,
+  basePath: string,
+  errors: ArtifactValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const type = (value as { type?: unknown }).type;
+  if (type !== 'upload' && type !== 'tool_result' && type !== 'workflow_stage') {
+    pushError(errors, `${basePath}/type`, "must be 'upload' | 'tool_result' | 'workflow_stage'");
+    return;
+  }
+  switch (type) {
+    case 'upload': {
+      if (typeof (value as { uploadId?: unknown }).uploadId !== 'string') {
+        pushError(errors, `${basePath}/uploadId`, 'must be a string');
+      }
+      return;
+    }
+    case 'tool_result': {
+      if (typeof (value as { toolCallId?: unknown }).toolCallId !== 'string') {
+        pushError(errors, `${basePath}/toolCallId`, 'must be a string');
+      }
+      const runId = (value as { runId?: unknown }).runId;
+      if (runId !== undefined && typeof runId !== 'string') {
+        pushError(errors, `${basePath}/runId`, 'must be a string when present');
+      }
+      return;
+    }
+    case 'workflow_stage': {
+      if (typeof (value as { workflowRunId?: unknown }).workflowRunId !== 'string') {
+        pushError(errors, `${basePath}/workflowRunId`, 'must be a string');
+      }
+      if (typeof (value as { stageId?: unknown }).stageId !== 'string') {
+        pushError(errors, `${basePath}/stageId`, 'must be a string');
+      }
+      const itemId = (value as { itemId?: unknown }).itemId;
+      if (itemId !== undefined && typeof itemId !== 'string') {
+        pushError(errors, `${basePath}/itemId`, 'must be a string when present');
+      }
+      return;
+    }
+  }
+}
+
+function validateArtifactEdgeInternal(
+  value: unknown,
+  basePath: string,
+  errors: ArtifactValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { parentId?: unknown }).parentId !== 'string') {
+    pushError(errors, `${basePath}/parentId`, 'must be a string');
+  }
+  if (!isArtifactRelation((value as { relation?: unknown }).relation)) {
+    pushError(errors, `${basePath}/relation`, 'must be a valid ArtifactRelation');
+  }
+}
+
+function validateArtifactVersionInternal(
+  value: unknown,
+  basePath: string,
+  errors: ArtifactValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  if (typeof (value as { versionId?: unknown }).versionId !== 'string') {
+    pushError(errors, `${basePath}/versionId`, 'must be a string');
+  }
+  if (typeof (value as { createdAt?: unknown }).createdAt !== 'string') {
+    pushError(errors, `${basePath}/createdAt`, 'must be a string');
+  }
+  if (!isArtifactVersionReason((value as { reason?: unknown }).reason)) {
+    pushError(errors, `${basePath}/reason`, 'must be a valid ArtifactVersionReason');
+  }
+  const uri = (value as { uri?: unknown }).uri;
+  if (uri !== undefined && typeof uri !== 'string') {
+    pushError(errors, `${basePath}/uri`, 'must be a string when present');
+  }
+  const jobId = (value as { jobId?: unknown }).jobId;
+  if (jobId !== undefined && typeof jobId !== 'string') {
+    pushError(errors, `${basePath}/jobId`, 'must be a string when present');
+  }
+}
+
+/**
+ * Validate that `value` is an {@link ArtifactNode}. Walks the required
+ * field set, reports each missing or wrong-typed field as
+ * `{ path, message }`, and recurses into `source` / `parents[]` /
+ * `versions[]`. `versions` has a `minItems: 1` constraint per the
+ * canonical schema — an empty array is reported as an error.
+ *
+ * The `isArtifactNode` predicate remains the cheap boolean check;
+ * `validateArtifactNode` is the slower, path-prefixed version that
+ * exists so dispatchers can surface specific reasons to the user.
+ */
+export function validateArtifactNode(value: unknown): ArtifactValidationResult {
+  const errors: ArtifactValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+
+  if (!isArtifactId((value as { artifactId?: unknown }).artifactId)) {
+    pushError(
+      errors,
+      '/artifactId',
+      'must match ULID or UUID pattern (art_<26 Crockford base32> or art_<32 hex> or art_<UUID with hyphens>)',
+    );
+  }
+  if (!isArtifactKind((value as { kind?: unknown }).kind)) {
+    pushError(errors, '/kind', 'must be a valid ArtifactKind');
+  }
+
+  const uri = (value as { uri?: unknown }).uri;
+  if (uri !== undefined && typeof uri !== 'string') {
+    pushError(errors, '/uri', 'must be a string when present');
+  }
+  const mimeType = (value as { mimeType?: unknown }).mimeType;
+  if (mimeType !== undefined && typeof mimeType !== 'string') {
+    pushError(errors, '/mimeType', 'must be a string when present');
+  }
+  const userLabel = (value as { userLabel?: unknown }).userLabel;
+  if (userLabel !== undefined && typeof userLabel !== 'string') {
+    pushError(errors, '/userLabel', 'must be a string when present');
+  }
+
+  const modelRefs = (value as { modelRefs?: unknown }).modelRefs;
+  if (!isRecord(modelRefs)) {
+    pushError(errors, '/modelRefs', 'must be an object');
+  } else {
+    for (const [k, v] of Object.entries(modelRefs)) {
+      if (typeof v !== 'string') {
+        pushError(errors, `/modelRefs/${k}`, 'must be a string');
+      }
+    }
+  }
+
+  const source = (value as { source?: unknown }).source;
+  if (source === undefined) {
+    pushError(errors, '/source', 'is required');
+  } else {
+    validateArtifactSourceInternal(source, '/source', errors);
+  }
+
+  const parents = (value as { parents?: unknown }).parents;
+  if (!isPlainArray(parents)) {
+    pushError(errors, '/parents', 'must be an array');
+  } else {
+    parents.forEach((edge, idx) => validateArtifactEdgeInternal(edge, `/parents/${idx}`, errors));
+  }
+
+  const versions = (value as { versions?: unknown }).versions;
+  if (!isPlainArray(versions)) {
+    pushError(errors, '/versions', 'must be an array');
+  } else {
+    if (versions.length < 1) {
+      pushError(errors, '/versions', 'must have at least 1 item');
+    }
+    versions.forEach((ver, idx) =>
+      validateArtifactVersionInternal(ver, `/versions/${idx}`, errors),
+    );
+  }
+
+  const metadata = (value as { metadata?: unknown }).metadata;
+  if (!isRecord(metadata)) {
+    pushError(errors, '/metadata', 'must be an object');
+  }
+
+  if (typeof (value as { createdAt?: unknown }).createdAt !== 'string') {
+    pushError(errors, '/createdAt', 'must be a string');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validate a serialized artifact graph (the JSON-transport shape). Walks
+ * `nodes[]` and reports per-node errors with a `/nodes/<idx>` prefix.
+ * Optional projection caches and `selectedId` are type-checked but not
+ * cross-validated against `nodes` — that's a separate consistency check.
+ */
+export function validateArtifactGraph(value: unknown): ArtifactValidationResult {
+  const errors: ArtifactValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+
+  const nodes = (value as { nodes?: unknown }).nodes;
+  if (!isPlainArray(nodes)) {
+    pushError(errors, '/nodes', 'must be an array');
+  } else {
+    nodes.forEach((node, idx) => {
+      const nested = validateArtifactNode(node);
+      if (!nested.valid) {
+        for (const e of nested.errors) {
+          pushError(errors, `/nodes/${idx}${e.path === '/' ? '' : e.path}`, e.message);
+        }
+      }
+    });
+  }
+
+  const selectedId = (value as { selectedId?: unknown }).selectedId;
+  if (selectedId !== undefined && typeof selectedId !== 'string') {
+    pushError(errors, '/selectedId', 'must be a string when present');
+  }
+
+  for (const key of ['imageNodeIds', 'videoNodeIds', 'audioNodeIds'] as const) {
+    const arr = (value as Record<string, unknown>)[key];
+    if (arr !== undefined) {
+      if (!isPlainArray(arr)) {
+        pushError(errors, `/${key}`, 'must be an array when present');
+      } else {
+        arr.forEach((id, idx) => {
+          if (typeof id !== 'string') {
+            pushError(errors, `/${key}/${idx}`, 'must be a string');
+          }
+        });
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }

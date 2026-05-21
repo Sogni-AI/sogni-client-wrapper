@@ -174,12 +174,146 @@ export function isTurnPlan(value: unknown): value is TurnPlan {
   return true;
 }
 
+/** One structured validation error (see intentInput for shape rationale). */
+export interface TurnPlanValidationError {
+  path: string;
+  message: string;
+}
+
+export interface TurnPlanValidationResult {
+  valid: boolean;
+  errors: TurnPlanValidationError[];
+}
+
+function pushError(
+  errors: TurnPlanValidationError[],
+  path: string,
+  message: string,
+): void {
+  errors.push({ path, message });
+}
+
+function validateArtifactRefInternal(
+  value: unknown,
+  basePath: string,
+  errors: TurnPlanValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const artifactId = (value as { artifactId?: unknown }).artifactId;
+  if (typeof artifactId !== 'string' || artifactId.length === 0) {
+    pushError(errors, `${basePath}/artifactId`, 'must be a non-empty string');
+  }
+  const artifactType = (value as { artifactType?: unknown }).artifactType;
+  if (artifactType !== undefined && !isArtifactType(artifactType)) {
+    pushError(errors, `${basePath}/artifactType`, 'must be a valid ArtifactType when present');
+  }
+}
+
+function validateProposedWorkflowInternal(
+  value: unknown,
+  basePath: string,
+  errors: TurnPlanValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const templateId = (value as { templateId?: unknown }).templateId;
+  if (typeof templateId !== 'string' || templateId.length === 0) {
+    pushError(errors, `${basePath}/templateId`, 'must be a non-empty string');
+  }
+  const inputs = (value as { inputs?: unknown }).inputs;
+  if (!isRecord(inputs)) {
+    pushError(errors, `${basePath}/inputs`, 'must be an object');
+  }
+  const reason = (value as { reason?: unknown }).reason;
+  if (reason !== undefined && typeof reason !== 'string') {
+    pushError(errors, `${basePath}/reason`, 'must be a string when present');
+  }
+}
+
+function validateSpendEstimateInternal(
+  value: unknown,
+  basePath: string,
+  errors: TurnPlanValidationError[],
+): void {
+  if (!isRecord(value)) {
+    pushError(errors, basePath, 'must be an object');
+    return;
+  }
+  const tokenCost = (value as { tokenCost?: unknown }).tokenCost;
+  if (tokenCost !== null && (typeof tokenCost !== 'number' || !Number.isFinite(tokenCost))) {
+    pushError(errors, `${basePath}/tokenCost`, 'must be a finite number or null');
+  }
+  const usdCost = (value as { usdCost?: unknown }).usdCost;
+  if (usdCost !== null && (typeof usdCost !== 'number' || !Number.isFinite(usdCost))) {
+    pushError(errors, `${basePath}/usdCost`, 'must be a finite number or null');
+  }
+  if (typeof (value as { estimateAvailable?: unknown }).estimateAvailable !== 'boolean') {
+    pushError(errors, `${basePath}/estimateAvailable`, 'must be a boolean');
+  }
+  const preferredModel = (value as { preferredModel?: unknown }).preferredModel;
+  if (preferredModel !== undefined && typeof preferredModel !== 'string') {
+    pushError(errors, `${basePath}/preferredModel`, 'must be a string when present');
+  }
+}
+
 /**
- * Stub validator. Returns `{ valid: true, errors: [] }` while the public
- * API surface stabilizes; real Ajv/zod wiring lands when
- * `@sogni-ai/sogni-protocol` codegens the schema. Signature is stable so
- * downstream consumers can adopt it now without a churn cycle later.
+ * Walk a {@link TurnPlan} and report each missing or wrong-typed field
+ * as `{ path, message }`. `confidence` is range-checked to `[0, 1]`
+ * because the field carries a contractual range and a value outside it
+ * is always a bug.
  */
-export function validateTurnPlan(_value: unknown): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+export function validateTurnPlan(value: unknown): TurnPlanValidationResult {
+  const errors: TurnPlanValidationError[] = [];
+  if (!isRecord(value)) {
+    return { valid: false, errors: [{ path: '/', message: 'must be an object' }] };
+  }
+  const proposedTools = (value as { proposedTools?: unknown }).proposedTools;
+  if (!Array.isArray(proposedTools)) {
+    pushError(errors, '/proposedTools', 'must be an array');
+  } else {
+    proposedTools.forEach((t, idx) => {
+      if (typeof t !== 'string') {
+        pushError(errors, `/proposedTools/${idx}`, 'must be a string');
+      }
+    });
+  }
+  const proposedWorkflow = (value as { proposedWorkflow?: unknown }).proposedWorkflow;
+  if (proposedWorkflow !== undefined) {
+    validateProposedWorkflowInternal(proposedWorkflow, '/proposedWorkflow', errors);
+  }
+  const refs = (value as { resolvedReferences?: unknown }).resolvedReferences;
+  if (!Array.isArray(refs)) {
+    pushError(errors, '/resolvedReferences', 'must be an array');
+  } else {
+    refs.forEach((ref, idx) =>
+      validateArtifactRefInternal(ref, `/resolvedReferences/${idx}`, errors),
+    );
+  }
+  const needsClarification = (value as { needsClarification?: unknown }).needsClarification;
+  if (needsClarification !== undefined) {
+    if (!isRecord(needsClarification)) {
+      pushError(errors, '/needsClarification', 'must be an object when present');
+    } else {
+      const q = (needsClarification as { question?: unknown }).question;
+      if (typeof q !== 'string' || q.length === 0) {
+        pushError(errors, '/needsClarification/question', 'must be a non-empty string');
+      }
+    }
+  }
+  const spendEstimate = (value as { spendEstimate?: unknown }).spendEstimate;
+  if (spendEstimate !== undefined) {
+    validateSpendEstimateInternal(spendEstimate, '/spendEstimate', errors);
+  }
+  const conf = (value as { confidence?: unknown }).confidence;
+  if (typeof conf !== 'number' || !Number.isFinite(conf)) {
+    pushError(errors, '/confidence', 'must be a finite number');
+  } else if (conf < 0 || conf > 1) {
+    pushError(errors, '/confidence', 'must be in [0, 1]');
+  }
+  return { valid: errors.length === 0, errors };
 }

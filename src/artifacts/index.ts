@@ -29,6 +29,9 @@ export {
   serializeGraph,
   deserializeGraph,
   validateArtifactNode,
+  validateArtifactGraph,
+  type ArtifactValidationError,
+  type ArtifactValidationResult,
 } from './graph.js';
 
 export {

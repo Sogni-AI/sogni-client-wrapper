@@ -2,7 +2,6 @@
  * Utility helper functions
  */
 
-import { randomUUID } from 'crypto';
 import type {
   ProjectConfig,
   SogniClientConfig,
@@ -13,10 +12,16 @@ import type {
 import { SogniValidationError } from './errors.js';
 
 /**
- * Generate a unique app ID
+ * Generate a unique app ID. Uses the universal `globalThis.crypto`
+ * (available in modern browsers and Node >= 18) so this package works
+ * in both runtimes without bundlers externalizing a node:crypto import.
  */
 export function generateAppId(): string {
-  return randomUUID();
+  const cryptoLike = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (cryptoLike?.randomUUID) return cryptoLike.randomUUID();
+  throw new SogniValidationError(
+    'generateAppId requires globalThis.crypto.randomUUID (Node >= 18 / modern browsers).',
+  );
 }
 
 /**

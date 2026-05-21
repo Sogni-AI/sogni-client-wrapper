@@ -41,6 +41,15 @@
       ],
       "skill-runtime-source": [
         "./dist/skill-runtime-source/index.d.ts"
+      ],
+      "artifacts": [
+        "./dist/artifacts/index.d.ts"
+      ],
+      "agent": [
+        "./dist/agent/index.d.ts"
+      ],
+      "billing": [
+        "./dist/billing/index.d.ts"
       ]
     }
   },
@@ -118,6 +127,24 @@
       "default": "./dist/openai-tools/index.js"
     },
     "./openai-tools/*.json": "./dist/openai-tools/*.json",
+    "./artifacts": {
+      "types": "./dist/artifacts/index.d.ts",
+      "import": "./dist-esm/artifacts/index.js",
+      "require": "./dist/artifacts/index.js",
+      "default": "./dist/artifacts/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "import": "./dist-esm/agent/index.js",
+      "require": "./dist/agent/index.js",
+      "default": "./dist/agent/index.js"
+    },
+    "./billing": {
+      "types": "./dist/billing/index.d.ts",
+      "import": "./dist-esm/billing/index.js",
+      "require": "./dist/billing/index.js",
+      "default": "./dist/billing/index.js"
+    },
     "./skill-runtime-source": {
       "types": "./dist/skill-runtime-source/index.d.ts",
       "import": "./dist-esm/skill-runtime-source/index.js",
@@ -172,8 +199,8 @@
   },
   "homepage": "https://github.com/Sogni-AI/sogni-intelligence-client#readme",
   "dependencies": {
-    "@sogni-ai/sogni-client": "^5.0.0-alpha.11",
-    "@sogni-ai/sogni-protocol": "^1.0.0-alpha.4",
+    "@sogni-ai/sogni-client": "file:../sogni-client-v2",
+    "@sogni-ai/sogni-protocol": "file:../sogni-protocol-v2",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

@@ -138,35 +138,6 @@ export function getToolPermissionDecision(toolName: string): ToolPermissionDecis
 }
 
 /**
- * Legacy per-tool regex for "the user explicitly asked for this destructive
- * action". Used only when `INTEL_PERMISSION_GATE_LEGACY_REGEX=true` is set
- * AND the planner did not supply a `plannerProvenance` for the call.
- *
- * In v2 the canonical authority for this gate is the L2 planner: when it
- * sees an explicit user statement in the IntentInput packet it emits
- * `provenance: 'user_explicit'`. The regex below remains as a one-release
- * safety net for hosts that have not yet wired the planner through; it
- * will be removed once those migrations land.
- */
-const LEGACY_EXPLICIT_INTENT_PATTERNS: Record<string, RegExp> = {
-  manage_memory:
-    /\b(?:save|remember|store|note|memorize|forget|delete|remove|wipe|clear)\b[\s\S]{0,80}\b(?:memory|memories|note|notes|preference|preferences|fact|facts|profile|about\s+me)\b/i,
-};
-
-/**
- * Resolve the legacy permission-gate regex flag. When `true`, the gate
- * falls back to LEGACY_EXPLICIT_INTENT_PATTERNS for destructive tools
- * whose call does not carry a `plannerProvenance`. Default `false` in v2.
- */
-function isLegacyPermissionGateRegexEnabled(): boolean {
-  if (typeof process === 'undefined' || !process || !process.env) return false;
-  const value = process.env.INTEL_PERMISSION_GATE_LEGACY_REGEX;
-  if (typeof value !== 'string') return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
-}
-
-/**
  * Evaluate whether one tool call can proceed under shared permission
  * contracts.
  *
@@ -179,15 +150,14 @@ function isLegacyPermissionGateRegexEnabled(): boolean {
  * v2 contract for destructive tools: the L2 planner is the authority.
  * When the planner sees an explicit user statement in its IntentInput
  * packet it emits `provenance: 'user_explicit'`. The gate accepts that
- * provenance and proceeds. When the planner is not yet wired into a
- * given call site (`plannerProvenance` is missing), the gate requires a
- * clarifying question instead of falling back to English-keyword regex.
+ * provenance and proceeds. When the planner has not supplied a
+ * provenance the gate refuses to proceed and the host must ask a
+ * clarifying question.
  *
- * For one release, hosts that need more time to wire the planner in can
- * set `INTEL_PERMISSION_GATE_LEGACY_REGEX=true` to restore the v1 regex
- * fallback. The flag — and the underlying
- * `LEGACY_EXPLICIT_INTENT_PATTERNS` table — will be removed in a future
- * release.
+ * The pre-v2 `INTEL_PERMISSION_GATE_LEGACY_REGEX` env flag and the
+ * underlying `LEGACY_EXPLICIT_INTENT_PATTERNS` table were removed in the
+ * 2026-05-21 architecture cleanup. There is no English-keyword regex
+ * fallback any more.
  */
 export function evaluatePermissionGate(input: PermissionGateInput): PermissionGateOutcome {
   const perm = getToolPermission(input.toolName);
@@ -204,15 +174,6 @@ export function evaluatePermissionGate(input: PermissionGateInput): PermissionGa
   // v2 path: planner provenance is the authority for destructive tools.
   if (input.plannerProvenance === 'user_explicit') {
     return { allowed: true, decision: 'require_explicit_intent' };
-  }
-
-  // Legacy fallback: only when explicitly opted in via env flag AND the
-  // planner did not supply a provenance. Will be removed next release.
-  if (input.plannerProvenance === undefined && isLegacyPermissionGateRegexEnabled()) {
-    const legacyPattern = LEGACY_EXPLICIT_INTENT_PATTERNS[input.toolName];
-    if (legacyPattern && legacyPattern.test(input.latestUserText)) {
-      return { allowed: true, decision: 'require_explicit_intent' };
-    }
   }
 
   return {

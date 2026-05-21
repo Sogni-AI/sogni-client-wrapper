@@ -84,9 +84,14 @@ export interface IntentInputArtifactState {
   lastEditedArtifactId?: string;
 }
 
-/** One prior user/assistant turn in chronological order. */
+/**
+ * One prior turn in chronological order. `'tool'` and `'system'` are
+ * accepted so chat-v2 / api-v2 producers can include tool-result and
+ * system-injection turns in the planner context without losing them to
+ * lossy role-collapse at the schema boundary.
+ */
 export interface IntentInputRecentTurn {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool' | 'system';
   content: string;
   sequence: number;
 }
@@ -266,7 +271,12 @@ const ARTIFACT_TYPES: ReadonlySet<ArtifactType> = new Set([
   'collection',
 ]);
 
-const TURN_ROLES: ReadonlySet<IntentInputRecentTurn['role']> = new Set(['user', 'assistant']);
+const TURN_ROLES: ReadonlySet<IntentInputRecentTurn['role']> = new Set([
+  'user',
+  'assistant',
+  'tool',
+  'system',
+]);
 
 const INTENT_INPUT_SURFACES: ReadonlySet<IntentInputSurface> = new Set<IntentInputSurface>([
   'browser',

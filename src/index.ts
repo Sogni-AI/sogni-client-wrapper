@@ -159,5 +159,12 @@ export {
 export { textExplicitlyRequestsMultipleImageOutputs } from './tools/shared/multiImageIntent.js';
 export { maybeAlignNumberOfVariationsToDynamicBranchCount } from './tools/shared/numberOfVariationsAlignment.js';
 
+// v2 platform contracts (Phase 0b additive). See
+// docs/superpowers/plans/2026-05-20-sogni-chat-v2-execution-architecture-plan-final.md
+export * from './agent/index.js';
+export * from './artifacts/index.js';
+export * from './events/index.js';
+export * from './billing/index.js';
+
 // Default export
 export { SogniClientWrapper as default } from './client/SogniClientWrapper.js';

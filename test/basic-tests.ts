@@ -48,6 +48,7 @@ import {
 } from '../src/tools/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
+import { runSeedanceReferencesTests } from './seedance-references-tests';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -1976,6 +1977,11 @@ async function runTests() {
   const sharedResults = runToolsSharedTests();
   testsPassed += sharedResults.passed;
   testsFailed += sharedResults.failed;
+
+  // Seedance reference-limit tests
+  const seedanceRefResults = runSeedanceReferencesTests();
+  testsPassed += seedanceRefResults.passed;
+  testsFailed += seedanceRefResults.failed;
 
   // Summary
   console.log('\n' + '='.repeat(50));

@@ -19,17 +19,30 @@ export type SignalSource =
   | 'regex';
 
 /**
+ * Tracks which legacy SignalSource values have already been warned about
+ * in this process. Audit fix (2026-05-20): the prior implementation
+ * called `console.warn` on every invocation of `normalizeSignalSource`,
+ * which spammed logs hot-path producers that emit thousands of signals
+ * per turn. Memoize per process so each unique legacy value warns once.
+ */
+const warnedSignalSources = new Set<string>();
+
+/**
  * Normalize a possibly-legacy signal source string into the canonical
  * v2 form. The literal `'regex'` is accepted for one release as a
  * deprecated alias for `'fact_extractor'` and emits a one-line console
- * warning. All other values pass through unchanged.
+ * warning the **first** time the process sees it (memoized in
+ * `warnedSignalSources`). All other values pass through unchanged.
  */
 export function normalizeSignalSource(value: string): SignalSource {
   if (value === 'regex') {
-    if (typeof console !== 'undefined' && console.warn) {
-      console.warn(
-        '[Contracts] SignalSource "regex" is deprecated; use "fact_extractor" instead. The old name will be removed in a future release.',
-      );
+    if (!warnedSignalSources.has(value)) {
+      warnedSignalSources.add(value);
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(
+          '[Contracts] SignalSource "regex" is deprecated; use "fact_extractor" instead. The old name will be removed in a future release.',
+        );
+      }
     }
     return 'fact_extractor';
   }

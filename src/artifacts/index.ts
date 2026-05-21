@@ -13,6 +13,7 @@ export {
   type ArtifactNode,
   type ArtifactGraph,
   type ArtifactGraphSerializable,
+  isArtifactId,
   isArtifactKind,
   isArtifactRelation,
   isArtifactVersionReason,

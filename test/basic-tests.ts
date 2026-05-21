@@ -2266,6 +2266,75 @@ async function runTests() {
     }
   })();
 
+  // -------------------------------------------------------------------------
+  // Commit 3: loose artifact ID pattern + memoized signal-source warn
+  // -------------------------------------------------------------------------
+
+  await test('isArtifactId accepts ULID, UUID-no-hyphens, and UUID-with-hyphens forms', async () => {
+    const { isArtifactId } = await import('../src/artifacts/index.js');
+    // ULID (preferred)
+    if (!isArtifactId('art_01HZABCDEFGHJKMNPQRSTVWXYZ')) {
+      throw new Error('ULID form rejected by isArtifactId');
+    }
+    // UUID-no-hyphens (legacy)
+    if (!isArtifactId('art_abcdef0123456789abcdef0123456789')) {
+      throw new Error('UUID-no-hyphens form rejected by isArtifactId');
+    }
+    // UUID-with-hyphens (legacy, as produced by createArtifactNode)
+    if (!isArtifactId('art_abcdef01-2345-6789-abcd-ef0123456789')) {
+      throw new Error('UUID-with-hyphens form rejected by isArtifactId');
+    }
+  })();
+
+  await test('isArtifactId rejects malformed prefixes and bad lengths', async () => {
+    const { isArtifactId } = await import('../src/artifacts/index.js');
+    if (isArtifactId('artifact_xyz')) throw new Error('wrong prefix should be rejected');
+    if (isArtifactId('art_short')) throw new Error('short body should be rejected');
+    if (isArtifactId('art_!!!@@@###$$$%%%^^^&&&***()_+')) {
+      throw new Error('illegal chars should be rejected');
+    }
+    if (isArtifactId(42 as unknown)) throw new Error('non-string should be rejected');
+  })();
+
+  await test('createArtifactNode emits an id that satisfies isArtifactId (round-trip)', async () => {
+    const { createArtifactNode, isArtifactId, isArtifactNode } = await import(
+      '../src/artifacts/index.js'
+    );
+    const node = createArtifactNode({
+      kind: 'image',
+      source: { type: 'tool_result', toolCallId: 'call_round_trip' },
+      now: '2026-05-20T00:00:00.000Z',
+    });
+    if (!isArtifactId(node.artifactId)) {
+      throw new Error(`createArtifactNode emitted invalid id: ${node.artifactId}`);
+    }
+    if (!isArtifactNode(node)) {
+      throw new Error('createArtifactNode emitted a node that fails isArtifactNode');
+    }
+  })();
+
+  await test('normalizeSignalSource warns only once per process for the same legacy value', async () => {
+    const { normalizeSignalSource } = await import('../src/contracts/turnPolicy.js');
+    const originalWarn = console.warn;
+    const calls: string[] = [];
+    console.warn = (...args: unknown[]) => {
+      calls.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      for (let i = 0; i < 5; i += 1) {
+        const result = normalizeSignalSource('regex');
+        if (result !== 'fact_extractor') {
+          throw new Error(`Expected 'fact_extractor', got ${String(result)}`);
+        }
+      }
+    } finally {
+      console.warn = originalWarn;
+    }
+    if (calls.length !== 1) {
+      throw new Error(`Expected exactly 1 warn call across 5 invocations, got ${calls.length}`);
+    }
+  })();
+
   // Tools/shared helper unit tests
   const sharedResults = runToolsSharedTests();
   testsPassed += sharedResults.passed;

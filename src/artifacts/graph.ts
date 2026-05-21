@@ -58,7 +58,22 @@ export interface ArtifactVersion {
  * per-model token format.
  */
 export interface ArtifactNode {
-  /** Format: `art_<uuid>`. Stable for the life of the artifact. */
+  /**
+   * Stable id for the life of the artifact. Two formats are accepted:
+   *
+   * 1. **ULID** (preferred, matches the canonical schema in
+   *    `sogni-protocol-v2/schemas/artifacts/artifact-node.schema.json`):
+   *    `art_<26-char Crockford base32>`, e.g. `art_01HZ...`.
+   * 2. **UUID (no hyphens)** (legacy): `art_<32-char hex>`. All current
+   *    consumer ID generators emit this form via
+   *    `globalThis.crypto.randomUUID()` with hyphens stripped.
+   *
+   * The audit (2026-05-20) flagged that consumer IDs would fail the
+   * ULID-only schema pattern. The validator here accepts both so live
+   * IDs keep validating while consumers migrate to ULID. New code
+   * SHOULD prefer ULID; the legacy pattern will tighten back to
+   * ULID-only after consumers cut over.
+   */
   artifactId: string;
   kind: ArtifactKind;
   uri?: string;
@@ -169,9 +184,49 @@ export function isArtifactVersion(value: unknown): value is ArtifactVersion {
   return true;
 }
 
+/**
+ * ULID artifact id (preferred). Matches the canonical schema pattern
+ * `^art_[A-Z0-9]{26}$` (Crockford base32 ULID body, 26 chars).
+ */
+const ULID_ARTIFACT_ID_PATTERN = /^art_[0-9A-Z]{26}$/;
+
+/**
+ * UUID-no-hyphens artifact id (legacy). Matches the form produced by
+ * `globalThis.crypto.randomUUID().replace(/-/g, '')` plus the `art_`
+ * prefix - 32 lowercase or uppercase hex chars.
+ *
+ * Loosened from ULID-only on 2026-05-20 so consumer IDs that haven't
+ * migrated yet still validate. New code should target ULID.
+ */
+const UUID_NO_HYPHENS_ARTIFACT_ID_PATTERN = /^art_[0-9a-fA-F]{32}$/;
+
+/**
+ * UUID-with-hyphens artifact id (also legacy). Produced by callers that
+ * never stripped the hyphens from `randomUUID()`. Accepted for the same
+ * reason as the no-hyphens variant - existing IDs in the wild keep
+ * validating while consumers migrate to ULID.
+ */
+const UUID_HYPHEN_ARTIFACT_ID_PATTERN =
+  /^art_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
+ * True when `value` is a string and matches one of the accepted
+ * artifact-id patterns (ULID, UUID-no-hyphens, or UUID-with-hyphens).
+ * Boundary code can call this directly when it doesn't have a full
+ * `ArtifactNode` yet.
+ */
+export function isArtifactId(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  return (
+    ULID_ARTIFACT_ID_PATTERN.test(value) ||
+    UUID_NO_HYPHENS_ARTIFACT_ID_PATTERN.test(value) ||
+    UUID_HYPHEN_ARTIFACT_ID_PATTERN.test(value)
+  );
+}
+
 export function isArtifactNode(value: unknown): value is ArtifactNode {
   if (!isRecord(value)) return false;
-  if (typeof value.artifactId !== 'string') return false;
+  if (!isArtifactId(value.artifactId)) return false;
   if (!isArtifactKind(value.kind)) return false;
   if (value.uri !== undefined && typeof value.uri !== 'string') return false;
   if (value.mimeType !== undefined && typeof value.mimeType !== 'string') return false;

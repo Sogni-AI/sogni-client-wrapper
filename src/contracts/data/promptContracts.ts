@@ -116,6 +116,9 @@ const ANIMATE_PHOTO_CONTRACT: PromptContract = {
     '(B) PER-CLIP CONTENT — when each clip has DIFFERENT dialogue, jokes, narration, or motion,',
     'pass BOTH sourceImageIndices AND prompts (array of N strings, one per clip) in the SAME',
     'single animate_photo call. The top-level prompt is still required — pass a brief batch summary.',
+    'For explicit last/end-frame-only batches, reuse the image through sourceImageIndices but set',
+    'frameRole="end" and omit endImageIndex/endImageIndices. This means each listed image is the',
+    'last frame for its corresponding clip and no first/start frame is supplied.',
     '',
     'CRITICAL: sourceImageIndices values MUST be read from the latest edit_image/generate_image',
     'tool result\'s startIndex field — if startIndex=3 and 4 images were generated, pass',
@@ -170,10 +173,10 @@ const ANIMATE_PHOTO_CONTRACT: PromptContract = {
     'those video indices before finalizing.',
   ].join('\n'),
   parameterDocs: {
-    sourceImageIndices: 'Batch source image indices. Read startIndex from prior generate_image/edit_image result. Negative = uploaded images (-1 = first upload).',
+    sourceImageIndices: 'Batch source image indices. Read startIndex from prior generate_image/edit_image result. Negative = uploaded images (-1 = first upload). May be paired with frameRole="end" only for explicit last/end-frame-only fan-out.',
     prompts: 'Per-clip prompt array. Length MUST equal sourceImageIndices.length when both are set.',
     duration: 'Per-clip duration in seconds. Target 15s when dialogue is involved and total length is given without per-clip spec.',
-    frameRole: 'Set to "both" for first+last frame transitions using sourceImageIndices + endImageIndices.',
+    frameRole: 'Set to "end" for explicit last/end-frame-only fan-out; set to "both" for first+last frame transitions using sourceImageIndices + endImageIndices.',
     endImageIndices: 'End frames for adjacent-chain transitions. N images → N-1 clips.',
   },
 };

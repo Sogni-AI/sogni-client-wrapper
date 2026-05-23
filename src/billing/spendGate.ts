@@ -115,6 +115,7 @@ export interface SpendGateCostBreakdownEntry {
 export interface SpendGatePendingToolCallRef {
   toolCallId: string;
   toolName: string;
+  estimateUnits?: number;
 }
 
 /**
@@ -276,6 +277,12 @@ export function isSpendGatePendingToolCallRef(
   if (!isRecord(value)) return false;
   if (typeof value.toolCallId !== 'string') return false;
   if (typeof value.toolName !== 'string') return false;
+  if (
+    value.estimateUnits !== undefined
+    && (typeof value.estimateUnits !== 'number' || !Number.isFinite(value.estimateUnits))
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -513,6 +520,13 @@ export function validateSpendGate(value: unknown): SpendGateValidationResult {
         }
         if (typeof (ref as { toolName?: unknown }).toolName !== 'string') {
           pushError(errors, `/pendingToolCalls/${idx}/toolName`, 'must be a string');
+        }
+        const estimateUnits = (ref as { estimateUnits?: unknown }).estimateUnits;
+        if (
+          estimateUnits !== undefined
+          && (typeof estimateUnits !== 'number' || !Number.isFinite(estimateUnits))
+        ) {
+          pushError(errors, `/pendingToolCalls/${idx}/estimateUnits`, 'must be a finite number when present');
         }
       });
     }

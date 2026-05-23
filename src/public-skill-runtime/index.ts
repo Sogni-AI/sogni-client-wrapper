@@ -13,6 +13,7 @@ import {
   REPAIR_RECIPES,
   PROMPT_CONTRACTS,
 } from '../contracts/data/index.js';
+import { normalizeSignalSource } from '../contracts/turnPolicy.js';
 
 type LtxWorkflow = 't2v' | 'i2v' | 'ia2v' | 'a2v' | 'v2v';
 
@@ -178,7 +179,15 @@ function isLtxWorkflow(workflow: string | null | undefined): workflow is LtxWork
 
 export const SKILL_RUNTIME_VERSION = '2026-05-13.1';
 
-export type PublicSkillSignalSource = 'planner' | 'runtime' | 'session_state' | 'classifier' | 'regex' | 'user' | 'system';
+export type PublicSkillSignalSource =
+  | 'planner'
+  | 'runtime'
+  | 'session_state'
+  | 'classifier'
+  | 'fact_extractor'
+  | 'regex'
+  | 'user'
+  | 'system';
 
 export interface PublicSkillSignal {
   kind: string;
@@ -351,9 +360,18 @@ export function createPublicSkillDefaultContractRuntime(input: Partial<PublicSki
   });
 }
 
+const PUBLIC_SKILL_ADVISORY_SIGNAL_SOURCES = new Set<string>(['regex', 'fact_extractor']);
+
+function normalizePublicSkillSignal(signal: PublicSkillSignal): PublicSkillSignal {
+  const source = normalizeSignalSource(String(signal.source));
+  if (source === signal.source) return signal;
+  return { ...signal, source };
+}
+
 function publicSkillSignalSourcesByKind(signals: readonly PublicSkillSignal[]): Map<string, Set<string>> {
   const sourcesByKind = new Map<string, Set<string>>();
   for (const signal of signals) {
+    if (PUBLIC_SKILL_ADVISORY_SIGNAL_SOURCES.has(signal.source)) continue;
     const sources = sourcesByKind.get(signal.kind) ?? new Set<string>();
     sources.add(signal.source);
     sourcesByKind.set(signal.kind, sources);
@@ -402,7 +420,7 @@ export function classifyPublicSkillTurn(input: {
   const signals = [
     ...(input.signals ?? []),
     ...publicSkillSessionSignals(input.sessionState),
-  ];
+  ].map(normalizePublicSkillSignal);
   const sourcesByKind = publicSkillSignalSourcesByKind(signals);
   const forbidden = new Set<string>();
   const required = new Set<string>();

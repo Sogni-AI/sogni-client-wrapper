@@ -40,6 +40,7 @@ import {
 import {
   auditCompiledStoryboardImagePrompt,
   buildStoryboardProject,
+  classifyPublicSkillTurn,
   compileVideoStoryboardImagePrompt,
 } from '../src/public-skill-runtime/index.js';
 import {
@@ -2149,7 +2150,7 @@ async function runTests() {
         tokenType: 'spark' as const,
         maxAcceptableUnits: 20,
       },
-      pendingToolCalls: [{ toolCallId: 'call_1', toolName: 'generate_video' }],
+      pendingToolCalls: [{ toolCallId: 'call_1', toolName: 'generate_video', estimateUnits: 12 }],
       createdAt: '2026-05-20T00:00:00.000Z',
       updatedAt: '2026-05-20T00:00:01.000Z',
     };
@@ -2232,8 +2233,8 @@ async function runTests() {
         tokenType: 'spark' as const,
       },
       pendingToolCalls: [
-        { toolCallId: 'call_a', toolName: 'generate_image' },
-        { toolCallId: 'call_b', toolName: 'generate_image' },
+        { toolCallId: 'call_a', toolName: 'generate_image', estimateUnits: 8 },
+        { toolCallId: 'call_b', toolName: 'generate_image', estimateUnits: 8 },
       ],
       createdAt: '2026-05-21T00:00:00.000Z',
       updatedAt: '2026-05-21T00:00:00.000Z',
@@ -2569,6 +2570,61 @@ async function runTests() {
     }
     if (calls.length !== 1) {
       throw new Error(`Expected exactly 1 warn call across 5 invocations, got ${calls.length}`);
+    }
+  })();
+
+  await test('public skill turn policies ignore regex-sourced signals for tool decisions', () => {
+    const policy = {
+      policyId: 'REGEX_SHOULD_NOT_DECIDE',
+      trigger: { allOf: ['requests_text_only_response'] },
+      effect: {
+        forbid: ['generate_image'],
+        require: ['finalize_response'],
+      },
+      rationale: 'Only authoritative sources may gate public skills.',
+    };
+    const result = classifyPublicSkillTurn({
+      availableTools: ['generate_image', 'finalize_response'],
+      policies: [policy],
+      signals: [{ kind: 'requests_text_only_response', source: 'regex' }],
+    });
+    if (result.appliedPolicies.includes(policy.policyId)) {
+      throw new Error('Regex-sourced signal applied a public skill policy');
+    }
+    if (!result.visibleTools.includes('generate_image')) {
+      throw new Error('Regex-sourced signal forbade a public skill tool');
+    }
+    if (result.requiredTools.includes('finalize_response')) {
+      throw new Error('Regex-sourced signal required a public skill tool');
+    }
+    if (result.signals[0]?.source !== 'fact_extractor') {
+      throw new Error(`Expected regex source to normalize to fact_extractor, got ${String(result.signals[0]?.source)}`);
+    }
+  })();
+
+  await test('public skill turn policies still honor planner-sourced signals', () => {
+    const policy = {
+      policyId: 'PLANNER_CAN_DECIDE',
+      trigger: { allOf: ['requests_text_only_response'] },
+      effect: {
+        forbid: ['generate_image'],
+        require: ['finalize_response'],
+      },
+      rationale: 'Planner signals may gate public skills.',
+    };
+    const result = classifyPublicSkillTurn({
+      availableTools: ['generate_image', 'finalize_response'],
+      policies: [policy],
+      signals: [{ kind: 'requests_text_only_response', source: 'planner' }],
+    });
+    if (!result.appliedPolicies.includes(policy.policyId)) {
+      throw new Error('Planner-sourced signal did not apply a public skill policy');
+    }
+    if (result.visibleTools.includes('generate_image')) {
+      throw new Error('Planner-sourced signal did not forbid the expected public skill tool');
+    }
+    if (!result.requiredTools.includes('finalize_response')) {
+      throw new Error('Planner-sourced signal did not require the expected public skill tool');
     }
   })();
 

@@ -44,8 +44,10 @@ import {
 } from '../src/public-skill-runtime/index.js';
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
+  animatePhotoDefinition,
   seedanceTerminalGenerationFailurePayloadFromError,
 } from '../src/tools/index.js';
+import { PROMPT_CONTRACTS } from '../src/contracts/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
@@ -1480,6 +1482,21 @@ async function runTests() {
     const all = SogniTools.all;
     if (!Array.isArray(all) || all.length !== 24) {
       throw new Error(`SogniTools.all expected 24 tools, got ${all.length}`);
+    }
+
+    const animateParams = animatePhotoDefinition.function.parameters.properties;
+    const sourceImageIndicesDoc = String(animateParams.sourceImageIndices.description ?? '');
+    const frameRoleDoc = String(animateParams.frameRole.description ?? '');
+    if (!sourceImageIndicesDoc.includes('Use frameRole="end" with sourceImageIndices')) {
+      throw new Error('animate_photo sourceImageIndices doc must allow explicit end-frame fan-out');
+    }
+    if (!frameRoleDoc.includes('use frameRole="end"')) {
+      throw new Error('animate_photo frameRole doc must describe end-frame fan-out');
+    }
+
+    const animateContract = PROMPT_CONTRACTS.find((contract) => contract.toolName === 'animate_photo');
+    if (!animateContract?.baseDescription.includes('frameRole="end"')) {
+      throw new Error('animate_photo prompt contract must describe end-frame fan-out');
     }
   })();
 

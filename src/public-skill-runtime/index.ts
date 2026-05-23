@@ -982,10 +982,10 @@ export const IMAGE_EDITING_SKILL: SkillManifest = {
   id: 'image_editing',
   name: 'Image editing',
   description:
-    'Edit, restore, restyle, refine, or change the camera angle of an existing image. Includes persona-conditioned edits — persona images must always be produced with edit_image and reference photos, never via text-to-image.',
+    'Edit, restore, restyle, refine, or change the camera angle of an existing image. Includes persona-conditioned edits — persona images should use edit_image and reference photos rather than text-to-image.',
   toolNames: ['edit_image', 'restore_photo', 'apply_style', 'change_angle', 'refine_result'],
   constraints: [
-    'Persona images must always be produced with edit_image and a reference photo — never invoke generate_image for persona output.',
+    'For persona image output, use edit_image with a reference photo rather than generate_image.',
     'refine_result acts on a prior generation in the session; do not call it before any image has been produced or uploaded.',
   ],
 };
@@ -997,7 +997,7 @@ export const VIDEO_GENERATION_SKILL: SkillManifest = {
     'Text-to-video synthesis (LTX-2). Use when the user wants a new video clip generated from a prompt with no source image, audio, or clip.',
   toolNames: ['generate_video'],
   constraints: [
-    'Persona-driven video requests must always go through image_editing first to produce a conditioned image; never go straight to text-to-video for personas.',
+    'For My Personas video requests, default to image_editing first to produce a conditioned scene image before animation. Use direct video only when the user explicitly asks to animate an existing persona image/reference or no source image is available for a voice-only request.',
   ],
 };
 
@@ -1019,7 +1019,7 @@ export const VIDEO_EDITING_SKILL: SkillManifest = {
     'add_subtitles',
   ],
   constraints: [
-    'Per-clip retry and the batch progress contract are sacred — never collapse a multi-clip render down to a single waterfall call.',
+    'Preserve per-clip retry and batch progress semantics. Use one Dynamic Prompt project for prompt-only fan-out, and avoid serial waterfall calls for independent clips.',
     'animate_photo errors with all_failed must surface to the user; do not auto-retry from inside the chat loop.',
   ],
 };
@@ -1047,7 +1047,7 @@ export const PERSONA_MANAGEMENT_SKILL: SkillManifest = {
     "Resolve named personas to their reference photos and read/write the user's long-term creative memory (preferences, named subjects, ongoing projects).",
   toolNames: ['resolve_personas', 'manage_memory'],
   constraints: [
-    'A persona-driven request must call resolve_personas before any image_editing or video_editing tool — never assume a name resolves on its own.',
+    'For clear My Personas references, call resolve_personas before persona-conditioned image or video tools; do not rely on name text alone for identity.',
   ],
 };
 
@@ -4746,6 +4746,13 @@ function extractStoryboardRequiredText(text: string): string[] {
       /\b(?:action|motion|camera|transition|audio|sfx|fx|foley|sound|music|dialogue|vo|voiceover|voice-over|narration|speech|lighting|style|performance|beat)\b/i.test(fieldLabel)
       && !visibleTextContextPattern.test(fieldLabel);
     const hasExplicitVisibleTextContext = visibleTextContextPattern.test(line);
+    const precedingCue = compactStoryboardLine([
+      precedingText ?? '',
+      line.slice(0, Math.max(0, matchIndex - lineStart)),
+    ].join(' ')).slice(-180);
+    const spokenTextCue =
+      /\b(?:dialogue|vo|v\.o\.|voiceover|voice-over|voice\s*over|narration|speech|spoken(?:\s+line)?|audio\s*\/\s*dialogue)\b/i.test(precedingCue)
+      || /\b(?:narrator|speaker|actor|character|person|subject|host|mascot|performer|he|she|they)\b[^"“`]{0,80}\b(?:says?|speaks?|whispers?|shouts?|asks?|replies?)\b/i.test(precedingCue);
     const isRestrictionOnlyTextInstruction =
       visibleTextContextPattern.test(fieldLabel || line)
       && visibleTextRestrictionPattern.test(value)
@@ -4787,6 +4794,10 @@ function extractStoryboardRequiredText(text: string): string[] {
     }
 
     if ((isProductionDirectionField || looksLikeActionOrSfxCallout) && !hasExplicitVisibleTextContext) {
+      return true;
+    }
+
+    if (spokenTextCue && !/\b(?:visible|on[-\s]?screen|in[-\s]?frame|text|copy|cta|tagline|headline|title\s+card|caption|subtitle|super|wordmark|slogan|sign|poster|banner|label|placard|sticker|screen)\b/i.test(precedingCue)) {
       return true;
     }
 
@@ -4906,9 +4917,10 @@ function extractStoryboardRequiredText(text: string): string[] {
   for (const match of text.matchAll(exactTextPattern)) {
     const fullMatch = match[0];
     const quoteOpenInMatch = fullMatch.search(/["“`]/);
-    const precedingInMatch = quoteOpenInMatch >= 0 ? fullMatch.slice(0, quoteOpenInMatch) : fullMatch;
+    const quoteAbsIndex = (match.index ?? 0) + Math.max(0, quoteOpenInMatch);
+    const lineStart = text.lastIndexOf('\n', quoteAbsIndex) + 1;
     addRequiredText(match[1] ?? match[2] ?? match[3], match.index ?? 0, {
-      precedingText: precedingInMatch,
+      precedingText: text.slice(lineStart, quoteAbsIndex),
     });
   }
 
@@ -5435,6 +5447,28 @@ function storyboardTableRowLooksLikeCountedBeat(cells: string[], headers: string
   return /^(?:beat|scene|shot|panel|frame)?\s*(?:#\s*)?0?\d{1,2}\b/i.test(candidate);
 }
 
+function normalizeStoryboardTableCellsToHeaders(cells: string[], headers: string[] | null): string[] {
+  if (!headers || cells.length <= headers.length) return cells;
+
+  const overflow = cells.length - headers.length;
+  const combinedAudioDialogueIndex = headers.findIndex(header =>
+    /\baudio\b/i.test(header)
+    && /\b(?:dialogue|vo|v\.o\.|voiceover|speech|narration)\b/i.test(header),
+  );
+  if (combinedAudioDialogueIndex < 0) return cells;
+
+  const mergeEnd = combinedAudioDialogueIndex + overflow;
+  if (mergeEnd >= cells.length) return cells;
+  const overflowCells = cells.slice(combinedAudioDialogueIndex, mergeEnd + 1);
+  if (!overflowCells.some(cell => storyboardTableCellLooksLikeUnlabeledSpeech(cell))) return cells;
+
+  return [
+    ...cells.slice(0, combinedAudioDialogueIndex),
+    overflowCells.join('\n'),
+    ...cells.slice(mergeEnd + 1),
+  ];
+}
+
 function storyboardTableCellWithoutDialogue(cell: string, dialogue: string): string {
   const normalizedDialogue = compactStoryboardLine(dialogue).toLowerCase();
   return cell
@@ -5500,14 +5534,15 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
   let headers: string[] | null = null;
 
   for (const line of text.split(/\r?\n/)) {
-    const cells = storyboardMarkdownTableCells(line);
-    if (cells.length < 3) continue;
+    const rawCells = storyboardMarkdownTableCells(line);
+    if (rawCells.length < 3) continue;
 
-    if (looksLikeStoryboardTableHeader(cells)) {
-      headers = cells;
+    if (looksLikeStoryboardTableHeader(rawCells)) {
+      headers = rawCells;
       continue;
     }
 
+    const cells = normalizeStoryboardTableCellsToHeaders(rawCells, headers);
     const timingCellIndex = cells.findIndex(cell => extractStoryboardTimingMarker(cell) !== null);
     if (timingCellIndex < 0) continue;
     const timing = extractStoryboardTimingMarker(cells[timingCellIndex]);

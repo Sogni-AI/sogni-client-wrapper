@@ -76,7 +76,10 @@ export type {
   ToolResultErr,
   ToolResultOk,
 } from './result.js';
-export { expandSingleSourceFanOutForPerClipPrompts } from './normalizeArgs.js';
+export {
+  collapseSingleSourceFanOutToDynamicPromptVariations,
+  expandSingleSourceFanOutForPerClipPrompts,
+} from './normalizeArgs.js';
 export {
   type DynamicPromptBranch,
   type SceneDynamicPromptValidation,

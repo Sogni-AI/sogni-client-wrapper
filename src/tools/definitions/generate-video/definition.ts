@@ -51,7 +51,7 @@ For complex/creative scenes (characters, dialogue, skits): capture the full crea
 
 AVOID: Vague prompts, too many characters at once, conflicting lighting logic, readable text or logos, abstract emotions with no visible behavior, rigid numeric constraints (exact angles, counts, speeds).
 
-BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. Lock in any camera/subject/style the user specified, vary the rest. Example: "slow dolly in on a city street {at dawn with golden light|during a rainstorm|at night with neon reflections}".`,
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This is one Sogni project with multiple jobs, so prefer it when all outputs share the same references, model, duration, dimensions, and generation parameters and only prompt text varies. Lock in any camera/subject/style the user specified, vary the rest. Example: "slow dolly in on a city street {at dawn with golden light|during a rainstorm|at night with neon reflections}".`,
         },
         expandPrompt: {
           type: "boolean",
@@ -121,7 +121,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. Lock i
         numberOfVariations: {
           type: "number",
           description:
-            "Number of variations (1-16). Use 1 unless user explicitly requests multiple separate video outputs. For Seedance, default to 1 because each variation is an expensive separate render.",
+            "Number of variations (1-16). Use with one Dynamic Prompt branch for multiple prompt-only takes that share the same references, model, duration, dimensions, and parameters. This creates one Sogni project with multiple jobs. Use 1 unless the user explicitly requests multiple separate video outputs. For Seedance, default to 1 unless the user explicitly requests separate outputs.",
           minimum: 1,
           maximum: 16,
         },

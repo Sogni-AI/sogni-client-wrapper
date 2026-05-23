@@ -42,7 +42,7 @@ LTX VOCABULARY: camera (tracking, dolly, pan, tilt, handheld, static frame), lig
 
 AVOID: Vague prompts, too many competing visual elements, abstract descriptions without visible behavior, rigid numeric constraints, readable text or logos. QUOTING RULE: ONLY use double quotes for spoken dialogue. Never quote on-screen text, overlay text, titles, captions, signs, or any visual text — describe them without quotes.
 
-BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the visual interpretation while keeping audio sync intent consistent. Example: "{abstract neon visualization|nature scene with swaying trees|urban street with rain} synced to the beat".`,
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the visual interpretation while keeping audio sync intent consistent. This is one Sogni project with multiple jobs, so prefer it when all outputs share the same audio source/window, image source, model, duration, dimensions, and parameters and only prompt text varies. Example: "{abstract neon visualization|nature scene with swaying trees|urban street with rain} synced to the beat".`,
         },
         expandPrompt: {
           type: "boolean",
@@ -87,7 +87,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         numberOfVariations: {
           type: "number",
           description:
-            "Number of video variations to generate (1-16). Default: 1.",
+            "Number of video variations to generate (1-16). Use with one Dynamic Prompt branch when all variations share the same audio source/window, image source, model, duration, dimensions, and parameters and only prompt text varies. This creates one Sogni project with multiple jobs. Default: 1.",
           minimum: 1,
           maximum: 16,
         },

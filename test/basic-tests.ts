@@ -46,6 +46,7 @@ import {
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
   animatePhotoDefinition,
+  collapseSingleSourceFanOutToDynamicPromptVariations,
   seedanceTerminalGenerationFailurePayloadFromError,
 } from '../src/tools/index.js';
 import { PROMPT_CONTRACTS } from '../src/contracts/index.js';
@@ -1491,8 +1492,37 @@ async function runTests() {
     if (!sourceImageIndicesDoc.includes('Use frameRole="end" with sourceImageIndices')) {
       throw new Error('animate_photo sourceImageIndices doc must allow explicit end-frame fan-out');
     }
+    if (!sourceImageIndicesDoc.includes('one Dynamic Prompt branch')) {
+      throw new Error('animate_photo sourceImageIndices doc must prefer Dynamic Prompt for prompt-only fan-out');
+    }
     if (!frameRoleDoc.includes('use frameRole="end"')) {
       throw new Error('animate_photo frameRole doc must describe end-frame fan-out');
+    }
+
+    const collapsedFanout = collapseSingleSourceFanOutToDynamicPromptVariations({
+      prompt: 'summary',
+      sourceImageIndices: [-1, -1, -1],
+      prompts: ['first take', 'second take', 'third take'],
+    });
+    if (!collapsedFanout || collapsedFanout.prompt !== '{first take|second take|third take}') {
+      throw new Error('prompt-only single-source fan-out should collapse to one Dynamic Prompt branch');
+    }
+    if (collapsedFanout.sourceImageIndex !== -1 || collapsedFanout.numberOfVariations !== 3) {
+      throw new Error('collapsed fan-out should preserve sourceImageIndex and numberOfVariations');
+    }
+    const differentSourceFanout = collapseSingleSourceFanOutToDynamicPromptVariations({
+      sourceImageIndices: [0, 1],
+      prompts: ['first take', 'second take'],
+    });
+    if (differentSourceFanout !== null) {
+      throw new Error('different source-image fan-out must remain multi-project');
+    }
+    const incompletePromptFanout = collapseSingleSourceFanOutToDynamicPromptVariations({
+      sourceImageIndices: [-1],
+      prompts: ['first take', ''],
+    });
+    if (incompletePromptFanout !== null) {
+      throw new Error('incomplete prompt-only fan-out must remain unchanged');
     }
 
     const animateContract = PROMPT_CONTRACTS.find((contract) => contract.toolName === 'animate_photo');
@@ -1669,6 +1699,66 @@ async function runTests() {
     }
     if (!prompt.includes('Required exact visible text: "Powered by the people."')) {
       throw new Error('Compiled prompt did not preserve final slogan text');
+    }
+  })();
+
+  await test('Should not promote user-requested voiceover to visible storyboard text', () => {
+    const userIntent = [
+      'Create a 6s video storyboard.',
+      'The narrator should say "Powered by the people." during the final shot.',
+      'Keep visible text limited to the product label.',
+    ].join('\n');
+    const assistantDraft = [
+      '### Timecoded Storyboard Plan',
+      '| Beat | Time | Visual / Action | Audio / Dialogue |',
+      '| :--- | :--- | :--- | :--- |',
+      '| 1 | 0s-3s | Product hero shot. Visible text: "Sogni.ai" | SFX: soft chime. |',
+      '| 2 | 3s-6s | Final shot with clean product label only. | VO: "Powered by the people." |',
+    ].join('\n');
+
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 2,
+      promptAuthorship: 'assistant',
+    });
+
+    if (prompt.includes('Required exact visible text: "Powered by the people."')) {
+      throw new Error('Voiceover was incorrectly promoted to required visible text');
+    }
+    if (!prompt.includes('Required exact visible text: "Sogni.ai"')) {
+      throw new Error('Visible product label was not preserved');
+    }
+  })();
+
+  await test('Should preserve dialogue when storyboard table rows contain an extra pipe-delimited cell', () => {
+    const assistantDraft = [
+      '#### Beat Table (4 Beats)',
+      '| Beat | Time | Purpose | Visual / Action | Motion / Camera | Audio / Dialogue | Transition |',
+      '| :--- | :--- | :--- | :--- | :--- | :--- | :--- |',
+      '| 01 | 0s-1s | Hook | Sloth at a boring desk. | Slow push-in. | "Ever since I was young..." | Hard cut. |',
+      '| 02 | 1s-2s | Setup | Sloth types while papers fall. | Handheld shake. | "...I have always wanted actionable insight" | Film burn. |',
+      '| 03 | 2s-3s | Turn | Sloth looks up with a mischievous glint. | Focus pull. | Camera spins 3. | "Syke! I have wanted to make wild art." | Match cut. |',
+      '| 04 | 3s-4s | End | Logo appears with tagline. | Static hold. | "Anything I can imagine." | Fade. |',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: 'Create a 4 beat video storyboard.',
+      approvedScriptContext: assistantDraft,
+      frameCount: 4,
+      promptAuthorship: 'assistant',
+    });
+
+    if (project.scenes.length !== 4) {
+      throw new Error(`Expected 4 parsed scenes, got ${project.scenes.length}`);
+    }
+    if (project.scenes[2].dialogue !== 'Syke! I have wanted to make wild art.') {
+      throw new Error(`Dialogue cell was not preserved: ${project.scenes[2].dialogue}`);
+    }
+    if (!project.scenes[2].audioSfx.includes('Camera spins 3.')) {
+      throw new Error(`Audio cue was not preserved: ${project.scenes[2].audioSfx.join(', ')}`);
     }
   })();
 

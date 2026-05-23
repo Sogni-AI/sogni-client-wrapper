@@ -34,7 +34,7 @@ Include:
 - Instruments (piano, guitar, drums, synth, strings, etc.)
 - Style descriptors (driving, mellow, atmospheric, punchy, etc.)
 
-BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary ONE dimension across separate tracks. Lock in any genre/mood/instruments the user specified, vary the rest. Example: "{lo-fi hip hop beat with muted keys|jazz piano trio with brushed drums|ambient electronic with soft pads} with warm reverb and vinyl texture".`,
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary ONE dimension across separate tracks. This is one Sogni project with multiple jobs, so prefer it when all tracks share the same duration, BPM, key, lyrics, model, and generation parameters and only prompt text varies. Lock in any genre/mood/instruments the user specified, vary the rest. Example: "{lo-fi hip hop beat with muted keys|jazz piano trio with brushed drums|ambient electronic with soft pads} with warm reverb and vinyl texture".`,
         },
         duration: {
           type: 'number',
@@ -75,7 +75,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         numberOfVariations: {
           type: 'number',
           description:
-            'Number of variations (1-16). Use 1 unless user requests multiple. Default: 1.',
+            'Number of variations (1-16). Use with one Dynamic Prompt branch when the user requests multiple prompt-only music variations that share the same duration, BPM, key, lyrics, model, and parameters. This creates one Sogni project with multiple jobs. Default: 1.',
           minimum: 1,
           maximum: 16,
         },

@@ -20,25 +20,107 @@ function stringArray(value: unknown): string[] | null {
   return parsed;
 }
 
-export function expandSingleSourceFanOutForPerClipPrompts(args: Record<string, unknown>): boolean {
+const SINGLE_PROJECT_FANOUT_ARRAY_FIELDS = new Set(['prompts', 'sourceImageIndices', 'endImageIndices']);
+
+function oneRepeatedInteger(values: readonly number[], expectedLength: number): number | null {
+  if (values.length === 1) return values[0] ?? null;
+  if (values.length !== expectedLength) return null;
+  const first = values[0];
+  return values.every(value => value === first) ? first ?? null : null;
+}
+
+function hasPerOutcomeArrayParams(args: Record<string, unknown>): boolean {
+  return Object.entries(args).some(([key, value]) => (
+    Array.isArray(value)
+    && !SINGLE_PROJECT_FANOUT_ARRAY_FIELDS.has(key)
+    && value.length > 1
+  ));
+}
+
+function canEmbedInDynamicPromptBranch(prompt: string): boolean {
+  return !/[{}|]/.test(prompt);
+}
+
+function buildDynamicPromptBranch(prompts: readonly string[]): string | null {
+  if (prompts.length < 2 || prompts.length > 16) return null;
+  const normalized = prompts.map(prompt => prompt.trim()).filter(Boolean);
+  if (normalized.length !== prompts.length) return null;
+  if (!normalized.every(canEmbedInDynamicPromptBranch)) return null;
+  return `{${normalized.join('|')}}`;
+}
+
+export function collapseSingleSourceFanOutToDynamicPromptVariations(
+  args: Record<string, unknown>,
+): Record<string, unknown> | null {
   const prompts = stringArray(args.prompts);
-  if (!prompts || prompts.length <= 1) return false;
+  if (!prompts || prompts.length < 2 || prompts.length > 16) return null;
+  if (hasPerOutcomeArrayParams(args)) return null;
 
   const sourceImageIndices = integerArray(args.sourceImageIndices);
-  if (!sourceImageIndices || sourceImageIndices.length !== 1) return false;
-
-  args.sourceImageIndices = Array.from(
-    { length: prompts.length },
-    () => sourceImageIndices[0],
-  );
+  const sourceImageIndex =
+    sourceImageIndices
+      ? oneRepeatedInteger(sourceImageIndices, prompts.length)
+      : typeof args.sourceImageIndex === 'number' && Number.isInteger(args.sourceImageIndex)
+        ? args.sourceImageIndex
+        : null;
+  if (sourceImageIndex === null) return null;
 
   const endImageIndices = integerArray(args.endImageIndices);
-  if (endImageIndices?.length === 1) {
-    args.endImageIndices = Array.from(
-      { length: prompts.length },
-      () => endImageIndices[0],
-    );
+  const repeatedEndImageIndex = endImageIndices
+    ? oneRepeatedInteger(endImageIndices, prompts.length)
+    : null;
+  if (endImageIndices && repeatedEndImageIndex === null) return null;
+
+  const explicitEndImageIndex =
+    typeof args.endImageIndex === 'number' && Number.isInteger(args.endImageIndex)
+      ? args.endImageIndex
+      : null;
+  if (
+    explicitEndImageIndex !== null
+    && repeatedEndImageIndex !== null
+    && explicitEndImageIndex !== repeatedEndImageIndex
+  ) {
+    return null;
   }
+
+  const prompt = buildDynamicPromptBranch(prompts);
+  if (!prompt) return null;
+
+  const next: Record<string, unknown> = {
+    ...args,
+    prompt,
+    numberOfVariations: prompts.length,
+    sourceImageIndex,
+  };
+  delete next.prompts;
+  delete next.sourceImageIndices;
+  delete next.endImageIndices;
+
+  if (repeatedEndImageIndex !== null) {
+    next.endImageIndex = repeatedEndImageIndex;
+  } else if (explicitEndImageIndex !== null) {
+    next.endImageIndex = explicitEndImageIndex;
+  } else if (args.frameRole === 'both') {
+    next.endImageIndex = sourceImageIndex;
+  }
+
+  return next;
+}
+
+/**
+ * @deprecated Use collapseSingleSourceFanOutToDynamicPromptVariations().
+ * Retained for older consumers; prompt-only fan-out for one fixed source now
+ * collapses to one Dynamic Prompt project instead of expanding to multiple
+ * SDK projects.
+ */
+export function expandSingleSourceFanOutForPerClipPrompts(args: Record<string, unknown>): boolean {
+  const collapsed = collapseSingleSourceFanOutToDynamicPromptVariations(args);
+  if (!collapsed) return false;
+
+  for (const key of Object.keys(args)) {
+    delete args[key];
+  }
+  Object.assign(args, collapsed);
 
   return true;
 }

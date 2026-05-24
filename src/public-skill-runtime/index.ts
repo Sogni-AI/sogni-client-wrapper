@@ -2150,7 +2150,7 @@ export function suggestedDurationForDialogue(
   const words = quotedDialogueWordCount(prompt);
   const baseDuration = currentDuration ?? 0;
   if (words <= 0) return baseDuration;
-  const speechSeconds = Math.ceil(words / 2.5) + 2;
+  const speechSeconds = Math.ceil(words / 3) + 2;
   return Math.max(baseDuration, Math.min(20, speechSeconds));
 }
 
@@ -3732,8 +3732,8 @@ interface StoryboardReferencePromptRole {
 
 const DEFAULT_STORYBOARD_TIMING_RULES: StoryboardTimingRules = {
   normalWordsPerSecondMin: 2.0,
-  normalWordsPerSecondMax: 2.5,
-  fastWordsPerSecondMax: 3.0,
+  normalWordsPerSecondMax: 3.0,
+  fastWordsPerSecondMax: 3.75,
   minEndCardHoldSec: 2.0,
   minPunchlineSec: 0.5,
   toleranceSec: 0.25,

@@ -231,6 +231,14 @@ export function validateWorkflow(def: WorkflowTemplate): ValidationResult {
           path: `stages/${stage.id}/concurrency`,
         });
       }
+      if (stage.maxAttemptsPerItem !== undefined && stage.maxAttemptsPerItem < 1) {
+        issues.push({
+          severity: 'error',
+          code: 'batch_max_attempts_invalid',
+          message: `Batch stage "${stage.id}" maxAttemptsPerItem must be ≥ 1.`,
+          path: `stages/${stage.id}/maxAttemptsPerItem`,
+        });
+      }
     }
   }
 
@@ -338,14 +346,28 @@ export function persistedRun(run: Run): Run {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+export interface WalkStagesOptions {
+  /**
+   * Whether to yield a batch stage's `itemStage`. Validation wants it (so the
+   * per-item template's tool/args are statically checked); execution does NOT,
+   * because the itemStage is dispatched per-item *inside* `runBatchStage`, not
+   * as a standalone top-level stage. Defaults to `true` for back-compat.
+   */
+  includeBatchItemStage?: boolean;
+}
+
 /** Depth-first iteration over a stage tree including subStages. */
-export function* walkStages(stages: WorkflowStage[]): Generator<WorkflowStage> {
+export function* walkStages(
+  stages: WorkflowStage[],
+  opts: WalkStagesOptions = {},
+): Generator<WorkflowStage> {
+  const includeBatchItemStage = opts.includeBatchItemStage ?? true;
   for (const stage of stages) {
     yield stage;
     if (stage.subStages?.length) {
-      yield* walkStages(stage.subStages);
+      yield* walkStages(stage.subStages, opts);
     }
-    if (stage.type === 'batch') {
+    if (stage.type === 'batch' && includeBatchItemStage) {
       yield stage.itemStage;
     }
   }

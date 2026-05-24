@@ -386,7 +386,19 @@ async function* runBatchStage<Context, Callbacks, Progress>(
       ...itemArgsCtx,
       item: { ...(typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : { value: item }), index: idx },
     };
-    const resolvedArgs = resolveBindings(itemStage.args, itemCtx) as Record<string, unknown>;
+
+    // Resolve args inside the slot's failure boundary: an unresolvable binding
+    // must surface as a per-slot failure (handled by onError below), never as a
+    // rejected runSlot promise — under concurrency that would escape the worker
+    // pool's Promise.race and orphan sibling promises (unhandled rejection).
+    let resolvedArgs: Record<string, unknown>;
+    try {
+      resolvedArgs = resolveBindings(itemStage.args, itemCtx) as Record<string, unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      options.onSlotEvent?.({ phase: 'failed', ...slotBase, attempt: 1, error: message });
+      return { idx, itemId, error: message };
+    }
 
     let lastError = '';
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {

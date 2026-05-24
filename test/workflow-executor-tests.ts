@@ -320,6 +320,33 @@ async function testConcurrencyClampedTo16(): Promise<void> {
   ok('all 20 slots complete', allItemsHaveVersion(finalRun));
 }
 
+// A batch whose itemStage args reference an unresolvable binding must fail the
+// affected slots gracefully (slot_failed + onError handling), NOT reject out of
+// the worker pool and orphan sibling promises (unhandled rejection).
+async function testBindingErrorFailsSlotGracefully(): Promise<void> {
+  const template = batchTemplate({ onError: 'continue' });
+  // Point the itemStage at a path that cannot resolve (items have no `missing`).
+  (template.stages[0] as { itemStage: { args: Record<string, unknown> } }).itemStage.args = {
+    prompt: '$item.missing.deeper',
+  };
+  const store = memoryStore();
+  const run = await createRun({
+    workflow: template,
+    inputs: { clips: [{ prompt: 'a' }, { prompt: 'b' }] },
+    store,
+  });
+  const slotEvents: SlotEvent[] = [];
+  const finalRun = await pump(executeRun(run.id, {
+    store,
+    dispatch: { has: () => true, execute: async () => JSON.stringify({ ok: true, videoResultUrls: ['u'] }) },
+    context: {},
+    callbacks: {},
+    onSlotEvent: (e) => slotEvents.push(e),
+  }));
+  ok('both slots fail gracefully on a binding error', slotEvents.filter((e) => e.phase === 'failed').length === 2);
+  eq('run still completes (onError: continue), no pool crash', finalRun.state, 'completed');
+}
+
 export async function runWorkflowExecutorTests(): Promise<{ passed: number; failed: number }> {
   console.log('\n🧪 workflow executor — per-slot retry-callback primitive\n');
   await testSlotProgressBridge();
@@ -329,6 +356,7 @@ export async function runWorkflowExecutorTests(): Promise<{ passed: number; fail
   await testConcurrencyCapHonored();
   await testDefaultsToSequential();
   await testConcurrencyClampedTo16();
+  await testBindingErrorFailsSlotGracefully();
   return { passed: testsPassed, failed: testsFailed };
 }
 

@@ -41,7 +41,9 @@ import {
   auditCompiledStoryboardImagePrompt,
   buildStoryboardProject,
   classifyPublicSkillTurn,
+  compileForModel,
   compileVideoStoryboardImagePrompt,
+  inferStoryboardLayoutSpec,
 } from '../src/public-skill-runtime/index.js';
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
@@ -1699,6 +1701,117 @@ async function runTests() {
     }
     if (!prompt.includes('Required exact visible text: "Powered by the people."')) {
       throw new Error('Compiled prompt did not preserve final slogan text');
+    }
+  })();
+
+  await test('Should compile compact GPT Image storyboard prompts without phantom references or stale sections', () => {
+    const userIntent = [
+      'Create a production storyboard sheet for a 15-second vertical commercial.',
+      'Use the two provided reference images:',
+      'Image 1 = Pink Sloth Mascot. Preserve pink fur, horn, glasses, face shape, playful nerdy attitude, and silhouette.',
+      'Image 2 = Sogni logo. Use only in the final CTA panel.',
+      'Create exactly 12 storyboard panels in a 4-column x 3-row grid.',
+      'Scene 12 visible text must be exactly:',
+      'Seedance 2.0 on Sogni.ai',
+      'Create anything.',
+      'Powered by the people.',
+    ].join('\n');
+    const assistantDraft = [
+      '**Working Header Title:** The Data Unicorn',
+      'Story Spine: A burned-out data sloth discovers that the real product promise is wild creative freedom.',
+      '',
+      '| Beat | Time | Purpose | Visual/Action | Camera/Motion | Dialogue/VO | Audio/SFX | Transition |',
+      '| --- | --- | --- | --- | --- | --- | --- | --- |',
+      '| 01 | 0s-1s | Setup | Pink sloth in a grey cubicle, surrounded by floating spreadsheet grids. | Static office shot. | [no dialogue] | Muffled office hum. | Hard cut. |',
+      '| 02 | 1s-2s | Data Tear | Close-up of the sloth; a tiny data tear rolls down his cheek. | Slow zoom. | [no dialogue] | Typing grows louder. | Tear match cut. |',
+      '| 03 | 2s-3s | The Turn | Spreadsheet grid melts into colorful paint drips. | Camera shake. | [no dialogue] | Tape deck rewind. | Film burn. |',
+      '| 04 | 3s-4s | Transformation | Sloth bursts into vibrant pink; horn glows. | Whip pan. | [no dialogue] | Chime into bass drop. | Color wipe. |',
+      '| 05 | 4s-5s | Psychedelic Void | Sloth floats with 3D shapes and glowing art tools. | Orbit. | [no dialogue] | Funky bassline begins. | Orbit handoff. |',
+      '| 06 | 5s-6.5s | Fake Business Setup | Sloth gestures at a floating neon brain made of data and charts. | Tracking shot. | Ever since I was young I have always wanted to convert unstructured data into actionable insight... | Mock-inspirational music. | Push into brain. |',
+      '| 07 | 6.5s-7.5s | Overblown Data Fantasy | Neon data brain becomes huge like a fake tech keynote visual. | Rapid zoom out. | continuation of previous VO | Corporate whoosh. | Smash zoom. |',
+      '| 08 | 7.5s-8.5s | The Twist | Sloth leans into fisheye lens, mischievous. | Extreme close-up. | Syke! I have wanted to make wild art. | Record scratch. | Lens pop. |',
+      '| 09 | 8.5s-9.5s | Anything I Imagine | Camera flies through sloth eyes into kaleidoscope of textures and worlds. | Dolly zoom. | Anything I can imagine. | Psychedelic shimmer. | Eye tunnel. |',
+      '| 10 | 9.5s-10.5s | Art Comes Alive | Sketch becomes real, painting steps out, digital art morphs into a cinematic creature. | Beat-synced montage feeling. | And it is finally here. | Creative impact. | Morph cut. |',
+      '| 11 | 10.5s-12s | Creative Conductor | Sloth conducts a symphony of colors, horn like a baton. | Slow-motion hero shot. | [no dialogue] | Peak crescendo. | Light sweep. |',
+      '| 12 | 12s-15s | CTA | Clean final brand card with Sogni logo centered and visible text: "Create anything." | Static pulse. | Powered by the people. | Final musical hit. | End. |',
+      '',
+      '### Storyboard Image Brief',
+      'Image 6: spreadsheet reference from a previous draft.',
+      'Image 12: logo reference from a stale brief.',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    const referenceIds = project.references.map(ref => ref.id).sort();
+    if (referenceIds.join(',') !== 'image_1,image_2') {
+      throw new Error(`Expected only image_1/image_2 references, got ${referenceIds.join(',')}`);
+    }
+    for (const text of ['Seedance 2.0 on Sogni.ai', 'Create anything.', 'Powered by the people.']) {
+      if (!project.scenes[11].textInImage.includes(text)) {
+        throw new Error(`Scene 12 did not carry required CTA text: ${text}`);
+      }
+    }
+
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    const adapterPrompt = compileForModel('gpt-image-2', project, { stage: 'storyboard_image' }).prompt;
+    for (const compiled of [prompt, adapterPrompt]) {
+      if (!compiled.includes('LAYOUT CONTRACT:')) throw new Error('Compiled prompt is missing consolidated layout contract');
+      if (!compiled.includes('TEXT RULES:')) throw new Error('Compiled prompt is missing consolidated text rules');
+      if (/COUNT \/ GRID CONTRACT:|CANVAS \/ LAYOUT:|FRAME GEOMETRY:|TEXT RENDERING:/i.test(compiled)) {
+        throw new Error('Compiled prompt retained stale repeated layout/text sections');
+      }
+      if (/\bImage 6\b|\bImage 12\b/i.test(compiled)) {
+        throw new Error('Compiled prompt retained phantom stale image references');
+      }
+      if (/unused grid slots/i.test(compiled)) {
+        throw new Error('Compiled prompt mentioned unused grid slots for an exact 12-slot grid');
+      }
+      for (const text of ['Seedance 2.0 on Sogni.ai', 'Create anything.', 'Powered by the people.']) {
+        if (!compiled.includes(`Required exact visible text: "${text}"`) && !compiled.includes(`"${text}"`)) {
+          throw new Error(`Compiled prompt did not include required CTA text: ${text}`);
+        }
+      }
+    }
+    const audit = auditCompiledStoryboardImagePrompt({
+      prompt,
+      expectedFrameCount: 12,
+      expectedDurationSec: 15,
+    });
+    if (!audit.ok) {
+      throw new Error(`Storyboard audit failed: ${audit.fatalIssues.map(issue => issue.code).join(', ')}`);
+    }
+
+    const exactPortraitLetterbox = inferStoryboardLayoutSpec(
+      'Create exactly 8 storyboard panels on a portrait 9:16 storyboard sheet with landscape 16:9 video frames.',
+      8,
+    );
+    if (exactPortraitLetterbox.layoutKind !== 'portrait_letterbox_cells') {
+      throw new Error(`Expected portrait_letterbox_cells, got ${exactPortraitLetterbox.layoutKind}`);
+    }
+    if (/unused grid slots/i.test(exactPortraitLetterbox.layoutDescription)) {
+      throw new Error('Exact portrait-letterbox layout mentioned unused grid slots');
+    }
+
+    const exactLandscapePortrait = inferStoryboardLayoutSpec(
+      'Create exactly 8 storyboard panels on a landscape 16:9 storyboard board with portrait 9:16 video frames.',
+      8,
+    );
+    if (exactLandscapePortrait.layoutKind !== 'landscape_portrait_cells') {
+      throw new Error(`Expected landscape_portrait_cells, got ${exactLandscapePortrait.layoutKind}`);
+    }
+    if (/unused grid slots/i.test(exactLandscapePortrait.layoutDescription)) {
+      throw new Error('Exact landscape-portrait layout mentioned unused grid slots');
     }
   })();
 

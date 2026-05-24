@@ -1221,33 +1221,48 @@ function compileStoryboardImagePromptFromProject(project: StoryboardProject): st
     : `Overall storyboard canvas aspect ratio: ${layout.boardAspectRatio}.`;
   return [
     'CREATE:',
-    `Create exactly ${frameCount} sequential video storyboard frames as one composite storyboard image.`,
-    `Project title: ${project.title}.`,
+    `Create exactly ${frameCount} sequential video storyboard frames as one production storyboard sheet.`,
+    '',
+    'PROJECT:',
+    `Title: ${project.title}.`,
+    `Format: ${layout.targetVideoAspectRatio} video storyboard.`,
     project.durationSec !== null ? `Target duration: ${project.durationSec} seconds.` : 'Target duration: unspecified in source brief.',
     '',
-    ...compileStoryboardCountContractSection(project, layout),
-    '',
-    ...compileStoryboardReferenceSection(project),
-    '',
-    'CANVAS / LAYOUT:',
+    'LAYOUT CONTRACT:',
+    `Create exactly ${frameCount} numbered storyboard panels; do not render fewer or more panels.`,
+    `Arrange panels in reading order, left-to-right then top-to-bottom: ${Array.from({ length: frameCount }, (_, index) => {
+      const scene = project.scenes[index];
+      return `[${index + 1}] ${scene?.id.toUpperCase() ?? `SCENE_${String(index + 1).padStart(2, '0')}`}`;
+    }).join(', ')}.`,
     boardSizeLine,
     `Individual scene-cell/frame aspect ratio: ${layout.cellAspectRatio}.`,
     `Target final video aspect ratio: ${layout.targetVideoAspectRatio}.`,
     `Layout preset: ${layout.layoutKind} - ${layout.layoutDescription}.`,
+    `Each panel must contain one distinct ${layout.cellAspectRatio} cinematic video-frame rectangle with compact notes outside the frame.`,
+    'Keep scene numbers, timecodes, titles, dialogue/VO, audio notes, and production notes outside the video-frame rectangles.',
+    'Do not merge panels, create inset thumbnails, make panels square, or overlay storyboard metadata inside the artwork frames.',
+    '',
+    ...compileStoryboardReferenceSection(project),
+    '',
+    'STYLE:',
+    `${project.creativeBrief.visualQualityBar} with cinematic shot language, coherent art direction, readable labels, and consistent reference usage.`,
+    'Reference-driven personality: before drawing, infer concrete visual and behavioral cues from uploaded/reference images, including character attitude, materials, props, palette, brand tone, typography style, and implied world. Let those cues make this storyboard specific to the supplied subject instead of a generic reusable template.',
+    'Vary composition within the required grid: keep the exact scene count, layout, and cell geometry, and make each panel intentionally staged with distinct shot scale, pose/action, camera angle, lighting beat, transition idea, and character-specific detail.',
     '',
     ...compileStoryboardStoryContinuitySection(project),
     '',
-    'GLOBAL STYLE:',
-    project.creativeBrief.visualQualityBar,
-    '',
     'CRITICAL REQUIREMENTS:',
     ...compileStoryboardCriticalRequirements().map((item, index) => `${index + 1}. ${item}`),
+    ...project.references
+      .filter(ref => ref.preservePriority === 'critical')
+      .map((ref, index) => `${compileStoryboardCriticalRequirements().length + index + 1}. Critical reference lock: ${ref.id} (${ref.kind}) must remain bound to its assigned usage scope: ${ref.usageScope}.`),
     '',
     ...compileStoryboardScenesSection(project),
-    'TEXT RENDERING:',
-    'Keep production labels outside video-frame artwork. Only user-required diegetic or brand text belongs inside a frame.',
+    'TEXT RULES:',
+    'Place scene number, timing, scene title, beat title, and compact production labels outside each video frame in a clearly associated header, footer strip, side rail, or table. Do not overlay scene numbers, timecodes, production notes, Dialogue/VO labels, Audio/SFX text, or SFX/action callout words such as Whoosh!, Impact!, Boom!, Thud!, Slash!, Crack!, or Pop! on top of the video-frame artwork. Also do not overlay scene/beat titles on top of the video-frame artwork. Project titles are metadata, not in-frame text. Only listed diegetic or brand text belongs inside a frame. Quote and spell any required visible text exactly.',
     'Visible text listed on a scene belongs only in that scene; repeat visible text only on scenes that list it.',
     ...storyboardRequiredVisibleText(project).map(formatStoryboardRequiredVisibleTextLine),
+    project.endCard.logoUsage ? `Logo usage: ${project.endCard.logoUsage}` : '',
     '',
     'NEGATIVE / AVOID:',
     ...compileStoryboardAvoidSection(project.creativeBrief.concept).map(item => `- ${item}`),
@@ -3717,8 +3732,8 @@ interface StoryboardReferencePromptRole {
 
 const DEFAULT_STORYBOARD_TIMING_RULES: StoryboardTimingRules = {
   normalWordsPerSecondMin: 2.0,
-  normalWordsPerSecondMax: 3.3,
-  fastWordsPerSecondMax: 4.0,
+  normalWordsPerSecondMax: 2.5,
+  fastWordsPerSecondMax: 3.0,
   minEndCardHoldSec: 2.0,
   minPunchlineSec: 0.5,
   toleranceSec: 0.25,
@@ -3944,10 +3959,13 @@ function describePortraitLetterboxCellArrangement(frameCount: number, cellAspect
 
   const columns = frameCount <= 8 ? 2 : frameCount <= 15 ? 3 : 4;
   const rows = Math.ceil(frameCount / columns);
+  const unusedSlotNote = columns * rows > frameCount
+    ? ['use unused grid slots as margin/notes space only']
+    : [];
   return [
     `${frameCount} numbered scene slots arranged as a ${columns}-column x ${rows}-row grid inside a portrait sheet`,
     `each slot contains one ${frameShape} with compact labels outside the rectangle`,
-    'use unused grid slots as margin/notes space only',
+    ...unusedSlotNote,
   ].join('; ');
 }
 
@@ -3960,10 +3978,13 @@ function describeLandscapePortraitCellArrangement(frameCount: number, cellAspect
 
   const rows = frameCount <= 8 ? 2 : frameCount <= 15 ? 3 : 4;
   const columns = Math.ceil(frameCount / rows);
+  const unusedSlotNote = columns * rows > frameCount
+    ? ['use unused grid slots as margin/notes space only']
+    : [];
   return [
     `${frameCount} numbered scene slots arranged as a ${rows}-row x ${columns}-column grid inside a landscape board`,
     `each slot contains one ${frameShape} with compact labels outside the rectangle`,
-    'use unused grid slots as margin/notes space only',
+    ...unusedSlotNote,
   ].join('; ');
 }
 
@@ -4121,6 +4142,9 @@ function describeSingleOrientationStoryboardArrangement(
   const slotGrid = pickBalancedSlotGrid(frameCount);
   const cols = cellOrientation === 'landscape' ? slotGrid.minor : slotGrid.major;
   const rows = cellOrientation === 'landscape' ? slotGrid.major : slotGrid.minor;
+  const unusedSlotNote = cols * rows > frameCount
+    ? ['use unused grid slots as margin/notes space only']
+    : [];
 
   if (boardOrientation === 'portrait') {
     return {
@@ -4128,7 +4152,7 @@ function describeSingleOrientationStoryboardArrangement(
       layoutDescription: [
         `${frameCount} numbered scene slots arranged as a ${cols}-column x ${rows}-row grid inside a portrait storyboard sheet`,
         `each slot contains one ${frameShape} with compact labels outside the rectangle`,
-        'use unused grid slots as margin/notes space only',
+        ...unusedSlotNote,
       ].join('; '),
     };
   }
@@ -4139,7 +4163,7 @@ function describeSingleOrientationStoryboardArrangement(
     layoutDescription: [
       `${frameCount} numbered scene slots arranged as a ${rows}-row x ${cols}-column grid inside a ${boardLabel}`,
       `each slot contains one ${frameShape} with compact labels outside the rectangle`,
-      'use unused grid slots as margin/notes space only',
+      ...unusedSlotNote,
     ].join('; '),
   };
 }
@@ -4576,6 +4600,20 @@ function cleanStoryboardReferenceSubjectHint(context: string, index: number): st
   const explicitSubject = cleanExplicitStoryboardReferenceSubject(source, index);
   if (explicitSubject) return explicitSubject;
 
+  const inlineReference = new RegExp(
+    String.raw`\b(?:uploaded|attached|provided|reference|source|input)?\s*(?:image|photo|picture|asset)\s*(?:#|number\s*)?${index}\b\s*(?:is|=|:|-)?\s*([^.;,\n]{2,120})`,
+    'i',
+  ).exec(source);
+  if (inlineReference?.[1]) {
+    const inlineSubject = compactStoryboardLine(stripStoryboardMarkup(inlineReference[1]))
+      .replace(/\b(?:use|usage|preserve|reference|asset)\b[\s\S]*$/i, '')
+      .replace(/[.\s]+$/g, '')
+      .trim();
+    if (inlineSubject && !/^(?:logo|brand|character|mascot|asset|reference|image|photo|picture)$/i.test(inlineSubject)) {
+      return inlineSubject.slice(0, 180).replace(/\s+\S*$/, match => inlineSubject.length > 180 ? '' : match).trim();
+    }
+  }
+
   const cleaned = source
     .replace(new RegExp(String.raw`^(?:image|photo|picture|asset)\s*(?:#|number\s*)?${index}\s*(?:\([^)]*\))?\s*:?\s*`, 'i'), '')
     .replace(new RegExp(String.raw`^(?:uploaded|attached|provided|reference|source|input)\s+(?:image|photo|picture|asset)\s*(?:#|number\s*)?${index}\s*:?\s*`, 'i'), '')
@@ -4681,6 +4719,54 @@ function buildStoryboardReferenceAssets(userIntentText: string, prompt: string):
     usageScope: storyboardUsageScopeFromRole(role),
     preservePriority: storyboardPreservePriorityFromRole(role),
   }));
+}
+
+function storyboardReferenceIndexFromText(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const match = normalized.match(/^(?:@?\s*)?(?:image|photo|picture|asset|uploaded\s+asset|uploaded\s+image)[\s_#-]*(\d{1,2})$/i)
+    ?? normalized.match(/^image_(\d{1,2})$/i);
+  if (!match) return null;
+  const index = Number(match[1]);
+  return Number.isInteger(index) && index > 0 ? index : null;
+}
+
+function looksLikeUnknownIndexedStoryboardReference(value: string): boolean {
+  return /^(?:@?\s*)?(?:image|photo|picture|asset|uploaded\s+asset|uploaded\s+image)[\s_#-]*\d{1,2}$/i.test(value.trim())
+    || /^image_\d{1,2}$/i.test(value.trim());
+}
+
+function normalizeStoryboardSceneReferenceUsage(
+  referenceUsage: string[],
+  references: ReferenceAsset[],
+): string[] {
+  if (referenceUsage.length === 0 || references.length === 0) return [];
+  const knownById = new Map(references.map(ref => [ref.id.toLowerCase(), ref.id]));
+  const knownByIndex = new Map(
+    references
+      .filter(ref => typeof ref.index === 'number')
+      .map(ref => [ref.index as number, ref.id]),
+  );
+
+  const normalized: string[] = [];
+  for (const raw of referenceUsage) {
+    const value = raw.trim();
+    if (!value) continue;
+    const knownId = knownById.get(value.toLowerCase());
+    if (knownId) {
+      normalized.push(knownId);
+      continue;
+    }
+    const index = storyboardReferenceIndexFromText(value);
+    if (index !== null) {
+      const id = knownByIndex.get(index);
+      if (id) normalized.push(id);
+      continue;
+    }
+    if (looksLikeUnknownIndexedStoryboardReference(value)) continue;
+    normalized.push(value);
+  }
+  return uniqueStoryboardStrings(normalized);
 }
 
 function compileStoryboardReferenceSection(project: StoryboardProject): string[] {
@@ -4883,7 +4969,7 @@ function extractStoryboardRequiredText(text: string): string[] {
       || /^(?:powered|made|built|created|generated|rendered|presented)\s+by\b/i.test(value);
     return !productionDirection || copyOverridesProduction;
   };
-  const endCardLabelPattern = /^\s*(?:[-*+]\s*)?(?:end|final|closing)\s+(?:scene|card|frame|shot|cta|logo(?:\s+lockup)?)\s*:\s*([^\n]*)$/gim;
+  const endCardLabelPattern = /^\s*(?:[-*+]\s*)?(?:(?:end|final|closing)\s+(?:scene|card|frame|shot|cta|logo(?:\s+lockup)?)|(?:scene|shot|beat|panel|frame)\s*\d{1,2}\s+(?:visible\s+text|on[-\s]?screen\s+text|onscreen\s+text|text|copy|cta)(?:\s+must\s+be\s+exactly)?)\s*:\s*([^\n]*)$/gim;
   for (const match of text.matchAll(endCardLabelPattern)) {
     const matchIndex = match.index ?? 0;
     const lineEnd = text.indexOf('\n', matchIndex);
@@ -6416,10 +6502,11 @@ function alignAssistantStoryboardDialogueWithUserSource(
 function minimumStoryboardSceneDurationForDialogue(
   scene: SceneSpec,
   rules: StoryboardTimingRules,
+  wordsPerSecondMax = rules.normalWordsPerSecondMax,
 ): number {
   const dialogueWords = countWords(scene.dialogue);
   let minDuration = dialogueWords > 0
-    ? dialogueWords / rules.normalWordsPerSecondMax
+    ? dialogueWords / wordsPerSecondMax
     : 0.5;
   const sceneContext = `${scene.title}\n${scene.visual}\n${scene.textInImage.join(' ')}`;
   const hasReadableText = scene.textInImage.length > 0;
@@ -6446,13 +6533,26 @@ function retimeStoryboardScenesForDialogue(
   const needsRetiming = scenes.some((scene, index) => (scene.durationSec ?? 0) + rules.toleranceSec < minimumDurations[index]);
   if (!needsRetiming) return scenes;
 
-  const minimumTotal = Math.round(minimumDurations.reduce((sum, duration) => sum + duration, 0) * 100) / 100;
+  let requiredDurations = minimumDurations;
+  let minimumTotal = Math.round(requiredDurations.reduce((sum, duration) => sum + duration, 0) * 100) / 100;
+  if (minimumTotal > targetDurationSec + rules.toleranceSec && rules.fastWordsPerSecondMax > rules.normalWordsPerSecondMax) {
+    const fastDurations = scenes.map(scene => minimumStoryboardSceneDurationForDialogue(
+      scene,
+      rules,
+      rules.fastWordsPerSecondMax,
+    ));
+    const fastTotal = Math.round(fastDurations.reduce((sum, duration) => sum + duration, 0) * 100) / 100;
+    if (fastTotal <= targetDurationSec + rules.toleranceSec) {
+      requiredDurations = fastDurations;
+      minimumTotal = fastTotal;
+    }
+  }
   if (minimumTotal > targetDurationSec + rules.toleranceSec) return scenes;
 
   const extraDuration = Math.max(0, targetDurationSec - minimumTotal);
   const originalDurations = scenes.map(scene => scene.durationSec ?? 0);
   const weightTotal = originalDurations.reduce((sum, duration) => sum + Math.max(0.01, duration), 0);
-  const unroundedDurations = minimumDurations.map((minimum, index) => (
+  const unroundedDurations = requiredDurations.map((minimum, index) => (
     minimum + (extraDuration * Math.max(0.01, originalDurations[index]) / weightTotal)
   ));
   const timelineStartSec = scenes[0].startSec ?? 0;
@@ -6644,6 +6744,27 @@ function finalStoryboardSceneVisibleText(scenes: SceneSpec[]): string[] {
   return [];
 }
 
+function applyStoryboardEndCardTextToScenes(scenes: SceneSpec[], endCardText: string[]): SceneSpec[] {
+  if (scenes.length === 0 || endCardText.length === 0) return scenes;
+  const finalSceneIndex = scenes.length - 1;
+  const explicitEndCardIndex = (() => {
+    for (let index = scenes.length - 1; index >= 0; index -= 1) {
+      if (storyboardSceneLooksLikeEndCard(scenes[index])) return index;
+    }
+    return finalSceneIndex;
+  })();
+
+  return scenes.map((scene, index) => index === explicitEndCardIndex
+    ? {
+        ...scene,
+        textInImage: uniqueStoryboardStrings([
+          ...scene.textInImage,
+          ...endCardText,
+        ]),
+      }
+    : scene);
+}
+
 function storyboardRequiredTextKey(value: string): string {
   return compactStoryboardLine(value)
     .toLowerCase()
@@ -6704,6 +6825,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const userIntentText = canonicalStoryboardScriptContext(rawUserIntentText) || rawUserIntentText;
   const narrativeUserIntentText = cleanStoryboardNarrativeSourceText(userIntentText);
   const approvedScriptContext = cleanStoryboardNarrativeSourceText(canonicalStoryboardScriptContext(options.approvedScriptContext));
+  const referencePromptContext = cleanStoryboardNarrativeSourceText(canonicalStoryboardScriptContext(prompt) || prompt);
   const primarySourceBrief = selectStoryboardSourceBriefForCompile(options, userIntentText);
   const sourceText = stripGenericStoryboardVisibleTextMetadata(sanitizeStoryboardExternalAudioReferences([
     cleanStoryboardNarrativeSourceText(primarySourceBrief),
@@ -6733,7 +6855,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const references = buildStoryboardReferenceAssets(
     userIntentText,
     [
-      prompt,
+      referencePromptContext,
       approvedScriptContext,
     ].filter(Boolean).join('\n\n'),
   );
@@ -6773,7 +6895,10 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
       );
     })
     : [];
-  const scenes = parsedScenes;
+  const scenes = parsedScenes.map(scene => ({
+    ...scene,
+    referenceUsage: normalizeStoryboardSceneReferenceUsage(scene.referenceUsage, references),
+  }));
   const timingNormalizedScenes = normalizeAssistantStoryboardSceneTiming(
     scenes,
     durationSec,
@@ -6784,7 +6909,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     userIntentText,
     options.promptAuthorship,
   );
-  const normalizedScenes = dialogueAlignment.shouldRetime
+  const dialogueTimedScenes = (options.promptAuthorship === 'assistant' || dialogueAlignment.shouldRetime)
     ? retimeStoryboardScenesForDialogue(dialogueAlignment.scenes, durationSec)
     : dialogueAlignment.scenes;
   const userConstraintSource = buildStoryboardUserConstraintSource(
@@ -6795,7 +6920,11 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const { mustIncludeText, endCardText } = storyboardRequiredTextForProject(
     options,
     userConstraintSource,
-    normalizedScenes,
+    dialogueTimedScenes,
+  );
+  const normalizedScenes = retimeStoryboardScenesForDialogue(
+    applyStoryboardEndCardTextToScenes(dialogueTimedScenes, endCardText),
+    durationSec,
   );
   const voiceLines = assignVoiceLinesToScenes(normalizedScenes, sourceText);
   const storySpineFallback = approvedScriptContext
@@ -6803,7 +6932,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     || prompt
     || narrativeUserIntentText;
   const storySpine = inferStoryboardStorySpine(allText, storySpineFallback);
-  const productFeatureMap = inferStoryboardProductFeatureMap(allText, scenes);
+  const productFeatureMap = inferStoryboardProductFeatureMap(allText, normalizedScenes);
 
   // Track how many beat/scene sections the AUTHOR wrote in the
   // source script — this is the "intended beat count" downstream
@@ -7069,69 +7198,6 @@ function compileStoryboardStoryContinuitySection(project: StoryboardProject): st
   ];
 }
 
-function compileStoryboardCountContractSection(
-  project: StoryboardProject,
-  layout: StoryboardLayoutSpec,
-  expectedFrameCount = project.scenes.length,
-): string[] {
-  if (expectedFrameCount <= 0) return [];
-
-  const sceneSlots = Array.from({ length: expectedFrameCount }, (_, index) => {
-    const scene = project.scenes[index];
-    return `[${index + 1}] ${scene?.id.toUpperCase() ?? `SCENE_${String(index + 1).padStart(2, '0')}`}`;
-  })
-    .join(', ');
-
-  return [
-    'COUNT / GRID CONTRACT:',
-    `Required scene count: exactly ${expectedFrameCount} numbered storyboard scene slots; do not render fewer slots and do not add extra scene slots.`,
-    `Allocate the full ${expectedFrameCount}-slot storyboard grid before drawing details. Fill slots in reading order, left-to-right then top-to-bottom: ${sceneSlots}.`,
-    `Each allocated scene slot gets one distinct ${layout.cellAspectRatio} cinematic video-frame rectangle plus its own compact notes outside that rectangle. Do not merge adjacent scenes, combine two beats into one slot, duplicate slots, or place thumbnail/inset panels inside a slot.`,
-    `Layout preset: ${layout.layoutKind} - ${layout.layoutDescription}. The final sheet should be visibly countable as ${expectedFrameCount} numbered scene slots at a glance.`,
-  ];
-}
-
-function compileStoryboardFrameGeometrySection(layout: StoryboardLayoutSpec): string[] {
-  const cellOrientation = parseAspectRatioOrientation(layout.cellAspectRatio);
-
-  if (cellOrientation === 'portrait') {
-    return [
-      'PORTRAIT FRAME GEOMETRY:',
-      'Treat each numbered scene slot as a container, not as the artwork shape.',
-      `Inside every numbered scene slot, draw one identical upright ${layout.cellAspectRatio} video-frame rectangle whose height is visibly greater than its width.`,
-      `Keep all scene numbers, timing, titles, notes, headers, footers, and production labels outside the ${layout.cellAspectRatio} video-frame rectangles.`,
-      `Do not make the numbered scene slots, frame artwork areas, or thumbnails square. Square cells violate the requested ${layout.cellAspectRatio} final video format.`,
-      'Unused grid slots must remain blank margin/notes space only; do not stretch or square off the portrait frame rectangles to fill the grid.',
-    ];
-  }
-
-  if (cellOrientation === 'landscape') {
-    return [
-      'LANDSCAPE FRAME GEOMETRY:',
-      'Treat each numbered scene slot as a container, not as the artwork shape.',
-      `Inside every numbered scene slot, draw one identical wide ${layout.cellAspectRatio} video-frame rectangle whose width is visibly greater than its height.`,
-      `Keep all scene numbers, timing, titles, notes, headers, footers, and production labels outside the ${layout.cellAspectRatio} video-frame rectangles.`,
-      `Do not make the numbered scene slots, frame artwork areas, or thumbnails square. Square cells violate the requested ${layout.cellAspectRatio} final video format.`,
-      'Unused grid slots must remain blank margin/notes space only; do not stretch or square off the landscape frame rectangles to fill the grid.',
-    ];
-  }
-
-  if (cellOrientation === 'square') {
-    return [
-      'SQUARE FRAME GEOMETRY:',
-      'Treat each numbered scene slot as a container, not as the artwork shape.',
-      `Inside every numbered scene slot, draw one identical square ${layout.cellAspectRatio} video-frame area plus compact notes outside that square.`,
-      `Do not stretch square frame artwork areas into portrait, landscape, full-board, or any aspect ratio other than ${layout.cellAspectRatio}.`,
-    ];
-  }
-
-  return [
-    'FRAME GEOMETRY:',
-    `Inside every numbered scene slot, draw one identical ${layout.cellAspectRatio} video-frame rectangle plus compact notes outside that rectangle.`,
-    `Do not let frame artwork areas drift to square, full-board, or any aspect ratio other than ${layout.cellAspectRatio}.`,
-  ];
-}
-
 function promptReferenceUsageForScene(
   referenceUsage: string[],
   references: ReferenceAsset[],
@@ -7139,10 +7205,11 @@ function promptReferenceUsageForScene(
 ): string {
   if (referenceUsage.length === 0) return '';
   const referenceById = new Map(references.map((ref, index) => [ref.id, { ref, index }]));
-  return uniqueStoryboardStrings(referenceUsage.map(value => {
+  return uniqueStoryboardStrings(referenceUsage.flatMap(value => {
     const found = referenceById.get(value);
-    if (!found) return value;
-    return formatModelRef(modelId, found.ref.index ?? found.index + 1, 'image');
+    if (found) return [formatModelRef(modelId, found.ref.index ?? found.index + 1, 'image')];
+    if (looksLikeUnknownIndexedStoryboardReference(value)) return [];
+    return [value];
   })).join(', ');
 }
 
@@ -7286,31 +7353,35 @@ export function compileVideoStoryboardImagePrompt(
 
   return [
     'CREATE:',
-    `Create exactly ${compiledFrameCount} sequential video storyboard frames as one composite storyboard image.`,
-    `Project title: ${project.title}.`,
+    `Create exactly ${compiledFrameCount} sequential video storyboard frames as one production storyboard sheet.`,
+    '',
+    'PROJECT:',
+    `Title: ${project.title}.`,
+    `Format: ${layout.targetVideoAspectRatio} video storyboard.`,
     project.durationSec !== null ? `Target duration: ${project.durationSec} seconds.` : 'Target duration: unspecified in source brief.',
     '',
-    ...compileStoryboardCountContractSection(project, layout, compiledFrameCount),
-    '',
-    ...compileStoryboardReferenceSection(project),
-    '',
-    'CANVAS / LAYOUT:',
+    'LAYOUT CONTRACT:',
+    `Create exactly ${compiledFrameCount} numbered storyboard panels; do not render fewer or more panels.`,
+    `Arrange panels in reading order, left-to-right then top-to-bottom: ${Array.from({ length: compiledFrameCount }, (_, index) => {
+      const scene = project.scenes[index];
+      return `[${index + 1}] ${scene?.id.toUpperCase() ?? `SCENE_${String(index + 1).padStart(2, '0')}`}`;
+    }).join(', ')}.`,
     boardSizeLine,
     `Individual scene-cell/frame aspect ratio: ${layout.cellAspectRatio}.`,
     `Target final video aspect ratio: ${layout.targetVideoAspectRatio}.`,
     `Layout preset: ${layout.layoutKind} - ${layout.layoutDescription}.`,
-    `Every cinematic frame artwork area inside every scene cell must preserve ${layout.cellAspectRatio}; do not let any individual frame drift to square, full-board, or a different portrait/landscape ratio.`,
-    'Keep margins, gutters, outside-frame numbering, note strips, and typography consistent across the full board.',
-    'Each scene cell must make the frame-to-notes relationship clear while keeping production labels outside the actual video-frame artwork.',
+    `Each panel must contain one distinct ${layout.cellAspectRatio} cinematic video-frame rectangle with compact notes outside the frame.`,
+    'Keep scene numbers, timecodes, titles, dialogue/VO, audio notes, and production notes outside the video-frame rectangles.',
+    'Do not merge panels, create inset thumbnails, make panels square, or overlay storyboard metadata inside the artwork frames.',
     '',
-    ...compileStoryboardFrameGeometrySection(layout),
+    ...compileStoryboardReferenceSection(project),
     '',
-    ...compileStoryboardStoryContinuitySection(project),
-    '',
-    'GLOBAL STYLE:',
+    'STYLE:',
     `${project.creativeBrief.visualQualityBar} with cinematic shot language, coherent art direction, readable labels, and consistent reference usage.`,
     'Reference-driven personality: before drawing, infer concrete visual and behavioral cues from uploaded/reference images, including character attitude, materials, props, palette, brand tone, typography style, and implied world. Let those cues make this storyboard specific to the supplied subject instead of a generic reusable template.',
     'Vary composition within the required grid: keep the exact scene count, layout, and cell geometry, and make each panel intentionally staged with distinct shot scale, pose/action, camera angle, lighting beat, transition idea, and character-specific detail.',
+    '',
+    ...compileStoryboardStoryContinuitySection(project),
     '',
     'CRITICAL REQUIREMENTS:',
     ...compileStoryboardCriticalRequirements().map((item, index) => `${index + 1}. ${item}`),
@@ -7319,7 +7390,7 @@ export function compileVideoStoryboardImagePrompt(
       .map((ref, index) => `${compileStoryboardCriticalRequirements().length + index + 1}. Critical reference lock: ${ref.id} (${ref.kind}) must remain bound to its assigned usage scope: ${ref.usageScope}.`),
     '',
     ...compileStoryboardScenesSection(project),
-    'TEXT RENDERING:',
+    'TEXT RULES:',
     'Place scene number, timing, scene title, beat title, and compact production labels outside each video frame in a clearly associated header, footer strip, side rail, or table. Do not overlay scene numbers, timecodes, production notes, Dialogue/VO labels, Audio/SFX text, or SFX/action callout words such as Whoosh!, Impact!, Boom!, Thud!, Slash!, Crack!, or Pop! on top of the video-frame artwork. Also do not overlay scene/beat titles on top of the video-frame artwork. Project titles are metadata, not in-frame text. Only listed diegetic or brand text belongs inside a frame. Quote and spell any required visible text exactly.',
     'Visible text listed on a scene belongs only in that scene; repeat visible text only on scenes that list it.',
     ...storyboardRequiredVisibleText(project).map(formatStoryboardRequiredVisibleTextLine),
@@ -7350,23 +7421,24 @@ export function lintStoryboardImagePrompt(
 ): StoryboardPromptLintResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const hasConsolidatedLayoutContract = /LAYOUT CONTRACT:/i.test(prompt);
 
   if (!/CREATE:/i.test(prompt)) errors.push('missing CREATE section');
-  if (!/COUNT \/ GRID CONTRACT:/i.test(prompt)) errors.push('missing COUNT / GRID CONTRACT section');
+  if (!hasConsolidatedLayoutContract && !/COUNT \/ GRID CONTRACT:/i.test(prompt)) errors.push('missing COUNT / GRID CONTRACT section');
   if (!/REFERENCE IMAGES:/i.test(prompt)) errors.push('missing REFERENCE IMAGES section');
-  if (!/CANVAS \/ LAYOUT:/i.test(prompt)) errors.push('missing CANVAS / LAYOUT section');
-  if (!/FRAME GEOMETRY:/i.test(prompt)) errors.push('missing FRAME GEOMETRY section');
+  if (!hasConsolidatedLayoutContract && !/CANVAS \/ LAYOUT:/i.test(prompt)) errors.push('missing CANVAS / LAYOUT section');
+  if (!hasConsolidatedLayoutContract && !/FRAME GEOMETRY:/i.test(prompt)) errors.push('missing FRAME GEOMETRY section');
   const cellOrientation = parseAspectRatioOrientation(layout.cellAspectRatio);
-  if (cellOrientation === 'portrait' && !/PORTRAIT FRAME GEOMETRY:/i.test(prompt)) {
+  if (!hasConsolidatedLayoutContract && cellOrientation === 'portrait' && !/PORTRAIT FRAME GEOMETRY:/i.test(prompt)) {
     errors.push('missing PORTRAIT FRAME GEOMETRY section');
   }
-  if (cellOrientation === 'landscape' && !/LANDSCAPE FRAME GEOMETRY:/i.test(prompt)) {
+  if (!hasConsolidatedLayoutContract && cellOrientation === 'landscape' && !/LANDSCAPE FRAME GEOMETRY:/i.test(prompt)) {
     errors.push('missing LANDSCAPE FRAME GEOMETRY section');
   }
-  if (cellOrientation === 'square' && !/SQUARE FRAME GEOMETRY:/i.test(prompt)) {
+  if (!hasConsolidatedLayoutContract && cellOrientation === 'square' && !/SQUARE FRAME GEOMETRY:/i.test(prompt)) {
     errors.push('missing SQUARE FRAME GEOMETRY section');
   }
-  if (!/TEXT RENDERING:/i.test(prompt)) errors.push('missing TEXT RENDERING section');
+  if (!/(?:TEXT RENDERING|TEXT RULES):/i.test(prompt)) errors.push('missing TEXT RENDERING section');
   if (!prompt.includes(`Overall storyboard canvas aspect ratio: ${layout.boardAspectRatio}`)
     && !prompt.includes(`(${layout.boardAspectRatio})`)) {
     errors.push(`missing board aspect ratio ${layout.boardAspectRatio}`);
@@ -7459,7 +7531,7 @@ function inferCompiledStoryboardPromptAspectRatio(prompt: string, labelPattern: 
 }
 
 function extractCompiledStoryboardScenesBlock(prompt: string): string {
-  const match = prompt.match(/\nSCENES:\s*\n([\s\S]*?)(?:\nTEXT RENDERING:|\nSOURCE BRIEF TO FOLLOW:|\nNEGATIVE \/ AVOID:|$)/i);
+  const match = prompt.match(/\nSCENES:\s*\n([\s\S]*?)(?:\nTEXT RENDERING:|\nTEXT RULES:|\nSOURCE BRIEF TO FOLLOW:|\nNEGATIVE \/ AVOID:|$)/i);
   return match?.[1] ?? '';
 }
 

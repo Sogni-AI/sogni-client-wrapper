@@ -1644,6 +1644,55 @@ async function runTests() {
     }
   })();
 
+  await test('Should synthesize storyboard scenes from plain narration scripts', () => {
+    const brief = [
+      'Create one finished GPT Image 2 storyboard sheet image now using all six uploaded assets as visual references.',
+      'Use a 1440x2560 vertical canvas with multiple labeled storyboard panels for this script.',
+      '',
+      'Uploaded image 1: venue-reference-1.jpg, 1616x1088px.',
+      'Uploaded image 2: headline-reference.jpg, 1750x1200px.',
+      'Uploaded image 3: club-reference.avif, 3840x2074px.',
+      'Uploaded image 4: logo-reference.jpeg, 200x200px.',
+      'Uploaded image 5: logo-reference.png, 225x225px.',
+      'Uploaded image 6: hero-reference.webp, 900x600px.',
+      '',
+      'Script:',
+      '',
+      'Hi, and welcome to ICONIC.',
+      '',
+      "I'm Patrick Grove, chairman of ICONIC, and I'm delighted to welcome you into our world.",
+      '',
+      'Across our properties and experiences, from Mandala Club in Singapore to Amber Lounge on the global stage, our ambition is to bring together hospitality, culture, wellness, sport, nightlife, and community under one connected platform.',
+      '',
+      'So welcome to ICONIC. We are thrilled to have you with us!',
+    ].join('\n');
+
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: 'Create the requested vertical storyboard sheet directly from the supplied script and visual references.',
+      userIntentText: brief,
+      frameCount: 6,
+      promptAuthorship: 'assistant',
+    });
+    const audit = auditCompiledStoryboardImagePrompt({ prompt, expectedFrameCount: 6 });
+    if (!audit.ok) {
+      throw new Error(`Plain narration storyboard audit failed: ${audit.fatalIssues.map(issue => issue.code).join(', ')}`);
+    }
+    if (!prompt.includes('SCENE_01') || !prompt.includes('SCENE_06')) {
+      throw new Error('Compiled prompt did not synthesize the requested SCENE entries');
+    }
+    if (!/ICONIC|Mandala|Amber/.test(prompt)) {
+      throw new Error('Compiled prompt lost key narration terms');
+    }
+    if (!prompt.includes('REFERENCE IMAGES:') || !prompt.includes('Image 6')) {
+      throw new Error('Compiled prompt lost uploaded reference image context');
+    }
+    for (const forbidden of ['premium hospitality', 'brand-world', 'luxury hospitality', 'Warm premium music']) {
+      if (prompt.includes(forbidden)) {
+        throw new Error(`Compiled prompt included overfit narration fallback text: ${forbidden}`);
+      }
+    }
+  })();
+
   await test('Should preserve user end-scene copy from assistant storyboard drafts', () => {
     const userIntent = [
       'Generate a fun 420p 10s video storyboard using this mascot image.',
@@ -1702,6 +1751,61 @@ async function runTests() {
     }
     if (!prompt.includes('Required exact visible text: "Powered by the people."')) {
       throw new Error('Compiled prompt did not preserve final slogan text');
+    }
+  })();
+
+  await test('Should preserve explicit assistant storyboard timing while normalizing total duration', () => {
+    const userIntent = [
+      'Generate a fun 15s video storyboard using image 1 as the pink sloth mascot and image 2 as the Sogni logo.',
+      'Let us construct this using 12 beats.',
+      '"Ever since I was young I’ve always wanted to convert unstructured data into actionable insight…. Syke! I’ve wanted to make wild art. Anything I can imagine. And it’s finally here."',
+      'End scene:',
+      'Seedance 2.0 on Sogni.ai',
+      'Create anything.',
+      'Powered by the people.',
+    ].join('\n');
+    const assistantDraft = [
+      '### The Script & Storyboard Plan (12 Beats)',
+      '**Reference Assets:**',
+      '* **Asset 1 (Mascot):** Pink fuzzy sloth with glasses and unicorn horn.',
+      '* **Asset 2 (Logo):** Sogni Logo.',
+      '',
+      '| Beat | Time | Visual / Action / Camera | Audio / VO / SFX | Transition Logic |',
+      '| :--- | :--- | :--- | :--- | :--- |',
+      '| **01** | 0:00-0:02 | **Wide Shot.** Pink sloth sits at a grey office desk. | **VO:** "Ever since I was young..."<br>**SFX:** Monotone fluorescent hum. | Establish the before state. |',
+      '| **02** | 0:02-0:04 | **Close Up.** Sloth blinks slowly as reality starts to glitch. | **VO:** "...I’ve always wanted to convert unstructured data..."<br>**SFX:** Glitchy buzz. | First crack in reality. |',
+      '| **03** | 0:04-0:05 | **Macro Shot.** His hand hits Enter and keys melt into paint. | **VO:** "...into actionable insight..."<br>**SFX:** Magical chime. | Transformation begins. |',
+      '| **04** | 0:05-0:06 | **Medium Shot.** Sloth smiles as the walls peel away. | **VO:** "...Syke!"<br>**SFX:** Record scratch. | Tone shift. |',
+      '| **05** | 0:06-0:07 | **POV Shot.** The office explodes into neon colors. | **VO:** "I’ve wanted to make wild art."<br>**SFX:** Whooshing wind. | Reality to imagination. |',
+      '| **06** | 0:07-0:08 | **Full Body.** Sloth floats in neon clouds. | **VO:** "Anything I can imagine."<br>**SFX:** Funky bassline. | Wonderland. |',
+      '| **07** | 0:08-0:10 | **Montage.** Sloth throws paint into neon birds. | **VO:** "And it’s finally here."<br>**SFX:** Paint splats. | Art payoff. |',
+      '| **08** | 0:10-0:12 | **Dynamic Pan.** Sloth rides a floating paintbrush. | **SFX:** Vroom sound, whooshing air. High energy. | Peak pace. |',
+      '| **09** | 0:12-0:13 | **Extreme Close Up.** His eyes swirl with galaxy colors. | **SFX:** Bright magical bell. | Brand hook. |',
+      '| **10** | 0:13-0:14 | **Graphic Transition.** A ripple wipes to black. | **SFX:** Pop and digital fade out. | Reset. |',
+      '| **11** | 0:14-0:15 | **End Card.** The Sogni Logo appears with text: "Create anything." | **VO:** "Powered by the people."<br>**SFX:** Brand chime. | Final branding. |',
+      '| **12** | 0:15-0:16 | **Stinger.** Small text appears under logo: "Seedance 2.0 on Sogni.ai". | **SFX:** Fade to silence. | Technical credit. |',
+    ].join('\n');
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    if (!prompt.includes('SCENE_12 - Stinger - 14.1s-15s')) {
+      throw new Error('Compiler redistributed explicit assistant beat timing instead of scaling 16s to 15s');
+    }
+    if (!prompt.includes('Dialogue/VO: Ever since I was young...')) {
+      throw new Error('Compiler dropped approved assistant dialogue punctuation');
+    }
+    if (!prompt.includes('Audio/SFX: Vroom sound, whooshing air. High energy.')) {
+      throw new Error('Compiler lost SFX-only scene audio');
+    }
+    if (!prompt.includes('Image 1: character/source subject reference.')) {
+      throw new Error('Compiler did not prefer approved reference asset roles over generic upload metadata');
+    }
+    if (!prompt.includes('Image 2: logo/brand reference.')) {
+      throw new Error('Compiler did not preserve the approved logo reference role');
     }
   })();
 
@@ -1813,14 +1917,11 @@ async function runTests() {
     for (const compiled of [prompt, adapterPrompt]) {
       if (!compiled.includes('LAYOUT CONTRACT:')) throw new Error('Compiled prompt is missing consolidated layout contract');
       if (!compiled.includes('TEXT RULES:')) throw new Error('Compiled prompt is missing consolidated text rules');
-      if (/COUNT \/ GRID CONTRACT:|CANVAS \/ LAYOUT:|FRAME GEOMETRY:|TEXT RENDERING:/i.test(compiled)) {
+      if (/COUNT \/ GRID CONTRACT:|CANVAS \/ LAYOUT:|(?:^|\n)FRAME GEOMETRY:|TEXT RENDERING:/i.test(compiled)) {
         throw new Error('Compiled prompt retained stale repeated layout/text sections');
       }
       if (/\bImage 6\b|\bImage 12\b/i.test(compiled)) {
         throw new Error('Compiled prompt retained phantom stale image references');
-      }
-      if (/unused grid slots/i.test(compiled)) {
-        throw new Error('Compiled prompt mentioned unused grid slots for an exact 12-slot grid');
       }
       for (const text of ['Seedance 2.0 on Sogni.ai', 'Create anything.', 'Powered by the people.']) {
         if (!compiled.includes(`Required exact visible text: "${text}"`) && !compiled.includes(`"${text}"`)) {
@@ -1857,6 +1958,25 @@ async function runTests() {
     }
     if (/unused grid slots/i.test(exactLandscapePortrait.layoutDescription)) {
       throw new Error('Exact landscape-portrait layout mentioned unused grid slots');
+    }
+
+    const portraitStoryboardPrompt = compileVideoStoryboardImagePrompt({
+      prompt: 'Twelve timed vertical-video storyboard beats with compact labels outside each portrait frame.',
+      userIntentText: 'Create a 12-beat storyboard sheet for a 9:16 vertical social campaign.',
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    if (!portraitStoryboardPrompt.includes('PORTRAIT FRAME GEOMETRY:')) {
+      throw new Error('Portrait storyboard prompt is missing portrait frame geometry guidance');
+    }
+    if (!portraitStoryboardPrompt.includes('Square cells violate the requested 9:16 final video format.')) {
+      throw new Error('Portrait storyboard prompt is missing square-cell rejection guidance');
+    }
+    if (!portraitStoryboardPrompt.includes('Inside every numbered scene slot, draw one identical upright 9:16 video-frame rectangle whose height is visibly greater than its width.')) {
+      throw new Error('Portrait storyboard prompt is missing upright portrait rectangle guidance');
+    }
+    if (!portraitStoryboardPrompt.includes('Unused grid slots must remain blank margin/notes space only')) {
+      throw new Error('Portrait storyboard prompt is missing unused-grid-slot safety guidance');
     }
   })();
 

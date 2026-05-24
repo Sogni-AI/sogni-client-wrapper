@@ -5938,6 +5938,122 @@ function splitStoryboardSections(text: string): Array<{ number: number; heading:
   return sectionHeadings.length > 0 ? sectionHeadings : tableSections;
 }
 
+function extractPlainNarrationScriptText(text: string): string {
+  const source = text.trim();
+  if (!source) return '';
+  const markers = Array.from(source.matchAll(/^\s*(?:#{1,6}\s*)?(?:voice[-\s]?over\s+|narration\s+)?script\s*:\s*$/gim));
+  const marker = markers[markers.length - 1];
+  if (!marker || marker.index === undefined) return '';
+  const body = source.slice(marker.index + marker[0].length).trim();
+  return body
+    .split(/\r?\n/)
+    .map(line => stripStoryboardMarkup(line).trim())
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function splitPlainNarrationPhrases(text: string): string[] {
+  const normalized = text
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) return [];
+
+  const sentenceMatches = normalized.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [normalized];
+  return sentenceMatches
+    .flatMap(sentence => sentence
+      .split(/\s*(?:;|:\s+|,\s+(?=(?:and|but|so|whether|from|across|under|while|as)\b))\s*/i)
+      .map(part => compactStoryboardLine(part)))
+    .filter(part => countWords(part) > 0);
+}
+
+function splitPhraseAtWordMidpoint(value: string): [string, string] | null {
+  const words = value.match(/\S+/g) ?? [];
+  if (words.length < 8) return null;
+  const midpoint = Math.floor(words.length / 2);
+  const left = words.slice(0, midpoint).join(' ').trim();
+  const right = words.slice(midpoint).join(' ').trim();
+  return left && right ? [left, right] : null;
+}
+
+function normalizeNarrationSegmentCount(phrases: string[], frameCount: number): string[] {
+  if (frameCount <= 0) return [];
+  let segments = phrases.slice();
+  while (segments.length < frameCount) {
+    let longestIndex = -1;
+    let longestCount = 0;
+    for (let index = 0; index < segments.length; index += 1) {
+      const words = countWords(segments[index]);
+      if (words > longestCount) {
+        longestCount = words;
+        longestIndex = index;
+      }
+    }
+    if (longestIndex < 0) break;
+    const split = splitPhraseAtWordMidpoint(segments[longestIndex]);
+    if (!split) break;
+    segments.splice(longestIndex, 1, split[0], split[1]);
+  }
+
+  if (segments.length <= frameCount) return segments;
+
+  const merged: string[] = [];
+  for (let index = 0; index < frameCount; index += 1) {
+    const start = Math.floor(index * segments.length / frameCount);
+    const end = Math.floor((index + 1) * segments.length / frameCount);
+    const chunk = segments.slice(start, Math.max(start + 1, end)).join(' ');
+    if (chunk.trim()) merged.push(chunk.trim());
+  }
+  return merged;
+}
+
+function titleFromNarrationSegment(segment: string, index: number): string {
+  const words = compactStoryboardLine(segment)
+    .replace(/["'()]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6)
+    .join(' ');
+  return words || `Narration Beat ${index + 1}`;
+}
+
+function synthesizeStoryboardSectionsFromPlainNarration(
+  sourceText: string,
+  frameCount: number,
+  references: ReferenceAsset[],
+): Array<{ number: number; heading: string; body: string }> {
+  const script = extractPlainNarrationScriptText(sourceText);
+  if (!script || countWords(script) < 8) return [];
+  const phrases = splitPlainNarrationPhrases(script);
+  const segments = normalizeNarrationSegmentCount(phrases, frameCount).slice(0, frameCount);
+  if (segments.length === 0) return [];
+
+  const referenceLine = references.length > 0
+    ? `Reference usage: ${references.map(ref => `Image ${ref.index ?? references.indexOf(ref) + 1}`).join(', ')}.`
+    : '';
+  const cameraPresets = [
+    'Wide establishing composition that introduces the setting, subject, or idea named in the narration.',
+    'Medium composition focused on the active subject, action, or relationship in this beat.',
+    'Detail insert on concrete objects, gestures, text, environment, or visual evidence named in the narration.',
+    'Tracking or reveal-style composition that moves the story into the next idea.',
+  ];
+
+  return segments.map((segment, index) => ({
+    number: index + 1,
+    heading: `Scene ${index + 1} - ${titleFromNarrationSegment(segment, index)}`,
+    body: [
+      `Purpose: Translate narration beat ${index + 1} into a concrete ordered storyboard moment.`,
+      `Visual/Action: Create a concrete visual moment using only this narration beat and the supplied references: ${segment}`,
+      `Camera/Motion: ${cameraPresets[index % cameraPresets.length]}`,
+      'Lighting/Style: Match the visual style, genre, and tone implied by the user request and supplied references; keep the frame cinematic but readable as a storyboard panel.',
+      'Transition: Maintain continuity from the previous beat through subject, setting, gesture, camera direction, color, or motion when those cues are present.',
+      `Dialogue/VO: ${segment}`,
+      'Audio/SFX: Use only audio cues implied by the narration or user request; otherwise keep ambience or music generic and unobtrusive.',
+      referenceLine,
+    ].filter(Boolean).join('\n'),
+  }));
+}
+
 function storyboardSectionsHavePreservableExplicitTiming(
   sections: Array<{ number: number; heading: string; body: string }>,
 ): boolean {
@@ -6914,8 +7030,16 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     : assistantDraftUndercounted || assistantApprovedDraftUndercounted
       ? []
       : sourceSections;
-  const parsedScenes = sections.length > 0
-    ? sections.map((section) => {
+  const selectedSectionsHaveExplicitTiming =
+    sections.length > 0 && storyboardSectionsHavePreservableExplicitTiming(sections);
+  const preserveAssistantExplicitTiming =
+    options.promptAuthorship === 'assistant' && selectedSectionsHaveExplicitTiming;
+  const synthesizedSections = sections.length === 0
+    ? synthesizeStoryboardSectionsFromPlainNarration(`${sourceText}\n\n${narrativeUserIntentText}`, options.frameCount, references)
+    : [];
+  const storyboardSections = sections.length > 0 ? sections : synthesizedSections;
+  const parsedScenes = storyboardSections.length > 0
+    ? storyboardSections.map((section) => {
       return buildSceneFromSection(
         section,
         references,
@@ -6938,7 +7062,10 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     userIntentText,
     options.promptAuthorship,
   );
-  const dialogueTimedScenes = (options.promptAuthorship === 'assistant' || dialogueAlignment.shouldRetime)
+  const canPreserveAssistantExplicitTiming =
+    preserveAssistantExplicitTiming && !dialogueAlignment.shouldRetime;
+  const dialogueTimedScenes = (!canPreserveAssistantExplicitTiming
+    && (options.promptAuthorship === 'assistant' || dialogueAlignment.shouldRetime))
     ? retimeStoryboardScenesForDialogue(dialogueAlignment.scenes, durationSec)
     : dialogueAlignment.scenes;
   const userConstraintSource = buildStoryboardUserConstraintSource(
@@ -6951,10 +7078,10 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     userConstraintSource,
     dialogueTimedScenes,
   );
-  const normalizedScenes = retimeStoryboardScenesForDialogue(
-    applyStoryboardEndCardTextToScenes(dialogueTimedScenes, endCardText),
-    durationSec,
-  );
+  const scenesWithEndCardText = applyStoryboardEndCardTextToScenes(dialogueTimedScenes, endCardText);
+  const normalizedScenes = canPreserveAssistantExplicitTiming
+    ? scenesWithEndCardText
+    : retimeStoryboardScenesForDialogue(scenesWithEndCardText, durationSec);
   const voiceLines = assignVoiceLinesToScenes(normalizedScenes, sourceText);
   const storySpineFallback = approvedScriptContext
     || (options.promptAuthorship === 'assistant' ? narrativeUserIntentText : cleanStoryboardNarrativeSourceText(primarySourceBrief))
@@ -7001,8 +7128,8 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   }
   const recognizedSectionCount = directBeatMarkerCount > 0
     ? directBeatMarkerCount
-    : sections.length > 0
-      ? sections.length
+    : storyboardSections.length > 0
+      ? storyboardSections.length
       : Math.max(approvedSections.length, sourceSections.length);
 
   return {
@@ -7362,6 +7489,20 @@ function storyboardLayoutSpecFromProject(
   };
 }
 
+function compileStoryboardFrameGeometrySection(layout: StoryboardLayoutSpec): string[] {
+  const cellOrientation = parseAspectRatioOrientation(layout.cellAspectRatio);
+  if (cellOrientation === 'portrait') {
+    return [
+      'PORTRAIT FRAME GEOMETRY:',
+      `Every cinematic artwork area inside a panel must remain a ${layout.cellAspectRatio} portrait video-frame rectangle matching the final video frame.`,
+      `Inside every numbered scene slot, draw one identical upright ${layout.cellAspectRatio} video-frame rectangle whose height is visibly greater than its width.`,
+      `Square cells violate the requested ${layout.targetVideoAspectRatio} final video format.`,
+      'Unused grid slots must remain blank margin/notes space only; do not fill them with extra scenes, duplicate frames, or decorative artwork.',
+    ];
+  }
+  return [];
+}
+
 export function compileVideoStoryboardImagePrompt(
   options: StoryboardPromptCompileOptions,
 ): string {
@@ -7402,6 +7543,7 @@ export function compileVideoStoryboardImagePrompt(
     `Each panel must contain one distinct ${layout.cellAspectRatio} cinematic video-frame rectangle with compact notes outside the frame.`,
     'Keep scene numbers, timecodes, titles, dialogue/VO, audio notes, and production notes outside the video-frame rectangles.',
     'Do not merge panels, create inset thumbnails, make panels square, or overlay storyboard metadata inside the artwork frames.',
+    ...compileStoryboardFrameGeometrySection(layout),
     '',
     ...compileStoryboardReferenceSection(project),
     '',

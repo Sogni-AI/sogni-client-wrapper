@@ -1704,6 +1704,50 @@ async function runTests() {
     }
   })();
 
+  await test('Should not promote retake follow-up text into storyboard end-card copy', () => {
+    const userIntent = [
+      'Generate a fun 15s video storyboard using image 1 as the pink sloth mascot and image 2 as the Sogni logo.',
+      'The commercial should end on our Sogni logo and slogans.',
+      'Let us construct this using 12 beats.',
+      'End scene: Seedance 2.0 on Sogni.ai Create anything. Powered by the people.',
+      "Let's try another take on the script.",
+      'use your best judgement',
+      'yes',
+      'Go ahead and generate it',
+    ].join('\n');
+    const assistantDraft = [
+      '### Timecoded Storyboard Plan (12 Beats)',
+      '| Beat | Time | Purpose | Visual / Action | Audio / Dialogue |',
+      '| :--- | :--- | :--- | :--- | :--- |',
+      '| **1** | 00:00 - 00:01 | Setup | Sloth at a boring desk. | SFX: office hum. |',
+      '| **2** | 00:01 - 00:02 | Setup | Papers pile up. | SFX: paper rustle. |',
+      '| **3** | 00:02 - 00:03 | Turn | Sloth looks to camera. | VO: "Ever since I was young" |',
+      '| **4** | 00:03 - 00:04 | Action | Horn glows. | VO: "I have always wanted to" |',
+      '| **5** | 00:04 - 00:05 | Action | Desk melts. | SFX: whoosh. |',
+      '| **6** | 00:05 - 00:06 | Escalation | Art orbs appear. | VO: "convert unstructured data" |',
+      '| **7** | 00:06 - 00:07 | Escalation | Psychedelic ribbons wrap the sloth. | SFX: synth swell. |',
+      '| **8** | 00:07 - 00:08 | Climax | Fractals explode. | VO: "into actionable insight" |',
+      '| **9** | 00:08 - 00:09 | Reveal | Sloth freezes happy in art. | SFX: record scratch. |',
+      '| **10** | 00:09 - 00:10 | Reveal | Text slams on screen: "Syke!" | VO: "Syke! I wanted to make wild art." |',
+      '| **11** | 00:10 - 00:12 | Payoff | Sloth winks near logo area. | VO: "Anything I can imagine." |',
+      '| **12** | 00:12 - 00:15 | End Card | Sogni Logo appears with the tagline below it. | [no dialogue] |',
+    ].join('\n');
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      approvedScriptContext: assistantDraft,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+
+    if (!prompt.includes('Required exact visible text: "Powered by the people."')) {
+      throw new Error('Compiled prompt did not preserve final slogan text');
+    }
+    if (/Required exact visible text: "Let(?:\\'|')s try another take on the script\."/i.test(prompt)) {
+      throw new Error('Compiled prompt promoted a retake instruction into required visible text');
+    }
+  })();
+
   await test('Should compile compact GPT Image storyboard prompts without phantom references or stale sections', () => {
     const userIntent = [
       'Create a production storyboard sheet for a 15-second vertical commercial.',

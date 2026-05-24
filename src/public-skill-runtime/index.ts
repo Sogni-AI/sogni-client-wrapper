@@ -4817,6 +4817,26 @@ function extractStoryboardRequiredText(text: string): string[] {
   const visibleTextContextPattern = /\b(?:visible|on[-\s]?screen|in[-\s]?frame|text|copy|cta|tagline|headline|title\s+card|caption|subtitle|super|wordmark|spell(?:ed)?|read(?:s)?|slogan)\b/i;
   const sceneHeadingPattern = /^\s*(?:[-*+]\s*)?(?:#{1,6}\s*)?(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)[\s_#-]*\d{1,2}\b/i;
   const visibleTextRestrictionPattern = /\b(?:only\s+(?:text|copy|words?)|no\s+(?:captions?|subtitles?|overlays?|watermarks?|added\s+logos?|extra\s+logos?|logos?|text|copy)|without\s+(?:captions?|subtitles?|overlays?|watermarks?|added\s+logos?|extra\s+logos?|logos?|text|copy)|do\s+not\s+(?:add|include|render|show|write)\s+(?:captions?|subtitles?|overlays?|watermarks?|logos?|text|copy|words?))\b/i;
+  const storyboardTextCandidateLooksLikeConversationInstruction = (candidate: string): boolean => {
+    const raw = compactStoryboardLine(stripStoryboardMarkup(candidate))
+      .replace(/^["“”'`]+|["“”'`]+$/g, '')
+      .trim();
+    if (!raw) return false;
+    if (/^\[(?:uploaded|attached|provided)\s+(?:images?|files?|videos?|audio)\s*:/i.test(raw)) return true;
+    if (/^(?:yes|no|approved?|looks?\s+good|ok(?:ay)?|sure)[.!?]?$/i.test(raw)) return true;
+
+    const value = raw.toLowerCase();
+    const workflowTerm = /\b(?:script|prompt|story\s*board|storyboard|take|version|again|redo|retry|regenerate|re-generate|revise|revision|approve|approval|proceed|generate|render|run|do\s+it|best\s+judg(?:e)?ment)\b/i;
+    if (/^use\s+your\s+best\s+judg(?:e)?ment\b/i.test(raw)) return true;
+    if (/^(?:try\s+another|another\s+take|regenerate|re-generate|redo|retry|revise)\b/i.test(raw)) return true;
+    if (/^(?:go\s+ahead|can\s+you|please)\b/i.test(raw) && workflowTerm.test(value)) return true;
+    if (/^let'?s\b|^lets\b/i.test(raw)) {
+      return /\b(?:script|prompt|story\s*board|storyboard|take|version|again|redo|retry|regenerate|re-generate|revise|revision)\b/i.test(value)
+        || /\b(?:generate|render|create|do|run)\s+it\b/i.test(value)
+        || /\buse\s+your\s+best\s+judg(?:e)?ment\b/i.test(value);
+    }
+    return false;
+  };
   const shouldIgnoreRequiredText = (
     value: string,
     matchIndex: number,
@@ -4864,6 +4884,10 @@ function extractStoryboardRequiredText(text: string): string[] {
     }
 
     if (storyboardTextCandidateLooksLikeGenericProductionLabel(value)) {
+      return true;
+    }
+
+    if (storyboardTextCandidateLooksLikeConversationInstruction(value)) {
       return true;
     }
 
@@ -4946,6 +4970,7 @@ function extractStoryboardRequiredText(text: string): string[] {
     if (!value || value.length > 120) return false;
     if (/^(?:none|n\/a|not\s+specified|no\s+(?:visible\s+)?text)\.?$/i.test(value)) return false;
     if (storyboardTextCandidateLooksLikeGenericProductionLabel(value)) return false;
+    if (storyboardTextCandidateLooksLikeConversationInstruction(value)) return false;
 
     const contextNamesText =
       /\b(?:slogans?|taglines?|cta|copy|text|words?|wordmark|brand|logo|end\s+card|final\s+card|end\s+scene|final\s+scene|closing\s+card)\b/i
@@ -4969,6 +4994,9 @@ function extractStoryboardRequiredText(text: string): string[] {
       || /^(?:powered|made|built|created|generated|rendered|presented)\s+by\b/i.test(value);
     return !productionDirection || copyOverridesProduction;
   };
+  const endCardFollowingLineLooksLikeContinuationInstruction = (line: string): boolean => {
+    return storyboardTextCandidateLooksLikeConversationInstruction(line);
+  };
   const endCardLabelPattern = /^\s*(?:[-*+]\s*)?(?:(?:end|final|closing)\s+(?:scene|card|frame|shot|cta|logo(?:\s+lockup)?)|(?:scene|shot|beat|panel|frame)\s*\d{1,2}\s+(?:visible\s+text|on[-\s]?screen\s+text|onscreen\s+text|text|copy|cta)(?:\s+must\s+be\s+exactly)?)\s*:\s*([^\n]*)$/gim;
   for (const match of text.matchAll(endCardLabelPattern)) {
     const matchIndex = match.index ?? 0;
@@ -4979,6 +5007,7 @@ function extractStoryboardRequiredText(text: string): string[] {
       const trimmed = line.trim();
       if (!trimmed) break;
       if (/^(?:#{1,6}\s+|\|\s*|(?:Scene|Shot|Beat|Panel|Frame)\s*\d{1,2}\b)/i.test(trimmed)) break;
+      if (endCardFollowingLineLooksLikeContinuationInstruction(trimmed)) break;
       if (followingLines.length >= 5) break;
       followingLines.push(trimmed);
     }

@@ -207,6 +207,15 @@ export interface BatchStage extends StageBase {
   partialExecutionEnabled: boolean;
   /** Template string for labeling items in UI (e.g. "Segment {index}"). */
   itemLabelTemplate?: string;
+  /**
+   * Max dispatch attempts per slot before the slot is treated as failed
+   * (bounded automatic retry of transient failures). Must be ≥ 1. Defaults
+   * to 2 when `onError` is `'retry_once'`, otherwise 1 (no auto-retry).
+   * Orthogonal to `onError`, which governs propagation *after* the attempt
+   * budget is exhausted (`stop` rethrows; `continue`/`skip` proceed to the
+   * next slot for partial-success fan-out).
+   */
+  maxAttemptsPerItem?: number;
 }
 
 export interface StageCondition {
@@ -388,6 +397,61 @@ export type ResumeInput =
       producedArtifacts?: Record<string, Artifact>;
     }
   | { type: 'cancel' };
+
+// ---------------------------------------------------------------------------
+// Per-slot retry-callback primitive
+// ---------------------------------------------------------------------------
+
+/**
+ * Lifecycle phase of a single batch/fixed-stage slot ("clip", "segment",
+ * "pose", "view" — whatever the fan-out iterates over).
+ *
+ * `retrying` is emitted just before a bounded automatic re-dispatch.
+ */
+export type SlotEventPhase = 'started' | 'progress' | 'completed' | 'failed' | 'retrying';
+
+/**
+ * Out-of-band per-slot callback payload — the missing primitive that lets a
+ * fan-out stage surface ~1s progress, per-slot retry, and parallel-slot
+ * status back to the caller's progress reducer.
+ *
+ * Why a callback and not a generator event: a tool reports progress (via
+ * `callbacks.onToolProgress`) *while the executor is awaiting
+ * `dispatch.execute()`*. The async generator is suspended at that `await`,
+ * not at a `yield`, so it physically cannot turn in-flight progress into a
+ * yielded `ExecutorEvent` in real time — and with bounded concurrency, N
+ * slots are in flight at once, which a single linear yield stream can't
+ * represent cleanly. A side-channel callback registered up-front on
+ * `ExecutorOptions.onSlotEvent` solves both.
+ *
+ * `toolProgress` is the tool's own progress payload, forwarded verbatim
+ * (opaque to this shared module). Consumers (e.g. sogni-chat) map it onto
+ * their concrete progress shape — they own that contract, not the executor.
+ */
+export interface SlotEvent<Progress = Record<string, unknown>> {
+  phase: SlotEventPhase;
+  /** Stage that owns the slot. */
+  stageId: string;
+  /** Flat index of the owning stage (matches `ExecutorEvent.stageIndex`). */
+  stageIndex: number;
+  /** Artifact item id for the slot, e.g. `"render/3"`. */
+  itemId: string;
+  /** Zero-based slot index within the fan-out (maps to a chat `jobIndex`). */
+  index: number;
+  /** 1-based attempt number for the current slot (incremented on retry). */
+  attempt: number;
+  /** Tool progress payload, forwarded verbatim. Present on `progress`. */
+  toolProgress?: Progress;
+  /** Produced version. Present on `completed`. */
+  version?: ArtifactVersion;
+  /** Failure message. Present on `failed` and `retrying`. */
+  error?: string;
+}
+
+/** Caller-registered sink for {@link SlotEvent}s. */
+export type SlotEventReporter<Progress = Record<string, unknown>> = (
+  event: SlotEvent<Progress>,
+) => void;
 
 // ---------------------------------------------------------------------------
 // Validation result

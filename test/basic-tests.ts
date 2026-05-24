@@ -55,6 +55,7 @@ import { PROMPT_CONTRACTS } from '../src/contracts/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
+import { runWorkflowExecutorTests } from './workflow-executor-tests';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -2987,6 +2988,11 @@ async function runTests() {
   const seedanceRefResults = runSeedanceReferencesTests();
   testsPassed += seedanceRefResults.passed;
   testsFailed += seedanceRefResults.failed;
+
+  // Workflow executor — per-slot retry-callback primitive
+  const executorResults = await runWorkflowExecutorTests();
+  testsPassed += executorResults.passed;
+  testsFailed += executorResults.failed;
 
   // Summary
   console.log('\n' + '='.repeat(50));

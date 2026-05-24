@@ -51,16 +51,24 @@ import type {
   InteractiveStage,
   ResumeInput,
   Run,
+  SlotEvent,
+  SlotEventReporter,
   StageExecution,
   WorkflowInput,
   WorkflowTemplate,
 } from './types.js';
 
+export type { SlotEvent, SlotEventPhase, SlotEventReporter } from './types.js';
+
 // ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
-export interface ExecutorOptions<Context = unknown, Callbacks = unknown> {
+export interface ExecutorOptions<
+  Context = unknown,
+  Callbacks = unknown,
+  Progress = Record<string, unknown>,
+> {
   /** Caller-supplied tool execution context (forwarded to the dispatcher verbatim). */
   context: Context;
   /** Caller-supplied callbacks forwarded to the dispatcher verbatim. */
@@ -71,6 +79,15 @@ export interface ExecutorOptions<Context = unknown, Callbacks = unknown> {
   dispatch: ToolDispatcher<Context, Callbacks>;
   /** Optional cooperative cancellation. Inspected at every loop iteration. */
   signal?: AbortSignal;
+  /**
+   * Optional out-of-band per-slot callback. Fan-out stages (batch + fixed)
+   * invoke it for every slot lifecycle transition — `started`, `progress`
+   * (forwarding the tool's own progress payload as it arrives mid-dispatch),
+   * `retrying`, `completed`, `failed` — so the caller's progress reducer can
+   * render ~1s per-slot progress and per-slot retry affordances that a
+   * yielded `ExecutorEvent` can't carry in real time. See {@link SlotEvent}.
+   */
+  onSlotEvent?: SlotEventReporter<Progress>;
 }
 
 /**
@@ -91,9 +108,13 @@ export interface ExecutorOptions<Context = unknown, Callbacks = unknown> {
  * }
  * ```
  */
-export async function* executeRun<Context = unknown, Callbacks = unknown>(
+export async function* executeRun<
+  Context = unknown,
+  Callbacks = unknown,
+  Progress = Record<string, unknown>,
+>(
   runId: string,
-  options: ExecutorOptions<Context, Callbacks>,
+  options: ExecutorOptions<Context, Callbacks, Progress>,
 ): AsyncGenerator<ExecutorEvent, Run, ResumeInput | undefined> {
   const loaded = await options.store.get(runId);
   if (!loaded) {
@@ -105,7 +126,9 @@ export async function* executeRun<Context = unknown, Callbacks = unknown>(
   await options.store.save(run);
   yield { type: 'run_started', run };
 
-  const flat = Array.from(walkStages(run.workflowSnapshot.stages));
+  // Execution iterates top-level stages only: a batch stage's itemStage is
+  // dispatched per-item inside runBatchStage, never as a standalone stage.
+  const flat = Array.from(walkStages(run.workflowSnapshot.stages, { includeBatchItemStage: false }));
   // Map stage IDs to their stable index, used for `currentStageIndex` math.
   const indexOf = new Map(flat.map((s, i) => [s.id, i]));
 
@@ -193,10 +216,10 @@ export async function* executeRun<Context = unknown, Callbacks = unknown>(
 // Stage runners
 // ---------------------------------------------------------------------------
 
-async function* runFixedStage<Context, Callbacks>(
+async function* runFixedStage<Context, Callbacks, Progress>(
   run: Run,
   stage: FixedStage,
-  options: ExecutorOptions<Context, Callbacks>,
+  options: ExecutorOptions<Context, Callbacks, Progress>,
 ): AsyncGenerator<ExecutorEvent, Run, ResumeInput | undefined> {
   let currentRun = await mutateRun(run, {
     stages: setStageState(run.stages, stage.id, {
@@ -257,10 +280,10 @@ async function* runFixedStage<Context, Callbacks>(
   return currentRun;
 }
 
-async function* runBatchStage<Context, Callbacks>(
+async function* runBatchStage<Context, Callbacks, Progress>(
   run: Run,
   stage: BatchStage,
-  options: ExecutorOptions<Context, Callbacks>,
+  options: ExecutorOptions<Context, Callbacks, Progress>,
 ): AsyncGenerator<ExecutorEvent, Run, ResumeInput | undefined> {
   let currentRun = await mutateRun(run, {
     stages: setStageState(run.stages, stage.id, {
@@ -332,50 +355,109 @@ async function* runBatchStage<Context, Callbacks>(
     return currentRun;
   }
 
-  // Sequential execution for M3. Concurrency is wired in M5/M7.
+  // A batch's itemStage must be a fixed tool call.
   if (stage.itemStage.type !== 'fixed') {
     throw new Error(
       `[WORKFLOW EXECUTOR] Batch itemStage of type "${stage.itemStage.type}" `
-        + `is not yet supported. Only fixed itemStages work in M3.`,
+        + `is not supported. Only fixed itemStages can fan out.`,
     );
   }
 
-  for (const idx of indicesToRun) {
-    if (options.signal?.aborted) break;
+  const itemStage = stage.itemStage;
+  const maxAttempts = maxAttemptsForStage(stage);
+  const concurrency = clampConcurrency(stage.concurrency);
 
+  // Snapshot the binding context once so fan-out slots resolve their args
+  // independently — a slot must never depend on a sibling slot's output, or a
+  // parallel run would be nondeterministic.
+  const itemArgsCtx = makeBindingContext(currentRun);
+
+  type SlotOutcome = { idx: number; itemId: string; version?: ArtifactVersion; error?: string };
+
+  // Run one slot end-to-end (dispatch + bounded retry), emitting per-slot
+  // lifecycle callbacks. Deliberately does NOT mutate `currentRun`: the
+  // generator body applies the produced version when the slot settles, so all
+  // run mutation stays single-threaded even with concurrent slots in flight.
+  const runSlot = async (idx: number): Promise<SlotOutcome> => {
     const itemId = itemIds[idx];
     const item = items[idx];
-    yield { type: 'stage_item_started', stageIndex: currentRun.currentStageIndex, itemId, index: idx };
-
+    const slotBase = { stageId: stage.id, stageIndex: currentRun.currentStageIndex, itemId, index: idx };
     const itemCtx: BindingContext = {
-      ...makeBindingContext(currentRun),
+      ...itemArgsCtx,
       item: { ...(typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : { value: item }), index: idx },
     };
-    const resolvedArgs = resolveBindings(stage.itemStage.args, itemCtx) as Record<string, unknown>;
+    const resolvedArgs = resolveBindings(itemStage.args, itemCtx) as Record<string, unknown>;
 
-    const wrappedCallbacks = wrapCallbacks(options.callbacks, () => { /* per-item pump happens via the yield below */ });
-
-    try {
-      const rawResult = await options.dispatch.execute(
-        stage.itemStage.tool,
-        resolvedArgs,
-        options.context,
-        wrappedCallbacks,
-      );
-      const failureMessage = parseToolErrorMessage(rawResult);
-      if (failureMessage) {
-        throw new Error(`[${stage.itemStage.tool}] ${failureMessage}`);
+    let lastError = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1) {
+        options.onSlotEvent?.({ phase: 'retrying', ...slotBase, attempt, error: lastError });
       }
-      const version = versionFromToolResult(rawResult, stage.id, stage.itemStage.tool, resolvedArgs);
-
-      currentRun = appendVersionToItem(currentRun, producedArtifactName, itemId, version);
-      yield { type: 'stage_item_completed', stageIndex: currentRun.currentStageIndex, itemId, version };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      yield { type: 'stage_item_failed', stageIndex: currentRun.currentStageIndex, itemId, error: message };
-      if (stage.onError === 'continue' || stage.onError === 'skip') continue;
-      throw err;
+      // Bridge the tool's in-flight progress (fired while we await the
+      // dispatch) onto the per-slot callback, tagged with this slot's
+      // identity + attempt — the generator can't yield during the await.
+      const wrappedCallbacks = wrapCallbacks(options.callbacks, (toolProgress) => {
+        options.onSlotEvent?.({ phase: 'progress', ...slotBase, attempt, toolProgress: toolProgress as Progress });
+      });
+      try {
+        const rawResult = await options.dispatch.execute(itemStage.tool, resolvedArgs, options.context, wrappedCallbacks);
+        const failureMessage = parseToolErrorMessage(rawResult);
+        if (failureMessage) {
+          throw new Error(`[${itemStage.tool}] ${failureMessage}`);
+        }
+        const version = versionFromToolResult(rawResult, stage.id, itemStage.tool, resolvedArgs);
+        options.onSlotEvent?.({ phase: 'completed', ...slotBase, attempt, version });
+        return { idx, itemId, version };
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        // Fall through to retry while attempts remain.
+      }
     }
+    options.onSlotEvent?.({ phase: 'failed', ...slotBase, attempt: maxAttempts, error: lastError });
+    return { idx, itemId, error: lastError };
+  };
+
+  // Bounded-concurrency worker pool. Progress/retry/lifecycle for in-flight
+  // slots flows out-of-band via onSlotEvent; the generator yields each slot's
+  // terminal ExecutorEvent as it settles. `continue`/`skip` keep the batch
+  // running for partial success; any other onError stops the batch on the
+  // first terminal failure (remaining in-flight slots drain, then we rethrow).
+  const queue = [...indicesToRun];
+  const inFlight = new Map<number, Promise<SlotOutcome>>();
+  let stopError: string | undefined;
+
+  while (!stopError && (queue.length > 0 || inFlight.size > 0)) {
+    while (!stopError && inFlight.size < concurrency && queue.length > 0) {
+      if (options.signal?.aborted) { queue.length = 0; break; }
+      const idx = queue.shift() as number;
+      const itemId = itemIds[idx];
+      yield { type: 'stage_item_started', stageIndex: currentRun.currentStageIndex, itemId, index: idx };
+      options.onSlotEvent?.({ phase: 'started', stageId: stage.id, stageIndex: currentRun.currentStageIndex, itemId, index: idx, attempt: 1 });
+      inFlight.set(idx, runSlot(idx));
+    }
+
+    if (inFlight.size === 0) break;
+
+    const settled = await Promise.race(
+      Array.from(inFlight.entries(), ([idx, p]) => p.then((outcome) => ({ idx, outcome }))),
+    );
+    inFlight.delete(settled.idx);
+    const { outcome } = settled;
+
+    if (outcome.version) {
+      currentRun = appendVersionToItem(currentRun, producedArtifactName, outcome.itemId, outcome.version);
+      yield { type: 'stage_item_completed', stageIndex: currentRun.currentStageIndex, itemId: outcome.itemId, version: outcome.version };
+    } else {
+      yield { type: 'stage_item_failed', stageIndex: currentRun.currentStageIndex, itemId: outcome.itemId, error: outcome.error ?? 'batch slot failed' };
+      if (!(stage.onError === 'continue' || stage.onError === 'skip')) {
+        stopError = outcome.error ?? 'batch slot failed';
+      }
+    }
+  }
+
+  if (stopError) {
+    await Promise.allSettled(Array.from(inFlight.values()));
+    throw new Error(stopError);
   }
 
   currentRun = await mutateRun(currentRun, {
@@ -393,10 +475,10 @@ async function* runBatchStage<Context, Callbacks>(
  * and blocks until the caller resumes with `interactive_complete`. Full
  * scoped-prompt / tool-filter handoff lands in M5.
  */
-async function* runInteractiveStage<Context, Callbacks>(
+async function* runInteractiveStage<Context, Callbacks, Progress>(
   run: Run,
   stage: InteractiveStage,
-  options: ExecutorOptions<Context, Callbacks>,
+  options: ExecutorOptions<Context, Callbacks, Progress>,
 ): AsyncGenerator<ExecutorEvent, Run, ResumeInput | undefined> {
   let currentRun = await mutateRun(run, {
     state: 'awaiting_input',
@@ -696,6 +778,31 @@ function clearItemVersionsForRedo(
   return { ...artifacts, [name]: { ...existing, items } };
 }
 
+/**
+ * Per-slot attempt budget for a batch stage. Explicit `maxAttemptsPerItem`
+ * wins; otherwise `onError: 'retry_once'` grants exactly one retry (2 total),
+ * and everything else gets a single attempt (no automatic retry).
+ */
+function maxAttemptsForStage(stage: BatchStage): number {
+  if (typeof stage.maxAttemptsPerItem === 'number' && stage.maxAttemptsPerItem >= 1) {
+    return Math.floor(stage.maxAttemptsPerItem);
+  }
+  return stage.onError === 'retry_once' ? 2 : 1;
+}
+
+/** Hard ceiling on parallel slots — matches the chat fan-out invariant. */
+const MAX_BATCH_CONCURRENCY = 16;
+
+/**
+ * Resolve a batch stage's effective concurrency. Undefined/invalid → 1
+ * (sequential, the back-compat default); otherwise floored and clamped to
+ * {@link MAX_BATCH_CONCURRENCY}.
+ */
+function clampConcurrency(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) return 1;
+  return Math.min(Math.floor(value), MAX_BATCH_CONCURRENCY);
+}
+
 function batchItemLabel(stage: BatchStage, index: number, item: unknown): string | undefined {
   if (stage.itemLabelTemplate) {
     // Tiny {index} + {field} interpolation for v1.
@@ -731,17 +838,16 @@ function ensureStageExec(run: Run, stageId: string): StageExecution {
 }
 
 function wrapCallbacks<Callbacks>(base: Callbacks, onProgress: (p: unknown) => void): Callbacks {
-  const baseRecord = base as unknown as Record<string, unknown>;
+  const baseRecord = (base ?? {}) as unknown as Record<string, unknown>;
   const baseOnToolProgress = baseRecord.onToolProgress as ((progress: unknown) => void) | undefined;
-  if (typeof baseOnToolProgress !== 'function') {
-    // Caller's callbacks don't include an onToolProgress hook; forward verbatim.
-    return base;
-  }
+  // Always intercept: the per-slot bridge must fire even when the caller's
+  // callbacks don't include an onToolProgress hook of their own. The tool can
+  // then always call onToolProgress, and we forward to the base when present.
   return {
     ...baseRecord,
     onToolProgress: (progress: unknown) => {
       onProgress(progress);
-      baseOnToolProgress(progress);
+      if (typeof baseOnToolProgress === 'function') baseOnToolProgress(progress);
     },
   } as unknown as Callbacks;
 }
@@ -780,7 +886,7 @@ export async function createRun(params: {
     state: 'draft',
     inputs: seededInputs,
     currentStageIndex: 0,
-    stages: Array.from(walkStages(params.workflow.stages)).map((s): StageExecution => ({
+    stages: Array.from(walkStages(params.workflow.stages, { includeBatchItemStage: false })).map((s): StageExecution => ({
       stageId: s.id,
       state: 'pending',
     })),

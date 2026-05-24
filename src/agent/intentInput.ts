@@ -571,7 +571,7 @@ function validateRecentTurnInternal(
   }
   const role = (value as { role?: unknown }).role;
   if (typeof role !== 'string' || !TURN_ROLES.has(role as IntentInputRecentTurn['role'])) {
-    pushError(errors, `${basePath}/role`, "must be 'user' | 'assistant'");
+    pushError(errors, `${basePath}/role`, "must be 'user' | 'assistant' | 'tool' | 'system'");
   }
   if (typeof (value as { content?: unknown }).content !== 'string') {
     pushError(errors, `${basePath}/content`, 'must be a string');

@@ -6,6 +6,9 @@
  *   - the wrapped tool returns ToolOk AND the optional `condition`
  *     predicate evaluates truthy on its result, or
  *   - `maxAttempts` total tries have been spent.
+ * Runtime handlers should surface the terminal attempt exactly as the
+ * host executor does. In current workflow execution that means re-throwing
+ * the final tool failure, not returning it as a successful primitive result.
  *
  * The predicate is a tiny safe-ish expression evaluator — workflow
  * authors don't get full JS, just dot-paths and a handful of

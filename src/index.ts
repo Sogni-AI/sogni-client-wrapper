@@ -176,8 +176,25 @@ export {
   sanitizeUntrustedString,
   escapeAttribute,
   wrapAsUntrustedUserInput,
+  // Field-tag surface (creative-agent planner / classifier / storyboard).
+  UNTRUSTED_OPEN,
+  UNTRUSTED_CLOSE,
+  MAX_BRIEF_LENGTH,
+  MAX_STYLE_LENGTH,
+  MAX_ASPECT_RATIO_LENGTH,
+  MAX_NOTES_LENGTH,
+  MAX_LATEST_USER_TEXT_LENGTH,
+  MAX_PRIOR_USER_TEXT_LENGTH,
+  MAX_PRIOR_ASSISTANT_TEXT_LENGTH,
+  MAX_CURRENT_MESSAGE_LENGTH,
+  MAX_RECENT_TURN_LENGTH,
+  MAX_CONVERSATION_SUMMARY_LENGTH,
 } from './workflows/primitives/sanitizer.js';
-export type { SanitizeUntrustedStringOptions } from './workflows/primitives/sanitizer.js';
+export type {
+  SanitizeUntrustedStringOptions,
+  SanitizeField,
+  SanitizeResult,
+} from './workflows/primitives/sanitizer.js';
 
 // Default export
 export { SogniClientWrapper as default } from './client/SogniClientWrapper.js';

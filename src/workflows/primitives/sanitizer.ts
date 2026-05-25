@@ -8,13 +8,35 @@
  *    C0 + DEL control chars but did NOT strip delimiter forgery — an
  *    attacker who wrote `</UNTRUSTED_USER_INPUT>...inject...` into a
  *    free-form field could break out of the untrusted block.
- *  - `sogni-creative-agent-v2/src/workflows/primitives/expandStoryboardScript.ts`
+ *  - `sogni-creative-agent-v2/src/workflows/primitives/sanitizer.ts`
  *    stripped both control chars AND a vocabulary of chat-template /
- *    role markers / delimiter tags, but did not expose the helpers as a
- *    reusable module.
+ *    role markers / delimiter tags, exposed a `SanitizeField`-tag-driven
+ *    `sanitizeUntrustedString(raw, field) => SanitizeResult` plus a
+ *    `wrapAsUntrustedUserInput(parts: string[])` joiner and per-field
+ *    `MAX_*` caps — but shipped as a private local copy.
  *
- * This module publishes the strict union of both. Both consumers should
- * import from here and delete their local copies.
+ * This module is the canonical SUPERSET of both surfaces. It publishes:
+ *
+ *  - The string-returning, throw-on-overflow primitives the v2 dispatch
+ *    path expects: `sanitizeUntrustedString(input, opts?) => string` and
+ *    `wrapAsUntrustedUserInput(field, content) => string` (XML block).
+ *  - The field-tag-driven surface the creative-agent planner / classifier
+ *    / storyboard primitives expect: `sanitizeUntrustedString(raw, field)
+ *    => SanitizeResult`, `wrapAsUntrustedUserInput(parts) => string`, the
+ *    `SanitizeField` / `SanitizeResult` types, the `MAX_*` per-field caps,
+ *    and the `UNTRUSTED_OPEN` / `UNTRUSTED_CLOSE` delimiter constants.
+ *
+ * Both `sanitizeUntrustedString` and `wrapAsUntrustedUserInput` are
+ * overloaded so each historical call shape resolves to its original
+ * behaviour. The second argument discriminates `sanitizeUntrustedString`
+ * (an options object => string form; a `SanitizeField` string => result
+ * form); the first argument discriminates `wrapAsUntrustedUserInput`
+ * (a string `field` => XML form; a string array `parts` => joined form).
+ * Existing consumers (sogni-api's URL/rubric primitives are unaffected;
+ * any caller of the string/XML forms keeps its types) are not broken.
+ *
+ * Both creative-agent and sogni-api should import from here and delete
+ * their local copies.
  *
  * Naming convention follows the rest of `workflows/primitives/*` — the
  * helpers are pure and stateless; LLM IO lives in the consumer.
@@ -107,6 +129,146 @@ export const HARD_STRIP_PATTERNS: readonly RegExp[] = Object.freeze([
   ...DELIMITER_PATTERNS,
 ]);
 
+// ---------------------------------------------------------------------------
+// Field-tag surface (creative-agent planner / classifier / storyboard)
+// ---------------------------------------------------------------------------
+//
+// The string/throw primitives above are the dispatch-path API. The
+// surface below is the field-tag-driven API the creative-agent planner,
+// shadow classifier, and storyboard primitive consume: a per-field length
+// cap keyed by a `SanitizeField` tag, a result object (`{ ok, value?,
+// reason?, field }`) instead of a throw, and the literal
+// `<UNTRUSTED_USER_INPUT>` delimiter constants those callers hard-code
+// into their system prompts. Both surfaces live in this one canonical
+// module so the ecosystem has a single sanitizer of record.
+
+/**
+ * Delimiter markers for the field-tag `wrapAsUntrustedUserInput(parts)`
+ * form. Stable so the system prompts produced by callers can hard-code
+ * the same strings. The string/XML `wrapAsUntrustedUserInput(field,
+ * content)` form emits the same `UNTRUSTED_USER_INPUT` tag name with an
+ * attribute; both are stripped on the way in by the delimiter-forgery
+ * patterns above.
+ */
+export const UNTRUSTED_OPEN = '<UNTRUSTED_USER_INPUT>';
+export const UNTRUSTED_CLOSE = '</UNTRUSTED_USER_INPUT>';
+
+/**
+ * Per-field length caps. Generous enough for every legitimate creative
+ * brief / planner field observed in the workflow fixtures while still
+ * capping a hostile producer's leverage in the LLM context. A field that
+ * exceeds its cap is rejected (the caller falls back to a safe default),
+ * not silently truncated. Exported as named constants so callers can
+ * compose their own caps.
+ */
+export const MAX_BRIEF_LENGTH = 8000;
+export const MAX_STYLE_LENGTH = 200;
+export const MAX_ASPECT_RATIO_LENGTH = 32;
+export const MAX_NOTES_LENGTH = 1000;
+export const MAX_LATEST_USER_TEXT_LENGTH = 12_000;
+export const MAX_PRIOR_USER_TEXT_LENGTH = 3600;
+export const MAX_PRIOR_ASSISTANT_TEXT_LENGTH = 6000;
+export const MAX_CURRENT_MESSAGE_LENGTH = 12_000;
+export const MAX_RECENT_TURN_LENGTH = 6000;
+export const MAX_CONVERSATION_SUMMARY_LENGTH = 6000;
+
+/**
+ * Field tags recognised by the field-tag `sanitizeUntrustedString(raw,
+ * field)` form. The tag picks the length cap and is echoed back in the
+ * result for logging.
+ */
+export type SanitizeField =
+  | 'brief'
+  | 'style'
+  | 'aspectRatio'
+  | 'notes'
+  | 'latestUserText'
+  | 'priorUserText'
+  | 'priorAssistantText'
+  | 'currentMessage'
+  | 'recentTurn'
+  | 'conversationSummary';
+
+const FIELD_CAPS: Record<SanitizeField, number> = {
+  brief: MAX_BRIEF_LENGTH,
+  style: MAX_STYLE_LENGTH,
+  aspectRatio: MAX_ASPECT_RATIO_LENGTH,
+  notes: MAX_NOTES_LENGTH,
+  latestUserText: MAX_LATEST_USER_TEXT_LENGTH,
+  priorUserText: MAX_PRIOR_USER_TEXT_LENGTH,
+  priorAssistantText: MAX_PRIOR_ASSISTANT_TEXT_LENGTH,
+  currentMessage: MAX_CURRENT_MESSAGE_LENGTH,
+  recentTurn: MAX_RECENT_TURN_LENGTH,
+  conversationSummary: MAX_CONVERSATION_SUMMARY_LENGTH,
+};
+
+const SANITIZE_FIELD_VALUES = new Set<SanitizeField>([
+  'brief',
+  'style',
+  'aspectRatio',
+  'notes',
+  'latestUserText',
+  'priorUserText',
+  'priorAssistantText',
+  'currentMessage',
+  'recentTurn',
+  'conversationSummary',
+]);
+
+function isSanitizeField(value: unknown): value is SanitizeField {
+  return typeof value === 'string' && SANITIZE_FIELD_VALUES.has(value as SanitizeField);
+}
+
+/**
+ * Result of the field-tag `sanitizeUntrustedString(raw, field)` form. On
+ * success `{ ok: true, value, field }`; on failure `{ ok: false, reason,
+ * field }` with `value` omitted. `reason` is developer-facing (logs,
+ * telemetry) and MUST NOT be surfaced to the LLM or the end user.
+ */
+export interface SanitizeResult {
+  ok: boolean;
+  value?: string;
+  /** Developer-facing reason; never surfaced to the LLM. */
+  reason?: 'too-long' | 'forbidden-control-character' | 'not-a-string';
+  field: SanitizeField;
+}
+
+/**
+ * Reject (do NOT strip) input carrying null bytes or non-whitespace
+ * control characters (C0 / DEL / C1). Whitespace (`\t \n \v \f \r`) is
+ * allowed. The field-tag form rejects so the caller sees an auditable
+ * reason; the string/throw form above strips control bytes instead (it
+ * keeps a narrower class and never rejects on them). Both behaviours are
+ * intentional and preserved.
+ */
+// eslint-disable-next-line no-control-regex
+const FORBIDDEN_CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/;
+
+/**
+ * Field-tag implementation. Validates + normalises a single untrusted
+ * string against the cap for `field`. Pure — never mutates inputs, never
+ * throws, never logs. Strips the same chat-template / delimiter-forgery
+ * vocabulary as {@link HARD_STRIP_PATTERNS}, trims, then applies the
+ * per-field cap.
+ */
+function sanitizeFieldTagged(raw: unknown, field: SanitizeField): SanitizeResult {
+  if (typeof raw !== 'string') {
+    return { ok: false, field, reason: 'not-a-string' };
+  }
+  if (FORBIDDEN_CONTROL_CHARS.test(raw)) {
+    return { ok: false, field, reason: 'forbidden-control-character' };
+  }
+  let cleaned = raw;
+  for (const pattern of HARD_STRIP_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  cleaned = cleaned.trim();
+  if (cleaned.length > FIELD_CAPS[field]) {
+    return { ok: false, field, reason: 'too-long' };
+  }
+  return { ok: true, field, value: cleaned };
+}
+
 // C0 control chars (0x00-0x1F) minus the whitespace ones we keep:
 // \t (0x09), \n (0x0A), \r (0x0D). Plus DEL (0x7F). C1 chars
 // (0x80-0x9F) excluded — they're routinely produced by legitimate
@@ -143,21 +305,42 @@ export interface SanitizeUntrustedStringOptions {
 }
 
 /**
- * Strip C0 + DEL control chars (keep `\n \r \t`), strip chat-template /
- * role markers, and (by default) strip delimiter-forgery tags so an
- * attacker can't break out of `<UNTRUSTED_USER_INPUT>` / `<UNTRUSTED_USER_BRIEF>`.
- *
- * Returns the sanitized string. Throws {@link SanitizerError} when
- * `maxLength` is set and the post-strip length still exceeds it. Pure;
- * no regex routing decision is ever made off the output.
+ * String/throw form (dispatch path): strip C0 + DEL control chars (keep
+ * `\n \r \t`), strip chat-template / role markers, and (by default) strip
+ * delimiter-forgery tags so an attacker can't break out of
+ * `<UNTRUSTED_USER_INPUT>` / `<UNTRUSTED_USER_BRIEF>`. Returns the
+ * sanitized string; throws {@link SanitizerError} when `maxLength` is set
+ * and the post-strip length still exceeds it.
  */
 export function sanitizeUntrustedString(
   input: string,
   opts?: SanitizeUntrustedStringOptions,
-): string {
+): string;
+/**
+ * Field-tag form (creative-agent planner / classifier / storyboard):
+ * validate + normalise `raw` against the per-field cap for `field`.
+ * Returns a {@link SanitizeResult} (`{ ok, value?, reason?, field }`)
+ * instead of throwing — the caller substitutes a safe default on failure.
+ */
+export function sanitizeUntrustedString(
+  raw: unknown,
+  field: SanitizeField,
+): SanitizeResult;
+export function sanitizeUntrustedString(
+  input: unknown,
+  optsOrField?: SanitizeUntrustedStringOptions | SanitizeField,
+): string | SanitizeResult {
+  // Discriminate the two call shapes on the second argument: a
+  // `SanitizeField` string selects the field-tag/result form; anything
+  // else (an options object or nothing) selects the string/throw form.
+  if (isSanitizeField(optsOrField)) {
+    return sanitizeFieldTagged(input, optsOrField);
+  }
+
   if (typeof input !== 'string') {
     throw new TypeError('sanitizeUntrustedString: input must be a string');
   }
+  const opts = optsOrField;
   const stripDelimiters = opts?.stripDelimiters ?? true;
 
   // Drop non-whitespace control bytes first so a delimiter pattern
@@ -213,7 +396,7 @@ function escapeContent(value: string): string {
 }
 
 /**
- * Wrap a sanitized content string in a canonical
+ * XML form: wrap a sanitized content string in a canonical
  * `<UNTRUSTED_USER_INPUT field="...">...</UNTRUSTED_USER_INPUT>` block.
  *
  * - `field` is escaped via {@link escapeAttribute} so a hostile field
@@ -225,7 +408,26 @@ function escapeContent(value: string): string {
  *
  * Returns the formatted block string. Pure.
  */
-export function wrapAsUntrustedUserInput(field: string, content: string): string {
+export function wrapAsUntrustedUserInput(field: string, content: string): string;
+/**
+ * Parts form (creative-agent planner / classifier / storyboard): join one
+ * or more already-sanitised parts inside `UNTRUSTED_OPEN` ...
+ * `UNTRUSTED_CLOSE`, each part on its own line. The caller is expected to
+ * have ALREADY run {@link sanitizeUntrustedString} (field-tag form) on
+ * every embedded user value — this form does NOT re-sanitise or escape.
+ */
+export function wrapAsUntrustedUserInput(parts: readonly string[]): string;
+export function wrapAsUntrustedUserInput(
+  fieldOrParts: string | readonly string[],
+  content?: string,
+): string {
+  // Discriminate on the first argument: a string array selects the parts
+  // form; a string `field` selects the XML form.
+  if (Array.isArray(fieldOrParts)) {
+    return [UNTRUSTED_OPEN, ...fieldOrParts, UNTRUSTED_CLOSE].join('\n');
+  }
+
+  const field = fieldOrParts as string;
   if (typeof field !== 'string' || field.length === 0) {
     throw new TypeError('wrapAsUntrustedUserInput: field must be a non-empty string');
   }

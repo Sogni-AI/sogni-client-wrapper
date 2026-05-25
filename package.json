@@ -96,6 +96,12 @@
       "require": "./dist/workflows/index.js",
       "default": "./dist/workflows/index.js"
     },
+    "./workflows/primitives/sanitizer": {
+      "types": "./dist/workflows/primitives/sanitizer.d.ts",
+      "import": "./dist-esm/workflows/primitives/sanitizer.js",
+      "require": "./dist/workflows/primitives/sanitizer.js",
+      "default": "./dist/workflows/primitives/sanitizer.js"
+    },
     "./media": {
       "types": "./dist/media/index.d.ts",
       "import": "./dist-esm/media/index.js",

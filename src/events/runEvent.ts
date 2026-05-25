@@ -9,14 +9,18 @@
  * `chatRun/index.ts`; v2 keeps the same wire names so durable consumers
  * can migrate in place without touching the network layer.
  *
- * Drift fix (audit 2026-05-20): pre-fix the canonical union was missing
+ * Drift fix (audit 2026-05-20): pre-fix this TS union was missing
  * `spend_gate_opened`, the workflow-stage events (`stage_started`,
  * `stage_completed`, `stage_failed`, `stage_waiting_for_user`), and the
  * `runKind` discriminator. Consumers were emitting those event types and
  * carrying a `runKind` (notably `'tool_batch'` from
- * `sogni-creative-agent-v2/src/agent/sharedTypes.ts`) without canonical
- * coverage. The union is now a SUPERSET of every event type any current
- * consumer emits, and `runKind` is a first-class field on `RunEvent`.
+ * `sogni-creative-agent-v2/src/agent/sharedTypes.ts`) without this union
+ * covering them. This TS union is now the reference shape: it includes
+ * every event type any current consumer emits, and `runKind` is a
+ * first-class field on `RunEvent`. The protocol schema in
+ * `schemas/events/run-event.schema.json` is being aligned to this TS union
+ * as part of this drift fix, so the two will agree once that parallel
+ * change lands.
  *
  * Plan: docs/superpowers/plans/2026-05-20-sogni-chat-v2-execution-architecture-plan-final.md §7 + §11 + §12 + §13.1.
  */
@@ -32,10 +36,11 @@ export type RunKind = 'chat' | 'workflow' | 'tool_batch';
 
 /**
  * All event types in the v2 unified vocabulary. Grouped here by purpose
- * for readability; consumers may treat the union as opaque strings. The
- * superset includes every event type emitted by any current consumer
- * (`sogni-creative-agent-v2`, `sogni-chat`, `sogni-api`) plus the
- * schema-mandated set.
+ * for readability; consumers may treat the union as opaque strings. This
+ * union is the reference shape — it includes every event type emitted by
+ * any current consumer (`sogni-creative-agent-v2`, `sogni-chat`,
+ * `sogni-api`); the protocol schema is aligned to it, not the other way
+ * around.
  */
 export type RunEventType =
   // Lifecycle
@@ -110,8 +115,9 @@ export interface RunEvent {
   runId: string;
   /**
    * Substrate discriminator. Optional on the in-memory type so legacy
-   * producers stay valid for one release; required at the wire level per
-   * `schemas/events/run-event.schema.json`.
+   * producers stay valid for one release; required at the wire level by
+   * `schemas/events/run-event.schema.json`, which is aligned to this TS
+   * type as the reference shape.
    */
   runKind?: RunKind;
   sequence: number;

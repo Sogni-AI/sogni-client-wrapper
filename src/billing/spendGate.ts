@@ -9,13 +9,14 @@
  * Drift fix (audit 2026-05-20): pre-fix `SpendGate` shipped only `{state,
  * request?, decidedAt?, decidedBy?, failureReason?}` — far thinner than
  * the durable shape every downstream consumer (`sogni-creative-agent-v2`,
- * `sogni-api`, `sogni-chat`) actually persists. The schema in
- * `schemas/billing/spend-gate.schema.json` mandates `{gateId, scope,
- * estimate, state, lastTransitionAt}` plus scope-discriminated fields.
- * This file now exposes those fields as the canonical shape while keeping
+ * `sogni-api`, `sogni-chat`) actually persists. These TS types are now the
+ * reference shape: they expose `{gateId, scope, estimate, state,
+ * createdAt, updatedAt}` plus scope-discriminated fields, while keeping
  * the legacy `state` / `request?` / `failureReason?` keys present so
  * existing producers stay valid. `decidedBy?` was dropped — no consumer
- * uses it.
+ * uses it. The protocol schema in `schemas/billing/spend-gate.schema.json`
+ * is being aligned to these TS types as part of this drift fix, so the two
+ * will agree once that parallel change lands.
  *
  * Plan: docs/superpowers/plans/2026-05-20-sogni-chat-v2-execution-architecture-plan-final.md §7.
  */
@@ -161,16 +162,18 @@ export interface SpendGateRequest {
 
 /**
  * Live gate. Canonical fields (`gateId`, `scope`, `estimate`, `reason`,
- * `createdAt`, `updatedAt`) match `schemas/billing/spend-gate.schema.json`
- * and the durable shape consumers persist; legacy fields (`request?`,
- * `failureReason?`) remain present so existing producers keep validating.
+ * `createdAt`, `updatedAt`) describe the durable shape consumers persist;
+ * the protocol schema in `schemas/billing/spend-gate.schema.json` is being
+ * aligned to these TS types as the reference shape. Legacy fields
+ * (`request?`, `failureReason?`) remain present so existing producers keep
+ * validating.
  *
  * All new canonical fields are optional in TypeScript on purpose: the
  * pre-2026-05-20 producers only set `state` and (sometimes) `request`,
  * and we don't want to break their type-checks in one cycle. Producers
  * targeting the canonical shape SHOULD populate `gateId`, `scope`,
- * `estimate`, `createdAt`, `updatedAt` (the JSON schema treats these as
- * required at the wire level).
+ * `estimate`, `createdAt`, `updatedAt` (the aligned JSON schema treats
+ * these as required at the wire level).
  */
 export interface SpendGate {
   state: SpendGateState;
@@ -178,8 +181,8 @@ export interface SpendGate {
    * Stable id for the gate. Optional at the TypeScript level (legacy
    * `{state, request}` producers may omit it) but every canonical-shape
    * producer — `sogni-api`, `sogni-creative-agent-v2`, `sogni-chat` —
-   * always populates it, and the canonical JSON schema marks it
-   * required. New code MUST set this.
+   * always populates it, and the protocol JSON schema (being aligned to
+   * this TS type) marks it required. New code MUST set this.
    */
   gateId?: string;
   /** What the gate is authorizing. Required at the wire level. */

@@ -51,6 +51,8 @@ For complex/creative scenes (characters, dialogue, skits): capture the full crea
 
 AVOID: Vague prompts, too many characters at once, conflicting lighting logic, readable text or logos, abstract emotions with no visible behavior, rigid numeric constraints (exact angles, counts, speeds).
 
+NON-SEEDANCE POSITIVE CONSTRAINTS: For videoModel="ltx23" or "wan22", prompt is a positive prompt. Translate user avoid/no/don't constraints into affirmative production constraints instead of copying negative phrasing. Preserve exact quoted visible text or dialogue when the user explicitly requests it; keep surrounding surfaces blank.
+
 BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This is one Sogni project with multiple jobs, so prefer it when all outputs share the same references, model, duration, dimensions, and generation parameters and only prompt text varies. Lock in any camera/subject/style the user specified, vary the rest. Example: "slow dolly in on a city street {at dawn with golden light|during a rainstorm|at night with neon reflections}".`,
         },
         expandPrompt: {
@@ -71,7 +73,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
         negativePrompt: {
           type: "string",
           description:
-            "Non-Seedance only. Optional negative prompt for video models that expose a separate negative-prompt field. Do not set for seedance2 or seedance2-fast; rewrite user-provided Seedance avoid/ban/no-X requests as positive visual instructions in prompt.",
+            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set for seedance2 or seedance2-fast.",
         },
         videoModel: {
           type: "string",

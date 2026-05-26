@@ -18,7 +18,11 @@ PROMPT CONSTRUCTION — include these elements in flowing prose:
 6. SOUND: Weave 3-5 audio elements naturally into prose — one ambient layer, action sounds, accent sounds. Never use [AMBIENT:] or [SOUND:] tags. If the action naturally involves speech or the user mentions dialogue/talking/speaking, include dialogue — weave quoted speech into action like a novel: 'She turns, "I've been waiting," her voice steady.' Describe vocal quality (whispers, warm tone, gravelly).
 7. TECHNICAL: End with a stability anchor and lens cue: "Shot on 35mm at f/1.8 with 180-degree shutter, smooth stabilized footage, natural motion blur."
 
-CONSTRAINTS: Present tense only. Positive phrasing — describe what IS, never what isn't. No on-screen text/logos. Dense prose, never bullet lists. No vague words ("beautiful," "nice") — be visually specific.
+NEGATIVE CONSTRAINT TRANSLATION: LTX receives only this positive prompt. Translate user avoid/no/don't constraints into affirmative production constraints instead of copying negative phrasing. For translated constraints, the output prompt must not use words such as "no", "not", "without", "avoid", or "never" except inside exact quoted user-requested text. Examples: "no people in background" becomes single subject focus with an empty background; "no text" becomes clean blank surfaces; "don't make it blurry" becomes crisp sharp focus; "no weird hands" becomes natural anatomically consistent hands; "no mouth movement, no talking, no lip syncing" becomes silent expression-only physical performance with facial motion independent of speech timing; "don't change the room" becomes the same room and layout remain consistent. If the user asks for exact quoted visible text, preserve that quoted text exactly and keep surrounding surfaces blank.
+
+DYNAMIC PROMPT BRANCHES: If the user prompt contains one Dynamic Prompt branch such as "{option A|option B}", preserve exactly one branch with the same option count. Put shared production constraints before the branch, then rewrite each branch option as a complete concrete motion option. Do not remove the braces, split the branch into bullets, add orchestration labels, or change the number of options.
+
+CONSTRAINTS: Present tense only. Positive phrasing — describe what IS, never what isn't. Clean blank surfaces unless exact quoted text is requested. Dense prose, never bullet lists. No vague words ("beautiful," "nice") — be visually specific.
 
 REFERENCE PROMPT (match this style):
 "A medium close-up cinematic shot in a quiet rain-soaked alley at night, neon reflections shimmering across wet pavement. A man in his 30s with short dark hair and a worn leather jacket stands under a flickering sign, water beading on his collar. He exhales slowly, shoulders tightening as his fingers clamp around a small metal lighter, then steadies his hand and clicks it once, watching the flame struggle against the damp air, rain tapping softly against the awning while a distant car horn echoes. The camera performs a slow push-in toward his face as his jaw sets, tendons rising, weight shifting forward by half a step, breathing measured. Shot on 35mm with natural motion blur, smooth stabilized footage, cinematic motion consistency."`;
@@ -40,6 +44,10 @@ CONSTRAINTS:
 - Limit style combinations to 2-3 compatible aesthetics.
 - One primary subject with one main motion — avoid complex multi-subject choreography.
 
+NEGATIVE CONSTRAINT TRANSLATION: WAN receives only this positive prompt. Translate user avoid/no/don't constraints into affirmative production constraints instead of copying negative phrasing. For translated constraints, the output prompt must not use words such as "no", "not", "without", "avoid", or "never" except inside exact quoted user-requested text. Examples: "no people in background" becomes single subject focus with an empty background; "no text" becomes clean blank surfaces; "don't make it blurry" becomes crisp sharp focus; "no weird hands" becomes natural anatomically consistent hands; "no mouth movement, no talking, no lip syncing" becomes silent expression-only physical performance with facial motion independent of speech timing; "don't change the room" becomes the same room and layout remain consistent. If the user asks for exact quoted visible text, preserve that quoted text exactly and keep surrounding surfaces blank.
+
+DYNAMIC PROMPT BRANCHES: If the user prompt contains one Dynamic Prompt branch such as "{option A|option B}", preserve exactly one branch with the same option count. Put shared production constraints before the branch, then rewrite each branch option as a complete concrete motion option. Do not remove the braces, split the branch into bullets, add orchestration labels, or change the number of options.
+
 REFERENCE PROMPT (match this style and density):
 "A young woman in a flowing ivory dress walks slowly through a field of tall golden wheat at sunset, her fingers trailing across the grain tips as warm backlight catches wisps of hair around her face. The wind pushes gentle waves through the field around her while dust motes float in shafts of amber light. She pauses, turning her head slightly as her hand rises to shield her eyes, weight shifting as she gazes toward the distant treeline. The camera performs a slow tracking shot at waist height, moving parallel to her path. Shot on Kodak Portra with shallow depth of field, warm golden tones, smooth stabilized footage."`;
 
@@ -58,6 +66,10 @@ CONSTRAINTS:
 - Do NOT describe the subject's appearance — the image defines that.
 - One continuous shot — no cuts, no montage.
 - Dense prose, never bullet lists.
+
+NEGATIVE CONSTRAINT TRANSLATION: WAN receives only this positive prompt. Translate user avoid/no/don't constraints into affirmative production constraints instead of copying negative phrasing. For translated constraints, the output prompt must not use words such as "no", "not", "without", "avoid", or "never" except inside exact quoted user-requested text. Examples: "no people in background" becomes single subject focus with an empty background; "no text" becomes clean blank surfaces; "don't make it blurry" becomes crisp sharp focus; "no weird hands" becomes natural anatomically consistent hands; "no mouth movement, no talking, no lip syncing" becomes silent expression-only physical performance with facial motion independent of speech timing; "don't change the room" becomes the same room and layout remain consistent. If the user asks for exact quoted visible text, preserve that quoted text exactly and keep surrounding surfaces blank.
+
+DYNAMIC PROMPT BRANCHES: If the user prompt contains one Dynamic Prompt branch such as "{option A|option B}", preserve exactly one branch with the same option count. Put shared production constraints before the branch, then rewrite each branch option as a complete concrete motion option. Do not remove the braces, split the branch into bullets, add orchestration labels, or change the number of options.
 
 REFERENCE PROMPT (for an image of a woman in a wheat field):
 "She walks slowly forward, fingers trailing across the grain tips as warm backlight catches wisps of hair. The wind pushes gentle waves through the field while dust motes float in shafts of amber light. She pauses, turning her head slightly, weight shifting as her hand rises to shield her eyes. The camera performs a slow tracking shot at waist height, moving parallel to her path. Smooth stabilized footage with shallow depth of field."`;
@@ -150,6 +162,7 @@ export function buildLtxScriptMessages(
     userText = `Come up with a unique, original video scene inspired by: ${theme}. Be creative and surprising — avoid clichés.`;
   }
   userText += `\n\nTarget video duration: ${duration} seconds.`;
+  userText += '\n\nPreserve any explicitly requested quoted visible text, dialogue, and Dynamic Prompt branch option count exactly.';
 
   if (hasVisionImage) {
     const content: SogniChatContentPart[] = [];
@@ -203,6 +216,7 @@ export function buildWanScriptMessages(params: GenerateWanPromptParams): SogniCh
   if (duration) {
     userText += `\n\nTarget video duration: ${duration} seconds.`;
   }
+  userText += '\n\nPreserve any explicitly requested quoted visible text, dialogue, and Dynamic Prompt branch option count exactly.';
 
   if (hasVisionImage) {
     const content: SogniChatContentPart[] = [];

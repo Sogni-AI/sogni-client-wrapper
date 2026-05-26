@@ -5562,8 +5562,51 @@ function storyboardTableRowLooksLikeCountedBeat(cells: string[], headers: string
   return /^(?:beat|scene|shot|panel|frame)?\s*(?:#\s*)?0?\d{1,2}\b/i.test(candidate);
 }
 
+function storyboardTableCellLooksLikeCameraCue(cell: string): boolean {
+  const compact = compactStoryboardLine(cell);
+  return /\b(?:camera|motion|shot|frame|framing|close[-\s]?up|medium|wide|macro|static|locked|hold|push(?:es)?\s+in|pull(?:s)?\s+back|pan|tilt|dolly|truck|tracking|handheld|orbit|zoom|focus|rack\s+focus|focus\s+pull|slow[-\s]?mo|timelapse)\b/i.test(compact);
+}
+
+function storyboardTableCellLooksLikeTransitionCue(cell: string): boolean {
+  const compact = compactStoryboardLine(cell);
+  return /\b(?:transition|cut|hard\s+cut|smash\s+cut|match\s+cut|jump\s+cut|fade|cross[-\s]?fade|dissolve|wipe|morph|glitch|burst|snap|blend|strobe|whip[-\s]?pan)\b/i.test(compact);
+}
+
 function normalizeStoryboardTableCellsToHeaders(cells: string[], headers: string[] | null): string[] {
-  if (!headers || cells.length <= headers.length) return cells;
+  if (!headers) return cells;
+
+  if (cells.length === headers.length - 1) {
+    const purposeHeaderIndex = storyboardTableHeaderIndex(
+      headers,
+      /\b(?:purpose|story\s*beat|story\s*purpose|beat\s*name|beat\s*title|narrative|name|title)\b/i,
+    );
+    const visualHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:visual|frame|shot|image|action)\b/i);
+    const transitionHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:transition|edit|cut|fade|dissolve|wipe)\b/i);
+    const purposeCell = compactStoryboardLine(cells[purposeHeaderIndex] || '');
+    const shiftedCameraCell = cells[visualHeaderIndex] || '';
+    const shiftedTransitionCell = transitionHeaderIndex >= 0
+      ? cells[transitionHeaderIndex - 1] || ''
+      : '';
+    const shiftedColumnsLookLikeFoldedPurposeVisual = transitionHeaderIndex >= 0
+      ? storyboardTableCellLooksLikeTransitionCue(shiftedTransitionCell)
+      : storyboardTableCellLooksLikeCameraCue(shiftedCameraCell);
+
+    if (
+      purposeHeaderIndex >= 0
+      && visualHeaderIndex === purposeHeaderIndex + 1
+      && visualHeaderIndex < cells.length
+      && purposeCell.length >= 20
+      && shiftedColumnsLookLikeFoldedPurposeVisual
+    ) {
+      return [
+        ...cells.slice(0, visualHeaderIndex),
+        cells[purposeHeaderIndex],
+        ...cells.slice(visualHeaderIndex),
+      ];
+    }
+  }
+
+  if (cells.length <= headers.length) return cells;
 
   const overflow = cells.length - headers.length;
   const combinedAudioDialogueIndex = headers.findIndex(header =>
@@ -5667,11 +5710,12 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
     const cameraHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:camera|motion|fx|effect|lighting|style|look)\b/i);
     const dialogueHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:dialogue|vo|v\.o\.|voiceover|speech|narration)\b/i);
     const soundHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:audio|sfx|sound|foley|music)\b/i);
+    const transitionHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:transition|edit|cut|fade|dissolve|wipe)\b/i);
     const visibleTextHeaderIndex = storyboardTableHeaderIndex(headers, /\b(?:visible\s+text|on[-\s]?screen\s+text|onscreen\s+text|text|copy|cta|tagline|headline|title\s+card|subtitle|caption)\b/i);
     const beatHeaderIndex = headers
       ? headers.findIndex(header =>
           /\b(?:beat|scene|shot|panel|frame)\b/i.test(header)
-          && !/\b(?:visual|action|camera|audio|dialogue|vo|sfx)\b/i.test(header),
+          && !/\b(?:visual|action|camera|audio|dialogue|vo|sfx|transition)\b/i.test(header),
         )
       : -1;
     const purposeHeaderIndex = headers
@@ -5704,6 +5748,9 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
       : '';
     const soundCell = soundHeaderIndex >= 0
       ? storyboardTableCellWithFieldBreaks(cells[soundHeaderIndex] || '')
+      : '';
+    const transitionCell = transitionHeaderIndex >= 0
+      ? storyboardTableCellWithFieldBreaks(cells[transitionHeaderIndex] || '')
       : '';
     const visibleTextCell = visibleTextHeaderIndex >= 0
       ? storyboardTableCellWithFieldBreaks(cells[visibleTextHeaderIndex] || '')
@@ -5750,6 +5797,8 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
     );
     const audio = extractStoryboardField(audioCell, ['Audio/SFX', 'Audio', 'SFX', 'FX', 'Foley', 'Sound', 'Sounds'])
       || storyboardTableCellWithoutDialogue(soundCell || audioCell, dialogue);
+    const transition = extractStoryboardField(transitionCell, ['Transition', 'Transition out', 'Transition-out', 'Edit'])
+      || (transitionHeaderIndex >= 0 ? compactStoryboardLine(transitionCell) : '');
     const number = sections.length + 1;
     const beatLabel = beatHeaderIndex >= 0 && beatHeaderIndex !== timingCellIndex
       ? compactStoryboardLine(cells[beatHeaderIndex])
@@ -5762,6 +5811,7 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
       && purposeHeaderIndex !== soundHeaderIndex
       && purposeHeaderIndex !== cameraHeaderIndex
       && purposeHeaderIndex !== visibleTextHeaderIndex
+      && purposeHeaderIndex !== transitionHeaderIndex
       ? compactStoryboardLine(cells[purposeHeaderIndex])
       : '';
     const beatTitleSource = purposeLabel && !/^\d{1,2}$/.test(purposeLabel)
@@ -5788,6 +5838,7 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
         dialogue ? `Dialogue/VO: ${dialogue}` : '',
         visibleText ? `Visible text: ${visibleText}` : '',
         audio ? `Audio/SFX: ${audio}` : '',
+        transition ? `Transition: ${transition}` : '',
       ].filter(Boolean).join('\n'),
     });
   }
@@ -6058,7 +6109,7 @@ function storyboardSectionsHavePreservableExplicitTiming(
   sections: Array<{ number: number; heading: string; body: string }>,
 ): boolean {
   return sections.length > 1
-    && sections.some(section => extractStoryboardTiming(`${section.heading}\n${section.body}`) !== null);
+    && sections.every(section => extractStoryboardTiming(`${section.heading}\n${section.body}`) !== null);
 }
 
 function canonicalStoryboardScriptContext(text: string | null | undefined): string {
@@ -6670,12 +6721,21 @@ function retimeStoryboardScenesForDialogue(
   rules: StoryboardTimingRules = DEFAULT_STORYBOARD_TIMING_RULES,
 ): SceneSpec[] {
   if (targetDurationSec === null || scenes.length === 0) return scenes;
-  if (!scenes.every(scene => scene.startSec !== null && scene.endSec !== null && scene.durationSec !== null && scene.durationSec > 0)) {
-    return scenes;
-  }
+  const hasCompletePositiveTiming = scenes.every(scene =>
+    scene.startSec !== null
+    && scene.endSec !== null
+    && scene.durationSec !== null
+    && scene.durationSec > 0,
+  );
+  const sourceDurations = scenes.map(scene => (
+    scene.durationSec !== null && scene.durationSec > 0
+      ? scene.durationSec
+      : targetDurationSec / scenes.length
+  ));
 
   const minimumDurations = scenes.map(scene => minimumStoryboardSceneDurationForDialogue(scene, rules));
-  const needsRetiming = scenes.some((scene, index) => (scene.durationSec ?? 0) + rules.toleranceSec < minimumDurations[index]);
+  const needsRetiming = !hasCompletePositiveTiming
+    || scenes.some((scene, index) => (scene.durationSec ?? 0) + rules.toleranceSec < minimumDurations[index]);
   if (!needsRetiming) return scenes;
 
   let requiredDurations = minimumDurations;
@@ -6695,10 +6755,9 @@ function retimeStoryboardScenesForDialogue(
   if (minimumTotal > targetDurationSec + rules.toleranceSec) return scenes;
 
   const extraDuration = Math.max(0, targetDurationSec - minimumTotal);
-  const originalDurations = scenes.map(scene => scene.durationSec ?? 0);
-  const weightTotal = originalDurations.reduce((sum, duration) => sum + Math.max(0.01, duration), 0);
+  const weightTotal = sourceDurations.reduce((sum, duration) => sum + Math.max(0.01, duration), 0);
   const unroundedDurations = requiredDurations.map((minimum, index) => (
-    minimum + (extraDuration * Math.max(0.01, originalDurations[index]) / weightTotal)
+    minimum + (extraDuration * Math.max(0.01, sourceDurations[index]) / weightTotal)
   ));
   const timelineStartSec = scenes[0].startSec ?? 0;
   const timelineEndSec = Math.round((timelineStartSec + targetDurationSec) * 100) / 100;
@@ -6806,7 +6865,11 @@ function inferStoryboardStorySpineFromHeading(text: string): string {
     const collected: string[] = [];
     for (let cursor = index + 1; cursor < lines.length && collected.length < 4; cursor += 1) {
       const candidate = lines[cursor];
-      if (/^(?:storyboard|video|production|reference|timecoded|beat\s+\d|scene\s+\d|format|duration|aspect|does this|please confirm)\b/i.test(candidate)) {
+      if (
+        /^\|/.test(candidate)
+        || storyboardMarkdownTableSeparatorLine(candidate)
+        || /^(?:storyboard|video|production|reference|timecoded|beat\s+\d|scene\s+\d|format|duration|aspect|does this|please confirm)\b/i.test(candidate)
+      ) {
         break;
       }
       const cleaned = cleanStoryboardStorySpine(candidate);
@@ -8279,6 +8342,7 @@ export function compileSeedanceStoryboardPromptFromProject(
     : 'All scene numbers, timecodes, labels, and production notes remain metadata only and must not appear in the video.';
   const toneProgression = project.creativeBrief.toneProgression.join(' -> ');
   const musicArc = project.scenes.map(scene => scene.music).filter(Boolean).join(' -> ');
+  const visualStyle = project.creativeBrief.visualQualityBar.replace(/\bstoryboard\s+sheet\b/gi, 'cinematic video');
 
   return [
     'PROJECT:',
@@ -8288,14 +8352,14 @@ export function compileSeedanceStoryboardPromptFromProject(
     `Story spine: ${storySpine}`,
     '',
     'INPUT ASSETS:',
-    `${storyboardImageTag}: approved GPT Image 2 storyboard board. Treat it as an ordered shot guide and timing reference only, not as a collage, split-screen, grid, or picture-in-picture layout to reproduce.`,
+    `${storyboardImageTag}: approved storyboard reference image. Treat it as an ordered shot guide and timing reference only, not as a collage, split-screen, grid, or picture-in-picture layout to reproduce.`,
     '',
     'GLOBAL VIDEO INSTRUCTIONS:',
     `Render one continuous cinematic video in ${aspectRatio}. Follow the storyboard scene order, timing ranges, transitions, and audio plan.`,
     'Use the storyboard as the controlling source for shot order and intent while converting each panel into full-screen motion.',
     visibleTextInstruction,
     metadataLabels.length > 0 ? `Do not render these metadata labels as video text: ${metadataLabels.join('; ')}.` : '',
-    `Visual style: ${project.creativeBrief.visualQualityBar}`,
+    `Visual style: ${visualStyle}`,
     toneProgression ? `Tone progression: ${toneProgression}` : '',
     musicArc ? `Music arc: ${musicArc}` : '',
     '',

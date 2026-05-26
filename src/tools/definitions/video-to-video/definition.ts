@@ -38,6 +38,8 @@ Examples by mode:
 
 Present tense. Positive phrasing. Concrete visual details.
 
+NON-SEEDANCE POSITIVE CONSTRAINTS: For LTX-2.3 and WAN 2.2 modes, prompt is a positive prompt. Translate user avoid/no/don't constraints into affirmative production constraints instead of copying negative phrasing. Preserve exact quoted visible text when the user explicitly requests it; keep surrounding surfaces blank.
+
 BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the artistic treatment while keeping control mode and structural intent consistent. Example: "transform to {watercolor with soft edges|oil painting with bold strokes|anime with clean lines} style".`,
         },
         expandPrompt: {
@@ -74,7 +76,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         negativePrompt: {
           type: "string",
           description:
-            "Non-Seedance only. Optional negative prompt for LTX/Wan video-to-video models. Do not set when controlMode is seedance-v2v or videoModel is seedance2/seedance2-fast; rewrite user-provided Seedance avoid/ban/no-X requests as positive prompt instructions.",
+            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set when controlMode is seedance-v2v or videoModel is seedance2/seedance2-fast.",
         },
         videoModel: {
           type: "string",

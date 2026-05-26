@@ -42,16 +42,24 @@ import {
   buildStoryboardProject,
   classifyPublicSkillTurn,
   compileForModel,
+  compileSeedanceStoryboardPromptFromProject,
   compileVideoStoryboardImagePrompt,
   inferStoryboardLayoutSpec,
 } from '../src/public-skill-runtime/index.js';
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
   animatePhotoDefinition,
+  generateVideoDefinition,
+  soundToVideoDefinition,
+  videoToVideoDefinition,
   collapseSingleSourceFanOutToDynamicPromptVariations,
   seedanceTerminalGenerationFailurePayloadFromError,
 } from '../src/tools/index.js';
-import { PROMPT_CONTRACTS } from '../src/contracts/index.js';
+import {
+  PROMPT_CONTRACTS,
+  buildLtxScriptMessages,
+  buildWanScriptMessages,
+} from '../src/contracts/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
@@ -1492,6 +1500,8 @@ async function runTests() {
     const animateParams = animatePhotoDefinition.function.parameters.properties;
     const sourceImageIndicesDoc = String(animateParams.sourceImageIndices.description ?? '');
     const frameRoleDoc = String(animateParams.frameRole.description ?? '');
+    const animatePromptDoc = String(animateParams.prompt.description ?? '');
+    const animateNegativeDoc = String(animateParams.negativePrompt.description ?? '');
     if (!sourceImageIndicesDoc.includes('Use frameRole="end" with sourceImageIndices')) {
       throw new Error('animate_photo sourceImageIndices doc must allow explicit end-frame fan-out');
     }
@@ -1500,6 +1510,23 @@ async function runTests() {
     }
     if (!frameRoleDoc.includes('use frameRole="end"')) {
       throw new Error('animate_photo frameRole doc must describe end-frame fan-out');
+    }
+    if (!animatePromptDoc.includes('POSITIVE CONSTRAINT TRANSLATION')) {
+      throw new Error('animate_photo prompt doc must describe LTX/WAN positive constraint translation');
+    }
+    if (!animateNegativeDoc.includes('explicitly asks to set a separate negative prompt')) {
+      throw new Error('animate_photo negativePrompt doc must not absorb ordinary user avoid/no constraints');
+    }
+
+    const positiveConstraintToolDocs = [
+      generateVideoDefinition,
+      videoToVideoDefinition,
+      soundToVideoDefinition,
+    ].map((definition) =>
+      String(definition.function.parameters.properties.prompt.description ?? '')
+    );
+    if (!positiveConstraintToolDocs.every((description) => description.includes('affirmative production constraints'))) {
+      throw new Error('non-Seedance video tool docs must describe positive constraint translation');
     }
 
     const collapsedFanout = collapseSingleSourceFanOutToDynamicPromptVariations({
@@ -1531,6 +1558,61 @@ async function runTests() {
     const animateContract = PROMPT_CONTRACTS.find((contract) => contract.toolName === 'animate_photo');
     if (!animateContract?.baseDescription.includes('frameRole="end"')) {
       throw new Error('animate_photo prompt contract must describe end-frame fan-out');
+    }
+    if (!animateContract.baseDescription.includes('Do not include orchestration labels')) {
+      throw new Error('animate_photo prompt contract must forbid orchestration labels in prompt-only takes');
+    }
+    if (!animateContract.baseDescription.includes('For videoModel="wan22" and "ltx23", the prompt field is the positive prompt')) {
+      throw new Error('animate_photo prompt contract must require positive prompts for WAN/LTX');
+    }
+    if (!animateContract.baseDescription.includes('Preserve exact quoted visible text or dialogue')) {
+      throw new Error('animate_photo prompt contract must preserve exact user-requested visible text/dialogue');
+    }
+
+    const ltxMessages = buildLtxScriptMessages(
+      'Make the mascot hold a sign reading "SOGNI.AI" with no other text.',
+      5,
+      { firstFrameDataUrl: 'data:image/png;base64,AAAA' }
+    );
+    const ltxSystem = ltxMessages.find((message) => message.role === 'system')?.content;
+    const ltxUser = ltxMessages.find((message) => message.role === 'user')?.content;
+    const ltxUserText = Array.isArray(ltxUser)
+      ? ltxUser.map((part) => 'text' in part ? part.text : '').join('\n')
+      : String(ltxUser ?? '');
+    if (typeof ltxSystem !== 'string' || !ltxSystem.includes('NEGATIVE CONSTRAINT TRANSLATION')) {
+      throw new Error('LTX script composition prompt must translate negative constraints');
+    }
+    if (!ltxSystem.includes('DYNAMIC PROMPT BRANCHES')) {
+      throw new Error('LTX script composition prompt must preserve Dynamic Prompt branches');
+    }
+    if (!ltxUserText.includes('"SOGNI.AI"')) {
+      throw new Error('LTX script composition user message must preserve quoted visible text');
+    }
+    if (!ltxUserText.includes('Dynamic Prompt branch option count')) {
+      throw new Error('LTX script composition user message must preserve Dynamic Prompt option count');
+    }
+
+    const wanMessages = buildWanScriptMessages({
+      prompt: 'Make the mascot hold a sign reading "NO SIGNAL" with no background people.',
+      firstFrameDataUrl: 'data:image/png;base64,AAAA',
+      duration: 5,
+    });
+    const wanSystem = wanMessages.find((message) => message.role === 'system')?.content;
+    const wanUser = wanMessages.find((message) => message.role === 'user')?.content;
+    const wanUserText = Array.isArray(wanUser)
+      ? wanUser.map((part) => 'text' in part ? part.text : '').join('\n')
+      : String(wanUser ?? '');
+    if (typeof wanSystem !== 'string' || !wanSystem.includes('NEGATIVE CONSTRAINT TRANSLATION')) {
+      throw new Error('WAN script composition prompt must translate negative constraints');
+    }
+    if (!wanSystem.includes('DYNAMIC PROMPT BRANCHES')) {
+      throw new Error('WAN script composition prompt must preserve Dynamic Prompt branches');
+    }
+    if (!wanUserText.includes('"NO SIGNAL"')) {
+      throw new Error('WAN script composition user message must preserve quoted visible text');
+    }
+    if (!wanUserText.includes('Dynamic Prompt branch option count')) {
+      throw new Error('WAN script composition user message must preserve Dynamic Prompt option count');
     }
   })();
 
@@ -2037,6 +2119,122 @@ async function runTests() {
     }
     if (!project.scenes[2].audioSfx.includes('Camera spins 3.')) {
       throw new Error(`Audio cue was not preserved: ${project.scenes[2].audioSfx.join(', ')}`);
+    }
+  })();
+
+  await test('Should align storyboard rows when purpose and visual are folded together', () => {
+    const assistantDraft = [
+      '#### Beat Table (2 Beats)',
+      '| Beat | Time | Purpose | Visual/Action | Camera/Motion | Dialogue/VO | Audio/SFX | Transition |',
+      '| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |',
+      '| 01 | 0s-1.25s | Establish monotony: Sloth sits slumped at a beige desk, papers stacked everywhere. | Static shot of drab cubicle. | "Ever since I was young" | Low monotone hum. | Hard cut to close-up. |',
+      '| 02 | 1.25s-2.5s | Tighten the joke: Sloth types one lazy key, spreadsheet cells glowing. | Close-up shot, slow push-in. | "I always wanted insight" | Keyboard clack. | Match cut to color. |',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: 'Create a 2 beat video storyboard.',
+      approvedScriptContext: assistantDraft,
+      frameCount: 2,
+      promptAuthorship: 'assistant',
+    });
+
+    if (project.scenes.length !== 2) {
+      throw new Error(`Expected 2 parsed scenes, got ${project.scenes.length}`);
+    }
+    if (!project.scenes[0].visual.includes('Sloth sits slumped at a beige desk')) {
+      throw new Error(`Visual was not recovered from folded purpose cell: ${project.scenes[0].visual}`);
+    }
+    if (project.scenes[0].camera !== 'Static shot of drab cubicle.') {
+      throw new Error(`Camera cell was shifted incorrectly: ${project.scenes[0].camera}`);
+    }
+    if (project.scenes[0].dialogue !== 'Ever since I was young') {
+      throw new Error(`Dialogue cell was shifted incorrectly: ${project.scenes[0].dialogue}`);
+    }
+    if (!project.scenes[0].audioSfx.includes('Low monotone hum.')) {
+      throw new Error(`Audio cue was shifted incorrectly: ${project.scenes[0].audioSfx.join(', ')}`);
+    }
+    if (project.scenes[0].transitionOut !== 'Hard cut to close-up.') {
+      throw new Error(`Transition was not preserved: ${project.scenes[0].transitionOut}`);
+    }
+  })();
+
+  await test('Should keep markdown tables out of storyboard story spines', () => {
+    const assistantDraft = [
+      '**Story Spine**',
+      'A nerdy sloth escapes boring data work through an analog transition into psychedelic art.',
+      '',
+      '| Beat | Time | Purpose | Visual/Action | Camera/Motion | Dialogue/VO | Audio/SFX | Transition |',
+      '| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |',
+      '| 01 | 0s-2s | Reality | Sloth at a grey desk. | Static shot. | "Ever since I was young" | Office hum. | Push in. |',
+      '| 02 | 2s-4s | Shift | Colors melt across the desk. | Whip pan. | "Syke!" | Record scratch. | Glitch flash. |',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: 'Create a 2 beat video storyboard.',
+      approvedScriptContext: assistantDraft,
+      frameCount: 2,
+      promptAuthorship: 'assistant',
+    });
+
+    if (project.creativeBrief.storySpine.includes('| Beat |')) {
+      throw new Error(`Story spine leaked the markdown table: ${project.creativeBrief.storySpine}`);
+    }
+    if (project.creativeBrief.storySpine !== 'A nerdy sloth escapes boring data work through an analog transition into psychedelic art.') {
+      throw new Error(`Unexpected story spine: ${project.creativeBrief.storySpine}`);
+    }
+  })();
+
+  await test('Should retime assistant storyboard tables that contain zero-duration end-card beats', () => {
+    const assistantDraft = [
+      '| Beat | Time | Purpose | Visual/Action | Camera/Motion | Dialogue/VO | Audio/SFX | Transition |',
+      '| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |',
+      '| 01 | 0:00 - 0:05 | Setup | Sloth at desk. | Static. | "Ever since I was young" | Office hum. | Cut. |',
+      '| 02 | 0:05 - 0:10 | Turn | Psychedelic art erupts. | Orbit. | "Syke!" | Record scratch. | Burst. |',
+      '| 03 | 0:10 - 0:15 | Brand | Logo fades in. | Hold. | [no dialogue] | Chime. | Fade. |',
+      '| 04 | 0:15 - 0:15 | CTA | Text "Create anything." appears. | Hold. | [no dialogue] | Silence. | End. |',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: 'Create a 15 second 4 beat video storyboard. End with this sequence of text: Create anything.',
+      approvedScriptContext: assistantDraft,
+      frameCount: 4,
+      promptAuthorship: 'assistant',
+    });
+
+    const finalScene = project.scenes[3];
+    if (finalScene.startSec === null || finalScene.endSec === null || finalScene.endSec <= finalScene.startSec) {
+      throw new Error(`Final scene was not retimed: ${JSON.stringify(finalScene)}`);
+    }
+    if (Math.round((project.scenes[project.scenes.length - 1].endSec ?? 0) * 100) / 100 !== 15) {
+      throw new Error(`Storyboard no longer ends at 15s: ${project.scenes.map(scene => `${scene.startSec}-${scene.endSec}`).join(', ')}`);
+    }
+  })();
+
+  await test('Should keep provider names and storyboard-sheet style out of Seedance prompts', () => {
+    const project = buildStoryboardProject({
+      prompt: [
+        '| Beat | Time | Visual/Action | Camera/Motion | Dialogue/VO | Audio/SFX |',
+        '| --- | --- | --- | --- | --- | --- |',
+        '| 01 | 0s-3s | Sloth at desk. | Static. | [no dialogue] | Office hum. |',
+        '| 02 | 3s-6s | Sloth enters psychedelic art world. | Orbit. | [no dialogue] | Music swell. |',
+      ].join('\n'),
+      userIntentText: 'Create a production-ready 6 second storyboard video, then render it with Seedance.',
+      frameCount: 2,
+      promptAuthorship: 'assistant',
+    });
+    const prompt = compileSeedanceStoryboardPromptFromProject(project);
+
+    if (/GPT Image 2/i.test(prompt)) {
+      throw new Error(`Seedance prompt leaked the image provider name: ${prompt}`);
+    }
+    if (/Visual style:\s*production-ready commercial storyboard sheet/i.test(prompt)) {
+      throw new Error(`Seedance prompt leaked storyboard-sheet style: ${prompt}`);
+    }
+    if (!prompt.includes('@Image1: approved storyboard reference image.')) {
+      throw new Error(`Seedance prompt is missing provider-neutral storyboard reference wording: ${prompt}`);
     }
   })();
 

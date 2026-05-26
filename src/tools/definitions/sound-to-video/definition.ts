@@ -42,6 +42,8 @@ LTX VOCABULARY: camera (tracking, dolly, pan, tilt, handheld, static frame), lig
 
 AVOID: Vague prompts, too many competing visual elements, abstract descriptions without visible behavior, rigid numeric constraints, readable text or logos. QUOTING RULE: ONLY use double quotes for spoken dialogue. Never quote on-screen text, overlay text, titles, captions, signs, or any visual text — describe them without quotes.
 
+NON-SEEDANCE POSITIVE CONSTRAINTS: For ltx23-ia2v, ltx23-a2v, and wan-s2v, prompt is a positive prompt. Translate user avoid/no/don't constraints into affirmative production constraints instead of copying negative phrasing. Preserve exact quoted visible text or dialogue when the user explicitly requests it; keep surrounding surfaces blank.
+
 BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the visual interpretation while keeping audio sync intent consistent. This is one Sogni project with multiple jobs, so prefer it when all outputs share the same audio source/window, image source, model, duration, dimensions, and parameters and only prompt text varies. Example: "{abstract neon visualization|nature scene with swaying trees|urban street with rain} synced to the beat".`,
         },
         expandPrompt: {

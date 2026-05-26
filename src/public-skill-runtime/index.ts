@@ -3498,7 +3498,7 @@ export interface StoryboardVideoHostedWorkflowBuildOptions {
   title?: string;
   frameCount?: number;
   imageModel?: string;
-  imageQuality?: 'low' | 'medium' | 'high' | 'auto';
+  imageQuality?: 'low' | 'medium' | 'high';
   imageOutputFormat?: 'png' | 'jpg' | 'jpeg' | 'webp';
   imageWidth?: number;
   imageHeight?: number;

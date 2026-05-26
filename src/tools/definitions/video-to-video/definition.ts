@@ -80,7 +80,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: "string",
           enum: ["ltx23-v2v", "wan22-animate", "seedance2", "seedance2-fast"],
           description:
-            'Model selector for this video-to-video request. Usually omit; controlMode chooses the non-Seedance model. For controlMode="seedance-v2v", use "seedance2-fast" by default, especially when the user asks for Seedance Fast/seedance-fast or 480p/720p. Use "seedance2" only when the user explicitly asks for the full/non-fast Seedance model or 1080p.',
+            'Model selector for this video-to-video request. Usually omit; controlMode chooses the non-Seedance model. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-fast" when the user asks for Seedance Fast / seedance-fast / faster draft iteration, and use "seedance2" for full/non-fast Seedance or 1080p. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro or from 480p/720p resolution requests alone.',
         },
         generateAudio: {
           type: "boolean",

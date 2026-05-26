@@ -2,7 +2,7 @@ import type { MediaDimensionBounds } from './aspectRatio.js';
 import { textRequestsProfessionalCharacterSheetImage } from './characterSheet.js';
 
 export type GptImageQuality = 'low' | 'medium' | 'high';
-export type GptImageQualityArg = GptImageQuality | 'auto';
+export type GptImageQualityArg = GptImageQuality;
 export type ImageOutputFormat = 'png' | 'jpg' | 'webp';
 
 export const GPT_IMAGE_MODEL_KEY = 'gpt-image-2';
@@ -152,7 +152,6 @@ export function getGptImage2ModelOverride(
 export function normalizeGptImageQuality(value: unknown): GptImageQualityArg | undefined {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim().toLowerCase();
-  if (normalized === 'auto') return 'auto';
   if (['low', 'fast', 'draft', 'quick'].includes(normalized)) return 'low';
   if (['medium', 'standard', 'balanced', 'hq'].includes(normalized)) return 'medium';
   if (['high', 'pro', 'best', 'final'].includes(normalized)) return 'high';

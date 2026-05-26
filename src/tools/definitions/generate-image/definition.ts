@@ -101,9 +101,9 @@ VIDEO KEYFRAMES: When generating images intended as first+last frames for video 
         },
         gptImageQuality: {
           type: 'string',
-          enum: ['low', 'medium', 'high', 'auto'],
+          enum: ['low', 'medium', 'high'],
           description:
-            'Optional GPT Image 2 rendering quality. Only set with model="gpt-image-2" when the user explicitly asks for low/fast, medium/balanced, high/final, or auto quality. Otherwise omit it and let the host app media quality setting map Fast to low, HQ to medium, and Pro to high.',
+            'Optional GPT Image 2 rendering quality. Only set with model="gpt-image-2" when the user explicitly asks for low/fast, medium/balanced, or high/final quality. Otherwise omit it and let the host app media quality setting map Fast to low, HQ to medium, and Pro to high.',
         },
         outputFormat: {
           type: 'string',

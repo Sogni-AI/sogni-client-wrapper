@@ -4301,6 +4301,16 @@ export function inferStoryboardLayoutSpec(
   userIntentText: string,
   frameCount: number,
   planningContract?: StoryboardPlanningContract | null,
+  /**
+   * Text that carries *genuine* user/host-stated geometry authority. Only an
+   * explicit ratio or orientation cue found here may override a typed planning
+   * contract's video geometry. Defaults to `userIntentText` so direct callers
+   * are unchanged; `buildStoryboardProject` passes a narrower value that
+   * excludes approved-script / assistant-draft prose, so a stale `16:9` line in
+   * a drafted script body never masquerades as user authority over an
+   * `llm_schema`/`assistant_metadata` planning contract.
+   */
+  geometryAuthorityText: string = userIntentText,
 ): StoryboardLayoutSpec {
   const planningLayout = planningContract?.layout;
   const userDefinedCanvas = typeof planningLayout?.storyboardCanvasSpecifiedByUser === 'boolean'
@@ -4317,7 +4327,13 @@ export function inferStoryboardLayoutSpec(
     explicitTargetVideoAspectRatio,
   );
   const inferredTargetVideoAspectRatio = inferredTargetVideoAspect.aspectRatio;
-  const userDefinedTargetVideoAspect = inferredTargetVideoAspect.source !== 'board_fallback';
+  // The authority flag (whether a stated video aspect may override a typed
+  // planning contract) is derived from the genuine user/host geometry text
+  // only — not from approved-script prose blended into the inference text.
+  const authorityTargetVideoAspect = geometryAuthorityText === userIntentText
+    ? inferredTargetVideoAspect
+    : inferStoryboardTargetVideoAspect(geometryAuthorityText, provisionalBoardAspectRatio);
+  const userDefinedTargetVideoAspect = authorityTargetVideoAspect.source !== 'board_fallback';
   const cellAspectRatio = inferStoryboardCellAspectRatio(userIntentText, inferredTargetVideoAspectRatio);
   const targetVideoAspectRatio = explicitTargetVideoAspectRatio ?? cellAspectRatio;
 
@@ -7077,6 +7093,22 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   ) {
     layoutTextParts.push(primarySourceBrief);
   }
+  // Geometry authority text = the parts that genuinely carry user/host intent
+  // (the user turn, plus a user-authored source brief). It deliberately
+  // excludes `approvedScriptContext` always, and excludes the source brief when
+  // the prompt is assistant-authored, so a stale `**Aspect Ratio:** 16:9` line
+  // in a drafted/approved script body cannot override a typed planning
+  // contract's video geometry. See `inferStoryboardLayoutSpec`.
+  const geometryAuthorityParts = [userIntentText].filter(Boolean);
+  if (
+    options.promptAuthorship !== 'assistant'
+    && primarySourceBrief
+    && !storyboardBriefContains(userIntentText, primarySourceBrief)
+    && !storyboardBriefContains(primarySourceBrief, userIntentText)
+  ) {
+    geometryAuthorityParts.push(primarySourceBrief);
+  }
+  const geometryAuthorityText = geometryAuthorityParts.join('\n\n') || userIntentText;
   if (
     approvedScriptContext
     && !storyboardBriefContains(layoutTextParts.join('\n'), approvedScriptContext)
@@ -7084,7 +7116,12 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     layoutTextParts.push(approvedScriptContext);
   }
   const layoutText = layoutTextParts.join('\n\n') || sourceText;
-  const layout = inferStoryboardLayoutSpec(layoutText, options.frameCount, options.planningContract);
+  const layout = inferStoryboardLayoutSpec(
+    layoutText,
+    options.frameCount,
+    options.planningContract,
+    geometryAuthorityText,
+  );
   const requestedDurationSec = inferRequestedTotalVideoDurationSeconds(userIntentText);
   const durationSec = requestedDurationSec ?? inferRequestedTotalVideoDurationSeconds(sourceText);
   const references = buildStoryboardReferenceAssets(

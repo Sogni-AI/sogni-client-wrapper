@@ -2077,6 +2077,41 @@ async function runTests() {
       throw new Error(`Expected explicit 16:9 target video to win, got ${managedLandscapeWithBadLlmContract.targetVideoAspectRatio}`);
     }
 
+    // A stale aspect-ratio line that lives ONLY in the assistant-authored
+    // approved-script body must NOT override a typed llm_schema planning
+    // contract. The user request carries no ratio, so the contract's 9:16
+    // owns the video geometry (the prose 16:9 is not user authority).
+    const approvedProseVsTypedContractScript = [
+      '**Aspect Ratio:** 16:9 (stale prose fallback that must lose to the typed planner contract)',
+      '| Beat | Time | Visual | Audio |',
+      '| :--- | :--- | :--- | :--- |',
+      '| 01 | 0:00-0:04 | Sloth at a grey desk. | VO: "Ever since I was young..." |',
+      '| 02 | 0:04-0:10 | Sloth breaks into psychedelic art. | VO: "Syke!" |',
+    ].join('\n');
+    const approvedProseVsTypedContract = buildStoryboardProject({
+      prompt: approvedProseVsTypedContractScript,
+      userIntentText: 'Generate a fun 15s video storyboard using image 1 as the pink sloth mascot.',
+      approvedScriptContext: approvedProseVsTypedContractScript,
+      frameCount: 2,
+      promptAuthorship: 'assistant',
+      planningContract: {
+        schemaVersion: 'storyboard-planning-contract/v1',
+        source: 'llm_schema',
+        layout: {
+          source: 'llm_schema',
+          storyboardCanvasAspectRatio: '16:9',
+          storyboardCellAspectRatio: '9:16',
+          targetVideoAspectRatio: '9:16',
+        },
+      },
+    });
+    if (approvedProseVsTypedContract.targetVideoAspectRatio !== '9:16') {
+      throw new Error(`Expected typed llm_schema contract 9:16 to beat stale approved-script prose 16:9, got ${approvedProseVsTypedContract.targetVideoAspectRatio}`);
+    }
+    if (approvedProseVsTypedContract.frameAspectRatio !== '9:16') {
+      throw new Error(`Expected typed llm_schema contract 9:16 cells to beat stale prose, got ${approvedProseVsTypedContract.frameAspectRatio}`);
+    }
+
     const portraitStoryboardPrompt = compileVideoStoryboardImagePrompt({
       prompt: 'Twelve timed vertical-video storyboard beats with compact labels outside each portrait frame.',
       userIntentText: 'Create a 12-beat storyboard sheet for a 9:16 vertical social campaign.',

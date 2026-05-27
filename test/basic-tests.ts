@@ -54,6 +54,9 @@ import {
   videoToVideoDefinition,
   collapseSingleSourceFanOutToDynamicPromptVariations,
   seedanceTerminalGenerationFailurePayloadFromError,
+  seedanceTerminalPolicyPayloadFromError,
+  SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE,
+  SEEDANCE_STYLIZE_RECOVERY_OPTIONS,
 } from '../src/tools/index.js';
 import {
   PROMPT_CONTRACTS,
@@ -3370,6 +3373,48 @@ async function runTests() {
       if (typeof (root as Record<string, unknown>)[name] !== 'function') {
         throw new Error(`root entry point missing ${name}`);
       }
+    }
+  })();
+
+  await test('seedance real-person rejection carries the stylize-then-resubmit recovery', () => {
+    const payload = seedanceTerminalPolicyPayloadFromError(
+      new Error(`Seedance vendor task status=failed code 5061 ${SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE} may contain a real person`),
+    );
+    if (!payload || payload.error !== 'seedance_input_image_privacy_policy') {
+      throw new Error(`expected privacy payload, got ${JSON.stringify(payload)}`);
+    }
+    // Message steers the user toward stylizing the source instead of dead-ending.
+    if (!/stylized reference image/i.test(payload.message) || !/re-run the Seedance video/i.test(payload.message)) {
+      throw new Error('privacy message no longer steers toward stylize-and-resubmit');
+    }
+    const recovery = payload.recovery;
+    if (!recovery || recovery.kind !== 'stylize_source_then_resubmit' || recovery.resubmitToolName !== 'generate_video') {
+      throw new Error(`expected stylize recovery, got ${JSON.stringify(recovery)}`);
+    }
+    const ids = recovery.options.map((o) => o.id).sort();
+    for (const required of ['anime', 'bobblehead', 'hide_faces', 'lego']) {
+      if (!ids.includes(required as never)) throw new Error(`recovery missing option "${required}"`);
+    }
+    if (recovery.options.length !== SEEDANCE_STYLIZE_RECOVERY_OPTIONS.length) {
+      throw new Error('recovery options drifted from the shared constant');
+    }
+    for (const opt of recovery.options) {
+      if (!opt.label.trim() || !opt.editInstruction.trim()) {
+        throw new Error(`recovery option "${opt.id}" missing label/editInstruction`);
+      }
+    }
+  })();
+
+  await test('seedance content-policy (non-privacy) rejection has no stylize recovery', () => {
+    const payload = seedanceTerminalPolicyPayloadFromError(
+      new Error('Seedance blocked: content_policy moderation safety violation 5061'),
+    );
+    if (!payload) throw new Error('expected a content-policy payload');
+    if (payload.error === 'seedance_input_image_privacy_policy') {
+      throw new Error('content-policy rejection misclassified as privacy');
+    }
+    if ((payload as { recovery?: unknown }).recovery) {
+      throw new Error('non-privacy rejection should not carry the stylize recovery');
     }
   })();
 

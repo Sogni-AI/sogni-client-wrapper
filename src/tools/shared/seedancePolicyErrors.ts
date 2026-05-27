@@ -13,7 +13,69 @@ export const SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE =
   'InputImageSensitiveContentDetected.PrivacyInformation';
 
 export const SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE =
-  "Seedance rejected the input image because it may contain a real person. Seedance Video currently doesn't allow photographic depictions of real people. Please use a non-real-person or more stylized reference image, or switch to another video model.";
+  "Seedance can't bring this image to life because it detected what looks like a real person, and it doesn't allow photographic depictions of real people. Let's convert your source image into a more stylized reference image to get around this — for example an anime version, a LEGO version, or a bobblehead version, or I can just hide the faces. Once the image is stylized I'll re-run the Seedance video using the new image. Which look would you like, or describe your own?";
+
+/**
+ * Structured recovery for the real-person privacy rejection: stylize the source
+ * image (so it is no longer a photographic depiction of a real person), then
+ * resubmit the same video. Consumers render the options as action chips and as
+ * a clear edit-then-resubmit flow. The edit itself routes to GPT Image 2 for
+ * storyboard sheets and Qwen Image Edit 2511 otherwise through the existing
+ * edit_image model routing — this descriptor intentionally does not pin a model.
+ */
+export interface SeedanceStylizeRecoveryOption {
+  id: 'anime' | 'lego' | 'bobblehead' | 'claymation' | 'hide_faces';
+  /** Short chip label. */
+  label: string;
+  /** edit_image instruction that stylizes the people while keeping the scene. */
+  editInstruction: string;
+}
+
+export const SEEDANCE_STYLIZE_RECOVERY_OPTIONS: readonly SeedanceStylizeRecoveryOption[] = [
+  {
+    id: 'anime',
+    label: 'Anime version',
+    editInstruction:
+      'Redraw every person in the image as a stylized 2D anime character, keeping their pose, outfit, and the overall scene composition.',
+  },
+  {
+    id: 'lego',
+    label: 'LEGO version',
+    editInstruction:
+      'Rebuild every person in the image as a LEGO minifigure, keeping their pose, outfit colors, and the overall scene composition.',
+  },
+  {
+    id: 'bobblehead',
+    label: 'Bobblehead version',
+    editInstruction:
+      'Turn every person in the image into a cute oversized-head bobblehead figurine, keeping their likeness cues, outfit, and the overall scene composition.',
+  },
+  {
+    id: 'claymation',
+    label: 'Claymation version',
+    editInstruction:
+      'Re-render every person in the image as a stop-motion claymation figure with visible clay texture, keeping their pose, outfit, and the overall scene composition.',
+  },
+  {
+    id: 'hide_faces',
+    label: 'Just hide the faces',
+    editInstruction:
+      'Obscure every human face in the image (for example with a tasteful mask, helmet, or soft blur) while keeping the people, their pose, outfit, and the overall scene composition intact.',
+  },
+];
+
+export interface SeedanceStylizeRecovery {
+  kind: 'stylize_source_then_resubmit';
+  options: readonly SeedanceStylizeRecoveryOption[];
+  /** The tool to re-run with the stylized image once it is ready. */
+  resubmitToolName: 'generate_video';
+}
+
+export const SEEDANCE_STYLIZE_RECOVERY: SeedanceStylizeRecovery = {
+  kind: 'stylize_source_then_resubmit',
+  options: SEEDANCE_STYLIZE_RECOVERY_OPTIONS,
+  resubmitToolName: 'generate_video',
+};
 
 export const SEEDANCE_PROVIDER_CONTENT_POLICY_MESSAGE =
   "Seedance blocked this video because it did not pass the provider's content policy. No video was returned.";
@@ -33,6 +95,11 @@ export interface SeedanceTerminalPolicyPayload {
   nextAction: 'wait_for_user';
   vendorCode?: 5061;
   vendorErrorCode: typeof SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE | string;
+  /**
+   * Present only for the real-person privacy rejection: the typed
+   * stylize-the-source-then-resubmit recovery the UI renders as action chips.
+   */
+  recovery?: SeedanceStylizeRecovery;
 }
 
 export interface SeedanceTerminalGenerationFailurePayload {
@@ -242,6 +309,7 @@ export function seedanceTerminalPolicyPayloadFromError(
     nextAction: 'wait_for_user',
     ...(hasExpectedVendorCode ? { vendorCode: 5061 } : {}),
     vendorErrorCode: SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE,
+    recovery: SEEDANCE_STYLIZE_RECOVERY,
   };
 }
 

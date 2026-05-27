@@ -13,7 +13,7 @@ export const SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE =
   'InputImageSensitiveContentDetected.PrivacyInformation';
 
 export const SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE =
-  "Seedance can't bring this image to life because it detected what looks like a real person, and it doesn't allow photographic depictions of real people. Let's convert your source image into a more stylized reference image to get around this — for example an anime version, a LEGO version, or a bobblehead version, or I can just hide the faces. Once the image is stylized I'll re-run the Seedance video using the new image. Which look would you like, or describe your own?";
+  "Seedance can't bring this image to life because it detected what looks like a real person, and it doesn't allow photographic depictions of real people. I can first convert the attached image or storyboard into a clearly non-photographic replacement reference, such as anime, cartoon, claymation, LEGO, or bobblehead, or I can hide the faces. I will not make another realistic human portrait. Once that safe reference exists, I'll re-run the Seedance video using it. Which look would you like, or describe your own?";
 
 /**
  * Structured recovery for the real-person privacy rejection: stylize the source
@@ -24,7 +24,7 @@ export const SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE =
  * edit_image model routing — this descriptor intentionally does not pin a model.
  */
 export interface SeedanceStylizeRecoveryOption {
-  id: 'anime' | 'lego' | 'bobblehead' | 'claymation' | 'hide_faces';
+  id: 'anime' | 'cartoon' | 'lego' | 'bobblehead' | 'claymation' | 'hide_faces';
   /** Short chip label. */
   label: string;
   /** edit_image instruction that stylizes the people while keeping the scene. */
@@ -36,31 +36,37 @@ export const SEEDANCE_STYLIZE_RECOVERY_OPTIONS: readonly SeedanceStylizeRecovery
     id: 'anime',
     label: 'Anime version',
     editInstruction:
-      'Redraw every person in the image as a stylized 2D anime character, keeping their pose, outfit, and the overall scene composition.',
+      'Redraw every person in the image as a clearly non-photographic 2D anime character, keeping their pose, outfit, and the overall scene composition; do not preserve a realistic face or skin texture.',
+  },
+  {
+    id: 'cartoon',
+    label: 'Cartoon version',
+    editInstruction:
+      'Redraw every person in the image as a clearly non-photographic cartoon character with simplified facial features, keeping their pose, outfit colors, and the overall scene composition.',
   },
   {
     id: 'lego',
     label: 'LEGO version',
     editInstruction:
-      'Rebuild every person in the image as a LEGO minifigure, keeping their pose, outfit colors, and the overall scene composition.',
+      'Rebuild every person in the image as a toy-like LEGO minifigure, keeping their pose, outfit colors, and the overall scene composition; avoid realistic human faces and skin.',
   },
   {
     id: 'bobblehead',
     label: 'Bobblehead version',
     editInstruction:
-      'Turn every person in the image into a cute oversized-head bobblehead figurine, keeping their likeness cues, outfit, and the overall scene composition.',
+      'Turn every person in the image into a cute oversized-head bobblehead figurine with toy-like simplified features, keeping the outfit and overall scene composition but avoiding a realistic human likeness.',
   },
   {
     id: 'claymation',
     label: 'Claymation version',
     editInstruction:
-      'Re-render every person in the image as a stop-motion claymation figure with visible clay texture, keeping their pose, outfit, and the overall scene composition.',
+      'Re-render every person in the image as a stop-motion claymation figure with visible clay texture and simplified faces, keeping their pose, outfit, and the overall scene composition.',
   },
   {
     id: 'hide_faces',
     label: 'Just hide the faces',
     editInstruction:
-      'Obscure every human face in the image (for example with a tasteful mask, helmet, or soft blur) while keeping the people, their pose, outfit, and the overall scene composition intact.',
+      'Obscure every human face in the image (for example with a tasteful mask, helmet, shadow, or soft blur) while keeping the people, their pose, outfit, and the overall scene composition intact.',
   },
 ];
 

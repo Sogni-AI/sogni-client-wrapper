@@ -3376,23 +3376,27 @@ async function runTests() {
     }
   })();
 
-  await test('seedance real-person rejection carries the stylize-then-resubmit recovery', () => {
+  await test('seedance real-person rejection carries non-photographic recovery options', () => {
     const payload = seedanceTerminalPolicyPayloadFromError(
       new Error(`Seedance vendor task status=failed code 5061 ${SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE} may contain a real person`),
     );
     if (!payload || payload.error !== 'seedance_input_image_privacy_policy') {
       throw new Error(`expected privacy payload, got ${JSON.stringify(payload)}`);
     }
-    // Message steers the user toward stylizing the source instead of dead-ending.
-    if (!/stylized reference image/i.test(payload.message) || !/re-run the Seedance video/i.test(payload.message)) {
-      throw new Error('privacy message no longer steers toward stylize-and-resubmit');
+    // Message steers the user toward a clearly non-photographic source replacement instead of dead-ending.
+    if (
+      !/clearly non-photographic replacement reference/i.test(payload.message)
+      || !/hide the faces/i.test(payload.message)
+      || !/not make another realistic human portrait/i.test(payload.message)
+    ) {
+      throw new Error('privacy message no longer steers toward non-photographic recovery');
     }
     const recovery = payload.recovery;
     if (!recovery || recovery.kind !== 'stylize_source_then_resubmit' || recovery.resubmitToolName !== 'generate_video') {
       throw new Error(`expected stylize recovery, got ${JSON.stringify(recovery)}`);
     }
     const ids = recovery.options.map((o) => o.id).sort();
-    for (const required of ['anime', 'bobblehead', 'hide_faces', 'lego']) {
+    for (const required of ['anime', 'bobblehead', 'cartoon', 'claymation', 'hide_faces', 'lego']) {
       if (!ids.includes(required as never)) throw new Error(`recovery missing option "${required}"`);
     }
     if (recovery.options.length !== SEEDANCE_STYLIZE_RECOVERY_OPTIONS.length) {

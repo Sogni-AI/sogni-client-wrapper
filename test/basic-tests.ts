@@ -3418,13 +3418,20 @@ async function runTests() {
     if (!payload || payload.error !== 'seedance_input_image_privacy_policy') {
       throw new Error(`expected privacy payload, got ${JSON.stringify(payload)}`);
     }
-    // Message steers the user toward a clearly non-photographic source replacement instead of dead-ending.
+    // The message must steer toward a non-photographic stylized recovery and
+    // offer the LTX 2.3 alternative rather than dead-ending. Exact wording is
+    // free to change for tone/voice, so assert the durable steering signals
+    // (non-photographic styling, named looks, hide-faces, LTX option) rather
+    // than a verbatim sentence — the structured `recovery` options below are
+    // the authoritative chip contract.
+    const message = payload.message.toLowerCase();
     if (
-      !/clearly non-photographic replacement reference/i.test(payload.message)
-      || !/hide the faces/i.test(payload.message)
-      || !/not make another realistic human portrait/i.test(payload.message)
+      !message.includes('non-photographic')
+      || !/\b(?:anime|cartoon|claymation|lego|bobblehead)\b/.test(message)
+      || !message.includes('hide the faces')
+      || !message.includes('ltx 2.3')
     ) {
-      throw new Error('privacy message no longer steers toward non-photographic recovery');
+      throw new Error('privacy message no longer steers toward non-photographic recovery + LTX alternative');
     }
     const recovery = payload.recovery;
     if (!recovery || recovery.kind !== 'stylize_source_then_resubmit' || recovery.resubmitToolName !== 'generate_video') {

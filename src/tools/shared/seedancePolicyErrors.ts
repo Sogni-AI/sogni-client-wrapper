@@ -13,7 +13,7 @@ export const SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE =
   'InputImageSensitiveContentDetected.PrivacyInformation';
 
 export const SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE =
-  "Seedance can't bring this image to life because it detected what looks like a real person, and it doesn't allow photographic depictions of real people. I can first convert the attached image or storyboard into a clearly non-photographic replacement reference, such as anime, cartoon, claymation, LEGO, or bobblehead, or I can hide the faces. I will not make another realistic human portrait. Once that safe reference exists, I'll re-run the Seedance video using it. Which look would you like, or describe your own?";
+  "No problem — Seedance just has a content rule that keeps it from animating photos of real people directly, but we've got a couple of great ways to bring this to life! I can give the people a fun, clearly non-photographic makeover — anime, cartoon, claymation, LEGO, or bobblehead, or simply hide the faces — and then run Seedance on that. Or, if you'd like to keep the original look, I can switch to LTX 2.3, which animates your photo directly (it just won't use Seedance-fast). Which sounds best — a stylized spin, or LTX 2.3?";
 
 /**
  * Structured recovery for the real-person privacy rejection: stylize the source
@@ -84,15 +84,15 @@ export const SEEDANCE_STYLIZE_RECOVERY: SeedanceStylizeRecovery = {
 };
 
 export const SEEDANCE_PROVIDER_CONTENT_POLICY_MESSAGE =
-  "Seedance blocked this video because it did not pass the provider's content policy. No video was returned.";
+  "Seedance's content check didn't pass this one, so no video came back this time. We can adjust the prompt or try a different look and give it another go.";
 
 export const SEEDANCE_VENDOR_GENERATION_FAILED_MESSAGE =
-  "Seedance couldn't complete this video after it started, so no media was generated. The provider did not return a specific reason. Please retry once; if it fails again, report the issue from this message.";
+  "Seedance hit a snag partway through this one, so no media was generated. The provider did not return a specific reason — a quick retry usually clears it up. If it happens again, you can report the issue right from this message.";
 export const SEEDANCE_VENDOR_TIMEOUT_MESSAGE =
-  "Seedance timed out while rendering this video, so no media was generated. Please retry once; if it times out again, report the issue from this message.";
+  "Seedance took a bit too long on this one and timed out, so no media was generated. A quick retry usually does the trick; if it times out again, you can report the issue right from this message.";
 
 export const SEEDANCE_REFERENCE_AUDIO_TOO_LONG_MESSAGE =
-  'Seedance rejected the reference audio because it is longer than this video mode allows. Use an audio clip at or below the provider limit, or retry with the audio trimmed to that length.';
+  "That reference audio is a little longer than this Seedance mode allows. Trim it to the mode's limit (or pick a shorter clip) and we'll give it another go.";
 
 export interface SeedanceTerminalPolicyPayload {
   error: 'seedance_input_image_privacy_policy' | 'seedance_content_policy';
@@ -273,7 +273,7 @@ function shapeSeedanceInvalidParameterMessage(
     return {
       vendorMessage,
       userMessage:
-        "Seedance can't combine a locked first/last frame image with audio, video, or extra image references in the same request. Send the image as a reference instead of a frame anchor, or remove the audio/video reference and try again.",
+        "Seedance can't mix a locked first/last-frame image with audio, video, or extra image references in one request. Send that image as a reference instead of a frame anchor, or drop the extra audio/video reference, and we'll try again.",
     };
   }
   return {
@@ -361,7 +361,7 @@ export function seedanceTerminalGenerationFailurePayloadFromError(
   if (audioDurationLimit !== null) {
     return {
       error: 'seedance_reference_audio_too_long',
-      message: `Seedance rejected the reference audio because it is longer than ${audioDurationLimit}s for this video mode. Use an audio clip ${audioDurationLimit}s or shorter, or retry with the audio trimmed to that length.`,
+      message: `That reference audio is a bit long — this Seedance mode allows up to ${audioDurationLimit}s. Trim it to ${audioDurationLimit}s or shorter and we'll give it another go.`,
       retryPolicy: 'manual_user_confirmation',
       nextAction: 'wait_for_user',
       vendorErrorCode: 'InvalidParameter',

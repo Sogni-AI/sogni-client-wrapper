@@ -3902,18 +3902,29 @@ function inferExplicitStoryboardTargetVideoAspectRatio(text: string): string | n
   return null;
 }
 
-function inferStoryboardTargetVideoAspectRatio(text: string, boardAspectRatio: string): string {
-  const explicitTarget = inferExplicitStoryboardTargetVideoAspectRatio(text);
-  if (explicitTarget) return explicitTarget;
+type StoryboardTargetVideoAspectSource = 'explicit_ratio' | 'orientation_cue' | 'board_fallback';
+
+function inferStoryboardTargetVideoAspect(
+  text: string,
+  boardAspectRatio: string,
+  explicitTargetVideoAspectRatio: string | null = inferExplicitStoryboardTargetVideoAspectRatio(text),
+): { aspectRatio: string; source: StoryboardTargetVideoAspectSource } {
+  if (explicitTargetVideoAspectRatio) {
+    return { aspectRatio: explicitTargetVideoAspectRatio, source: 'explicit_ratio' };
+  }
 
   if (/\b(?:portrait|vertical|9\s*:\s*16)\b/i.test(text) || textMentionsPortraitSocialFormat(text)) {
-    return '9:16';
+    return { aspectRatio: '9:16', source: 'orientation_cue' };
   }
   if (/\b(?:landscape|horizontal|widescreen|16\s*:\s*9|youtube)\b/i.test(text)) {
-    return '16:9';
+    return { aspectRatio: '16:9', source: 'orientation_cue' };
   }
 
-  return boardAspectRatio;
+  return { aspectRatio: boardAspectRatio, source: 'board_fallback' };
+}
+
+function inferStoryboardTargetVideoAspectRatio(text: string, boardAspectRatio: string): string {
+  return inferStoryboardTargetVideoAspect(text, boardAspectRatio).aspectRatio;
 }
 
 function inferStoryboardCellAspectRatio(text: string, targetVideoAspectRatio: string): string {
@@ -4214,6 +4225,7 @@ function applyStoryboardPlanningLayoutContract(
   contract: StoryboardPlanningContract | null | undefined,
   frameCount: number,
   userDefinedCanvas: boolean,
+  userDefinedTargetVideoAspect: boolean,
 ): StoryboardLayoutSpec {
   const layoutContract = contract?.layout;
   if (!layoutContract) return fallback;
@@ -4229,11 +4241,15 @@ function applyStoryboardPlanningLayoutContract(
   const boardAspectRatio = contractOwnsCanvas
     ? normalizeAspectRatio(layoutContract.storyboardCanvasAspectRatio) ?? fallback.boardAspectRatio
     : fallback.boardAspectRatio;
-  const cellAspectRatio = normalizeAspectRatio(layoutContract.storyboardCellAspectRatio)
-    ?? fallback.cellAspectRatio;
-  const targetVideoAspectRatio = normalizeAspectRatio(layoutContract.targetVideoAspectRatio)
-    ?? cellAspectRatio
-    ?? fallback.targetVideoAspectRatio;
+  const contractOwnsVideoGeometry =
+    !userDefinedTargetVideoAspect
+    || layoutSource === 'user_schema';
+  const cellAspectRatio = contractOwnsVideoGeometry
+    ? normalizeAspectRatio(layoutContract.storyboardCellAspectRatio) ?? fallback.cellAspectRatio
+    : fallback.cellAspectRatio;
+  const targetVideoAspectRatio = contractOwnsVideoGeometry
+    ? normalizeAspectRatio(layoutContract.targetVideoAspectRatio) ?? cellAspectRatio ?? fallback.targetVideoAspectRatio
+    : fallback.targetVideoAspectRatio;
   const layout = describeStoryboardLayout(boardAspectRatio, cellAspectRatio, frameCount);
   const contractBoardDimensions = contractOwnsCanvas
     ? normalizeStoryboardBoardDimensions(layoutContract.boardDimensions)
@@ -4295,8 +4311,13 @@ export function inferStoryboardLayoutSpec(
   const provisionalBoardAspectRatio = userDefinedCanvas
     ? inferStoryboardBoardAspectRatio(userIntentText)
     : '16:9';
-  const inferredTargetVideoAspectRatio = explicitTargetVideoAspectRatio
-    ?? inferStoryboardTargetVideoAspectRatio(userIntentText, provisionalBoardAspectRatio);
+  const inferredTargetVideoAspect = inferStoryboardTargetVideoAspect(
+    userIntentText,
+    provisionalBoardAspectRatio,
+    explicitTargetVideoAspectRatio,
+  );
+  const inferredTargetVideoAspectRatio = inferredTargetVideoAspect.aspectRatio;
+  const userDefinedTargetVideoAspect = inferredTargetVideoAspect.source !== 'board_fallback';
   const cellAspectRatio = inferStoryboardCellAspectRatio(userIntentText, inferredTargetVideoAspectRatio);
   const targetVideoAspectRatio = explicitTargetVideoAspectRatio ?? cellAspectRatio;
 
@@ -4317,7 +4338,13 @@ export function inferStoryboardLayoutSpec(
         ? {}
         : { boardDimensions: balancedGrid?.boardDimensions ?? GPT_IMAGE_STORYBOARD_DEFAULTS.storyboardLandscape.aspectRatio }),
   };
-  return applyStoryboardPlanningLayoutContract(fallback, planningContract, frameCount, userDefinedCanvas);
+  return applyStoryboardPlanningLayoutContract(
+    fallback,
+    planningContract,
+    frameCount,
+    userDefinedCanvas,
+    userDefinedTargetVideoAspect,
+  );
 }
 
 function clampStoryboardDefaultFrameCount(value: number): number {

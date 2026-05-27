@@ -2042,6 +2042,38 @@ async function runTests() {
       throw new Error('Exact landscape-portrait layout mentioned unused grid slots');
     }
 
+    const managedLandscapeWithBadLlmContract = inferStoryboardLayoutSpec(
+      [
+        'Create a fun 15s 720p landscape Seedance video storyboard with a 12-beat storyboard.',
+        'DEFAULT STORYBOARD PAGE LAYOUT: Use a 4:3 landscape storyboard canvas/page (2304x1728) sized for clean GPT Image storyboard readability. Keep individual scene-cell/frame aspect ratio 16:9; target final video aspect ratio 16:9.',
+      ].join('\n'),
+      12,
+      {
+        schemaVersion: 'storyboard-planning-contract/v1',
+        source: 'llm_schema',
+        layout: {
+          source: 'llm_schema',
+          storyboardCanvasAspectRatio: '16:9',
+          storyboardCellAspectRatio: '9:16',
+          targetVideoAspectRatio: '9:16',
+          boardDimensions: '1024x576',
+          storyboardCanvasSpecifiedByUser: false,
+        },
+      },
+    );
+    if (managedLandscapeWithBadLlmContract.boardAspectRatio !== '4:3') {
+      throw new Error(`Expected explicit 4:3 storyboard canvas to win, got ${managedLandscapeWithBadLlmContract.boardAspectRatio}`);
+    }
+    if (managedLandscapeWithBadLlmContract.boardDimensions !== '2304x1728') {
+      throw new Error(`Expected explicit storyboard canvas dimensions to win, got ${managedLandscapeWithBadLlmContract.boardDimensions}`);
+    }
+    if (managedLandscapeWithBadLlmContract.cellAspectRatio !== '16:9') {
+      throw new Error(`Expected explicit 16:9 storyboard cells to win, got ${managedLandscapeWithBadLlmContract.cellAspectRatio}`);
+    }
+    if (managedLandscapeWithBadLlmContract.targetVideoAspectRatio !== '16:9') {
+      throw new Error(`Expected explicit 16:9 target video to win, got ${managedLandscapeWithBadLlmContract.targetVideoAspectRatio}`);
+    }
+
     const portraitStoryboardPrompt = compileVideoStoryboardImagePrompt({
       prompt: 'Twelve timed vertical-video storyboard beats with compact labels outside each portrait frame.',
       userIntentText: 'Create a 12-beat storyboard sheet for a 9:16 vertical social campaign.',

@@ -57,6 +57,12 @@ export function isCostApprovalGatedTool(
  * duration, steps) — those have to be picked by the LLM at request
  * time so the cost gate evaluates the correct cost class.
  *
+ * `prompt` / `prompts` are allowed because a prompt edit is
+ * cost-neutral: the cost class is a function of model, dimensions,
+ * duration, and variation count, never of prompt content. So the user
+ * may correct the prompt on the approval screen and have it applied to
+ * the tool args before dispatch without re-evaluating the cost gate.
+ *
  * Unknown / unsafe keys must be stripped by the API rather than
  * rejected with a 400 so a buggy client cannot wedge a run that
  * already paused; the user can still confirm or cancel.
@@ -66,6 +72,8 @@ export const COST_APPROVAL_OVERRIDE_ALLOWLIST: ReadonlySet<string> = new Set<str
   'quality_tier',
   'safeContentFilter',
   'safe_content_filter',
+  'prompt',
+  'prompts',
 ]);
 
 /**
@@ -79,6 +87,16 @@ export function sanitizeCostApprovalOverride(key: string, value: unknown): unkno
   }
   if (key === 'safeContentFilter' || key === 'safe_content_filter') {
     return typeof value === 'boolean' ? value : undefined;
+  }
+  if (key === 'prompt') {
+    return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+  }
+  if (key === 'prompts') {
+    return Array.isArray(value)
+      && value.length > 0
+      && value.every((entry) => typeof entry === 'string' && entry.trim().length > 0)
+      ? value
+      : undefined;
   }
   return undefined;
 }

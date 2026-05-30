@@ -67,6 +67,7 @@ import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
 import { runWorkflowExecutorTests } from './workflow-executor-tests';
+import { runCostApprovalTests } from './cost-approval-tests';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -3478,6 +3479,11 @@ async function runTests() {
   const executorResults = await runWorkflowExecutorTests();
   testsPassed += executorResults.passed;
   testsFailed += executorResults.failed;
+
+  // Cost-approval override allowlist + sanitizer (prompt edits)
+  const costApprovalResults = runCostApprovalTests();
+  testsPassed += costApprovalResults.passed;
+  testsFailed += costApprovalResults.failed;
 
   // Summary
   console.log('\n' + '='.repeat(50));

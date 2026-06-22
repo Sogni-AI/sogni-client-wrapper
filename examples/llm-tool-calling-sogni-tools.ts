@@ -155,7 +155,7 @@ async function executeSogniTool(
     const modelId = selectModel(
       models,
       'audio',
-      typeof args.model === 'string' ? args.model : 'ace_step_1.5_turbo'
+      typeof args.model === 'string' ? args.model : 'ace_step_1.5_xl_turbo'
     );
     const positivePrompt = asString(args.prompt, 'A mellow electronic ambient track');
     const duration = asNumber(args.duration, 30);

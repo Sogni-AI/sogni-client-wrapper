@@ -1,8 +1,8 @@
 export type MusicRenderMode = 'speed' | 'quality';
 
 export enum MusicModel {
-  speed = 'ace_step_1.5_turbo',
-  quality = 'ace_step_1.5_sft',
+  speed = 'ace_step_1.5_xl_turbo',
+  quality = 'ace_step_1.5_xl_sft',
 }
 
 export const MUSIC_MODELS = {

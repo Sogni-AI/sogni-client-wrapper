@@ -15,7 +15,7 @@ export const definition: ToolDefinition = {
   function: {
     name: "video_to_video",
     description:
-      'Transform an existing video using AI. Uses WAN 2.2 Animate (move/replace) with a reference image to animate a photo with the video\'s motion or swap the video\'s subject, LTX-2.3 V2V ControlNet (canny/pose/depth/detailer) for video-only transforms, or Seedance V2V when the user explicitly asks to transform, upscale, enhance, restyle, or remaster an uploaded video with Seedance. Requires an uploaded video file. Use when the user wants to animate a photo with video motion, replace subjects in a video, restyle an existing video, or enhance video quality.',
+      'Transform an existing video using AI. Uses WAN 2.2 Animate (move/replace) with a reference image to animate a photo with the video\'s motion or swap the video\'s subject, LTX-2.3 V2V ControlNet (canny/pose/depth/detailer) for video-only transforms, LTX-2.3 outpaint to extend/expand the video canvas (e.g. make a vertical clip widescreen) or inpaint to regenerate a masked region of the video, or Seedance V2V when the user explicitly asks to transform, upscale, enhance, restyle, or remaster an uploaded video with Seedance. Requires an uploaded video file. Use when the user wants to animate a photo with video motion, replace subjects in a video, restyle an existing video, extend or expand a video frame, regenerate part of a video, or enhance video quality.',
     parameters: {
       type: "object",
       properties: {
@@ -35,6 +35,8 @@ Examples by mode:
 - depth (LTX-2.3 — depth-map restyle): "A misty alpine valley at golden hour, expansive scale, volumetric haze, cool blue shadows, warm rim light, cinematic depth, lingering continuous shot."
 - detailer (LTX-2.3 — enhance quality): DESCRIBE THE SOURCE, do not request changes. Append quality qualifiers only. E.g. "The same scene, ultra-sharp and clean, crisp high-resolution detail, preserving all original content, composition, and color." Avoid words like "enhanced textures", "restyled", or any new subjects/objects — they cause drift.
 - seedance-v2v (BytePlus Dreamina Seedance 2.0 V2V): "Restyle the source clip in a watercolor look with soft ink edges, while preserving its motion and composition." Use natural prose; Seedance reads the reference video holistically rather than via control-net constraints, so describe target style/mood/dialogue rather than control strength.
+- outpaint (LTX-2.3 — canvas extension): describe what fills the NEWLY REVEALED area around the original frame, consistent with the source scene. E.g. "The same street scene continues seamlessly into the newly revealed space — more wet asphalt, parked cars, and glowing shopfronts, matching the original lighting and perspective." Set outpaintPosition (and optionally outpaintAspectRatio); no mask needed.
+- inpaint (LTX-2.3 — masked region regeneration): describe ONLY what the masked (white) region should become; the rest of the frame is preserved. E.g. "A vintage red convertible parked at the curb, matching the scene's lighting and shadows." Requires maskImageIndex.
 
 Present tense. Positive phrasing. Concrete visual details.
 
@@ -60,6 +62,8 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             "pose",
             "depth",
             "detailer",
+            "outpaint",
+            "inpaint",
             "seedance-v2v",
           ],
           description:
@@ -70,6 +74,8 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             '• "pose" — LTX-2.3 skeletal tracking. Best for replacing a person while keeping their motion (e.g. "turn this dancer into a robot"). Image optional — if provided, controls appearance; otherwise the prompt drives appearance. Requires person-centric motion.\n' +
             '• "depth" — LTX-2.3 depth-map control. Best for restyling scenes with perspective, camera movement, or volumetric content (landscapes, interiors, camera pans). Preserves 3D spatial layout rather than 2D edges; more forgiving than canny when edges are noisy. Video-only.\n' +
             '• "detailer" — LTX-2.3 quality enhancement. Sharpens detail and texture WITHOUT restyling. The prompt must DESCRIBE THE ORIGINAL scene with quality qualifiers (sharp, clean, high-resolution) — never request content changes, new textures, or a new look. Pick this when the user asks to "improve quality", "enhance", "upscale", or "sharpen" without a creative transformation.\n' +
+            '• "outpaint" — LTX-2.3 canvas extension. Extend or expand the video frame outward, or convert it to a new aspect ratio (e.g. "make this vertical clip widescreen", "add more space on the right", "extend the scene"). Positional and mask-free: set outpaintPosition for where the original frame sits in the expanded canvas, and optionally outpaintAspectRatio for the target shape. The prompt describes what fills the new area. Video-only.\n' +
+            '• "inpaint" — LTX-2.3 masked region regeneration. Regenerate or replace a specific masked region of the source video while preserving the rest (e.g. "replace the billboard", "change what\'s on the table"). REQUIRES a mask image: set maskImageIndex to the uploaded mask where white pixels mark the region to regenerate. The prompt describes only the masked region. Video-only.\n' +
             `• "seedance-v2v" — BytePlus Dreamina Seedance 2.0 video-to-video. Use only when the user explicitly asks for Seedance on the uploaded source video, such as Seedance Fast upscale, enhance, remaster, restyle, or transform. High-fidelity quality, native audio, time-coded scene control. ${SEEDANCE_TOOL_V2V_REFERENCE_GUIDANCE} Distinct from canny/depth/pose which use control-net constraints — Seedance treats the reference video holistically.\n` +
             'Canny vs depth: canny preserves silhouettes and fine outlines — pick it for subject-led scenes and graphic restyles. Depth preserves 3D structure — pick it for scenes where the camera moves or spatial layout matters more than edge fidelity. Default: "animate-move".',
         },
@@ -97,7 +103,24 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         sourceImageIndex: {
           type: "number",
           description:
-            'Optional index of a reference image (0-based). Required for "animate-move" and "animate-replace". Optional for "pose" (controls appearance if provided). Ignored by "canny", "depth", and "detailer".',
+            'Optional index of a reference image (0-based). Required for "animate-move" and "animate-replace". Optional for "pose" (controls appearance if provided). Ignored by "canny", "depth", "detailer", "outpaint", and "inpaint".',
+        },
+        outpaintPosition: {
+          type: "string",
+          enum: ["center", "top", "bottom", "left", "right"],
+          description:
+            'controlMode="outpaint" only. Where the ORIGINAL frame is anchored inside the expanded canvas, which determines the direction the canvas grows: "left" anchors the original on the left and adds new space on the right; "right" adds space on the left; "top" adds space below; "bottom" adds space above; "center" expands all sides evenly. Default: "center". Pick by the user\'s direction ("extend to the right" → "left"; "make it wider"/"widescreen" → "center").',
+        },
+        outpaintAspectRatio: {
+          type: "string",
+          enum: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
+          description:
+            'controlMode="outpaint" only. OPTIONAL target aspect ratio for the expanded canvas (e.g. "16:9" to make a vertical clip widescreen). The canvas only grows to reach this ratio — the original content is never cropped. Omit to expand moderately in the direction implied by outpaintPosition. Only set when the user names a target shape or orientation.',
+        },
+        maskImageIndex: {
+          type: "number",
+          description:
+            'controlMode="inpaint" only. REQUIRED for inpaint. 0-based index of the uploaded mask IMAGE that marks the region to regenerate (white pixels = regenerate, black = preserve). Ignored by every other controlMode.',
         },
         duration: {
           type: "number",

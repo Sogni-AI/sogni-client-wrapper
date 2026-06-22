@@ -966,8 +966,9 @@ const VIDEO_TO_VIDEO_CONTRACT: PromptContract = {
     'with Seedance, including Seedance-fast uploaded-video upscale/remaster requests. For detailer,',
     'describe the original scene plus quality terms, not new content.',
     'Use outpaint to extend/expand the frame or change aspect ratio (positional, mask-free); set',
-    'outpaintPosition and optionally outpaintAspectRatio. Use inpaint to regenerate a masked region',
-    'while preserving the rest; inpaint REQUIRES a mask image referenced by maskImageIndex.',
+    'outpaintPosition and optionally outpaintAspectRatio. Use inpaint to regenerate a region',
+    'while preserving the rest. If the user supplied a mask, set maskImageIndex; otherwise',
+    'omit maskImageIndex so execution derives one from the source video and prompt.',
   ].join('\n'),
   parameterDocs: {
     prompt: 'Describe the target appearance in present tense. For detailer, describe the original content plus quality qualifiers only. For outpaint, describe what fills the new area; for inpaint, describe only the masked region.',
@@ -976,7 +977,7 @@ const VIDEO_TO_VIDEO_CONTRACT: PromptContract = {
     sourceImageIndex: 'Required for animate-move and animate-replace. Ignored by canny, depth, detailer, outpaint, and inpaint.',
     outpaintPosition: 'outpaint only. Where the original frame sits in the expanded canvas (center/top/bottom/left/right); determines grow direction. Default center.',
     outpaintAspectRatio: 'outpaint only, optional. Target aspect ratio (e.g. 16:9) for the expanded canvas; the canvas only grows, never crops. Set only when the user names a target shape/orientation.',
-    maskImageIndex: 'inpaint only, REQUIRED. 0-based index of the uploaded mask image (white = regenerate, black = preserve).',
+    maskImageIndex: 'inpaint only, optional. 0-based index of an uploaded mask image (white = regenerate, black = preserve). Omit when the user did not provide a mask.',
     duration: 'Set only when the user requests a different output length; otherwise let the tool match/cap the source duration.',
   },
 };

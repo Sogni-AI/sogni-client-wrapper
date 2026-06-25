@@ -1339,7 +1339,7 @@ const PUBLIC_SEEDANCE_ADAPTER: PublicStoryboardAdapter = {
         stage: 'storyboard_image',
         prompt: compileStoryboardImagePromptFromProject(storyboard),
         args: {
-          videoModel: 'seedance2-fast',
+          videoModel: 'seedance2-mini',
           aspectRatio: storyboard.targetVideoAspectRatio,
           skipPromptProcessing: true,
           expandPrompt: false,
@@ -1354,7 +1354,7 @@ const PUBLIC_SEEDANCE_ADAPTER: PublicStoryboardAdapter = {
         stage: 'scene_clip',
         prompt: compileSeedanceSceneClipPromptFromProject(storyboard, scene, referenceTag),
         args: {
-          videoModel: 'seedance2-fast',
+          videoModel: 'seedance2-mini',
           duration,
           aspectRatio: storyboard.targetVideoAspectRatio,
           skipPromptProcessing: true,
@@ -1365,7 +1365,7 @@ const PUBLIC_SEEDANCE_ADAPTER: PublicStoryboardAdapter = {
     throw new StoryboardAdapterUnsupportedStageError('seedance', input.stage);
   },
   getSystemPromptGuidance() {
-    return `SEEDANCE STORYBOARD REFERENCES: If exactly one uploaded image is an ordered storyboard/sequence sheet and the user asks for a Seedance video with only a sparse/casual prompt, use generate_video with referenceImageIndices=[-1], prompt="${SEEDANCE_STORYBOARD_REFERENCE_PROMPT}", videoModel="seedance2", skipPromptProcessing=true, and expandPrompt=false. Also use videoModel="seedance2" when a generated storyboard image becomes the Seedance reference, regardless of requested resolution, unless the user explicitly asks for a draft or the Seedance fast model/version. Do not use this fallback when the user provides a literal prompt, their own script, shot list, timecoded beats, VO/SFX notes, or other substantive video instructions.`;
+    return `SEEDANCE STORYBOARD REFERENCES: If exactly one uploaded image is an ordered storyboard/sequence sheet and the user asks for a Seedance video with only a sparse/casual prompt, use generate_video with referenceImageIndices=[-1], prompt="${SEEDANCE_STORYBOARD_REFERENCE_PROMPT}", videoModel="seedance2", skipPromptProcessing=true, and expandPrompt=false. Also use videoModel="seedance2" when a generated storyboard image becomes the Seedance reference, regardless of requested resolution, unless the user explicitly asks for a draft, Mini, or the Seedance fast model/version. Do not use this fallback when the user provides a literal prompt, their own script, shot list, timecoded beats, VO/SFX notes, or other substantive video instructions.`;
   },
 };
 
@@ -1648,6 +1648,7 @@ export function resolveLtx23WorkflowModelForQuality(
 
 export const SEEDANCE_WORKFLOW_MODELS = Object.freeze({
   t2v: 'seedance-2-0',
+  t2vMini: 'seedance-2-0-mini',
   t2vFast: 'seedance-2-0-fast',
   ia2v: 'seedance-2-0',
   v2v: 'seedance-2-0'
@@ -1925,6 +1926,8 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   'wan22-animate-replace': 'wan_v2.2-14b-fp8_animate-replace_lightx2v',
   seedance2: SEEDANCE_WORKFLOW_MODELS.t2v,
   'seedance2-t2v': SEEDANCE_WORKFLOW_MODELS.t2v,
+  'seedance2-mini': SEEDANCE_WORKFLOW_MODELS.t2vMini,
+  'seedance2-mini-t2v': SEEDANCE_WORKFLOW_MODELS.t2vMini,
   'seedance2-fast': SEEDANCE_WORKFLOW_MODELS.t2vFast,
   'seedance2-fast-t2v': SEEDANCE_WORKFLOW_MODELS.t2vFast,
   'seedance2-ia2v': SEEDANCE_WORKFLOW_MODELS.ia2v,
@@ -3502,7 +3505,7 @@ export interface StoryboardVideoHostedWorkflowBuildOptions {
   imageOutputFormat?: 'png' | 'jpg' | 'jpeg' | 'webp';
   imageWidth?: number;
   imageHeight?: number;
-  videoModel?: 'seedance2' | 'seedance2-fast' | string;
+  videoModel?: 'seedance2' | 'seedance2-mini' | 'seedance2-fast' | string;
   videoDurationSec?: number;
   videoTargetResolution?: number;
   generateAudio?: boolean;

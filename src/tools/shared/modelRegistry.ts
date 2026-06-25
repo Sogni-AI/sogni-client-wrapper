@@ -70,6 +70,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'ltx23', displayName: 'LTX 2.3 22B' },
     { key: 'wan22', displayName: 'WAN 2.2 14B' },
     { key: 'seedance2', displayName: 'Seedance 2.0' },
+    { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
     { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast' },
   ],
   animate_photo: [
@@ -79,6 +80,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
   sound_to_video: [
     { key: 'wan-s2v', displayName: 'WAN 2.2 S2V' },
     { key: 'seedance2', displayName: 'Seedance 2.0 Image+Audio' },
+    { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini Image+Audio' },
     { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast Image+Audio' },
     { key: 'ltx23-ia2v', displayName: 'LTX 2.3 Image+Audio' },
     { key: 'ltx23-a2v', displayName: 'LTX 2.3 Audio Only' },

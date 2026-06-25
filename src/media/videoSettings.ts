@@ -8,7 +8,7 @@ import { parseAspectRatio } from "./imageDimensions.js";
 // Model IDs & Types
 // ============================================================================
 
-export type VideoModelId = "wan22" | "ltx23" | "seedance2" | "seedance2-fast";
+export type VideoModelId = "wan22" | "ltx23" | "seedance2" | "seedance2-mini" | "seedance2-fast";
 export type VideoQualityTier = "fast" | "hq" | "pro";
 export type Ltx23Workflow = "t2v" | "i2v" | "a2v" | "ia2v";
 
@@ -115,6 +115,13 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     dimensionDivisor: 1,
     minDimension: 1,
     maxDimension: 99999,
+  },
+  "seedance2-mini": {
+    model: "seedance-2-0-mini",
+    fps: 24,
+    dimensionDivisor: 1,
+    minDimension: 1,
+    maxDimension: 1280,
   },
   "seedance2-fast": {
     model: "seedance-2-0-fast",

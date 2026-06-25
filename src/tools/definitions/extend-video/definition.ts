@@ -49,7 +49,7 @@ export const definition: ToolDefinition = {
         },
         videoModel: {
           type: 'string',
-          enum: ['auto', 'ltx23', 'seedance2', 'seedance2-fast'],
+          enum: ['auto', 'ltx23', 'seedance2', 'seedance2-mini', 'seedance2-fast'],
           description:
             'Which model to use for the new segment. Default: "auto" — detect from the base video\'s producer (Seedance base → Seedance, otherwise LTX-2.3). ' +
             'Override only when the user explicitly requests a different model.',

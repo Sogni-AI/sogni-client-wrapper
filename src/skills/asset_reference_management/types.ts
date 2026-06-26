@@ -8,7 +8,8 @@
  *   user_label  — human-readable name the user / LLM use in conversation
  *   model_ref   — the literal token a given model expects in its prompt
  *                 (Seedance "@Image1", GPT-Image-2 "Image 1",
- *                  context-conditioned "context_image_0", etc.)
+ *                  HappyHorse "[Image 1]", context-conditioned
+ *                  "context_image_0", etc.)
  *
  * The portable contract lives here so chat (Path A), the hosted API
  * (Path B), the public skill, and the SDK can all consume the same
@@ -50,6 +51,7 @@ export interface AssetManifest {
 /** Identifiers we know how to format model_ref for out of the box. */
 export type KnownAssetModelId =
   | 'seedance'
+  | 'happyhorse'
   | 'ltx23'
   | 'gpt-image-2'
   | 'wan'

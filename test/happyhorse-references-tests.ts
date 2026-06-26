@@ -12,6 +12,11 @@ import {
   happyhorseTerminalGenerationFailurePayloadFromError,
   happyhorseTerminalPolicyPayloadFromError,
 } from '../src/tools/index';
+import {
+  formatModelRef,
+  getModelRefFormat,
+  getModelRefFormatResolution,
+} from '../src/skills/asset_reference_management/index';
 
 let testsPassed = 0;
 let testsFailed = 0;
@@ -177,6 +182,49 @@ export function runHappyHorseReferencesTests(): { passed: number; failed: number
     happyhorseTerminalPolicyPayloadFromError(new Error('sensitive content detected by moderation')),
     null,
   );
+
+  // ── model_ref formatting: HappyHorse r2v uses bracketed ordinals ──
+  // Capture console.warn to prove the GPT-Image-2 fallback (which warns) is
+  // not taken for happyhorse ids.
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+  console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')); };
+  let happyHorseRef = '';
+  let resolution: ReturnType<typeof getModelRefFormatResolution> | null = null;
+  let heuristicResolution: ReturnType<typeof getModelRefFormatResolution> | null = null;
+  try {
+    happyHorseRef = formatModelRef('happyhorse', 1, 'image');
+    resolution = getModelRefFormatResolution('happyhorse');
+    // Heuristic: a more specific id still resolves to happyhorse (no fallback).
+    heuristicResolution = getModelRefFormatResolution('happyhorse-1.1-r2v');
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  expect("formatModelRef('happyhorse',1,'image') === '[Image 1]'", happyHorseRef, '[Image 1]');
+  expect('happyhorse video ref is bracketed', formatModelRef('happyhorse', 3, 'video'), '[Video 3]');
+  expect('happyhorse audio ref is bracketed', formatModelRef('happyhorse', 2, 'audio'), '[Audio 2]');
+  expect('happyhorse resolution did not fall back', resolution?.fell_back, false);
+  expect('happyhorse resolved model_id', resolution?.model_id, 'happyhorse');
+  expect('happyhorse-1.1-r2v heuristic did not fall back', heuristicResolution?.fell_back, false);
+  expect('happyhorse-1.1-r2v heuristic model_id', heuristicResolution?.model_id, 'happyhorse');
+  expect('no fallback warning emitted for happyhorse', warnings.length, 0);
+
+  // parse/scan round-trip `[Image 2]`.
+  const hhFormat = getModelRefFormat('happyhorse');
+  expect('happyhorse parse([Image 2]) round-trips', hhFormat.parse('[Image 2]'), { index: 2, type: 'image' });
+  expect(
+    'happyhorse parse(format(2,image)) round-trips',
+    hhFormat.parse(formatModelRef('happyhorse', 2, 'image')),
+    { index: 2, type: 'image' },
+  );
+  expect(
+    'happyhorse scanRegex matches [Image 2] in prose',
+    'use [Image 2] for the hero shot'.match(hhFormat.scanRegex)?.[0] ?? null,
+    '[Image 2]',
+  );
+  // Bare (GPT) form is NOT a HappyHorse reference.
+  expect('happyhorse parse rejects bare Image 2', hhFormat.parse('Image 2'), null);
 
   console.log(`\nhappyhorse references: ${testsPassed} passed, ${testsFailed} failed`);
   return { passed: testsPassed, failed: testsFailed };

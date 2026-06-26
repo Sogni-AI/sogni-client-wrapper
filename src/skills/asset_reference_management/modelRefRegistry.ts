@@ -52,6 +52,31 @@ const SEEDANCE_FORMAT: ModelRefFormat = {
   scanRegex: /@(?:Image|Video|Audio)\d+/g,
 };
 
+/**
+ * HappyHorse (r2v reference-to-video) tags reference images in the prompt
+ * as bracketed ordinals — `[Image 1]`, `[Image 2]`, … `[Image 9]`. The
+ * brackets are part of the canonical literal, distinguishing it from the
+ * GPT-Image-2 bare `Image 1` form. HappyHorse references are image-only,
+ * but the format keeps video/audio parity for shape consistency.
+ */
+const HAPPYHORSE_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `[Video ${index}]`;
+    if (type === 'audio') return `[Audio ${index}]`;
+    return `[Image ${index}]`;
+  },
+  parse(token) {
+    const m = /^\[(Image|Video|Audio)\s+(\d+)\]$/.exec(token.trim());
+    if (!m) return null;
+    const kind = m[1]!;
+    const idx = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(idx) || idx < 1) return null;
+    const t: AssetType = kind === 'Video' ? 'video' : kind === 'Audio' ? 'audio' : 'image';
+    return { index: idx, type: t };
+  },
+  scanRegex: /\[(?:Image|Video|Audio)\s+\d+\]/g,
+};
+
 const GPT_IMAGE_2_FORMAT: ModelRefFormat = {
   format(index, type) {
     if (type === 'video') return `Video ${index}`;
@@ -96,6 +121,7 @@ const CONTEXT_FORMAT: ModelRefFormat = {
 
 const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
   seedance: SEEDANCE_FORMAT,
+  happyhorse: HAPPYHORSE_FORMAT,
   'gpt-image-2': GPT_IMAGE_2_FORMAT,
   ltx23: CONTEXT_FORMAT,
   wan: CONTEXT_FORMAT,
@@ -127,6 +153,7 @@ export function getModelRefFormatResolution(modelId: string): ModelRefFormatReso
   // Heuristic fallbacks — model ids in chat are sometimes more specific
   // (e.g. "ltx23-fast", "seedance-1080p").
   if (trimmed.startsWith('seedance')) return { format: SEEDANCE_FORMAT, model_id: 'seedance', fell_back: false };
+  if (trimmed.startsWith('happyhorse')) return { format: HAPPYHORSE_FORMAT, model_id: 'happyhorse', fell_back: false };
   if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) {
     return {
       format: GPT_IMAGE_2_FORMAT,

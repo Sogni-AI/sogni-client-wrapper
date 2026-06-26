@@ -72,6 +72,9 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'seedance2', displayName: 'Seedance 2.0' },
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
     { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast' },
+    { key: 'happyhorse-1.1-t2v', displayName: 'HappyHorse 1.1 (Text to Video)' },
+    { key: 'happyhorse-1.1-i2v', displayName: 'HappyHorse 1.1 (Image to Video)' },
+    { key: 'happyhorse-1.1-r2v', displayName: 'HappyHorse 1.1 (Reference to Video)' },
   ],
   animate_photo: [
     { key: 'ltx23', displayName: 'LTX 2.3 22B' },

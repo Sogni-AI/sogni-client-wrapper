@@ -120,6 +120,7 @@ export {
   isWanVideoModel,
   isLtxVideoModel,
   isSeedanceVideoModel,
+  isHappyHorseVideoModel,
   isCookieAuth,
   sleep,
   retry,

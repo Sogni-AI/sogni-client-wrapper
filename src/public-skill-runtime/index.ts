@@ -1654,6 +1654,15 @@ export const SEEDANCE_WORKFLOW_MODELS = Object.freeze({
   v2v: 'seedance-2-0'
 });
 
+// Alibaba HappyHorse 1.1 — three discrete vendor models (no mini/fast variants).
+// Unlike Seedance, the per-mode model id IS the canonical socket/Alibaba id, so
+// the map values double as the values accepted by the generate_video tool.
+export const HAPPYHORSE_WORKFLOW_MODELS = Object.freeze({
+  t2v: 'happyhorse-1.1-t2v',
+  i2v: 'happyhorse-1.1-i2v',
+  r2v: 'happyhorse-1.1-r2v'
+});
+
 export const VIDEO_MODEL_REGISTRY = Object.freeze({
   [LTX23_WORKFLOW_MODELS.t2v]: {
     workflow: 't2v',
@@ -1965,6 +1974,10 @@ export function isWanModel(modelId: string | null | undefined): boolean {
 
 export function isSeedanceModel(modelId: string | null | undefined): boolean {
   return modelId?.startsWith('seedance-2-0') || false;
+}
+
+export function isHappyHorseModel(modelId: string | null | undefined): boolean {
+  return modelId?.startsWith('happyhorse-1.1') || false;
 }
 
 export function resolveVideoControlNetStrength(
@@ -3195,6 +3208,16 @@ export function isSeedanceModelSelection(modelId: string | null | undefined): bo
     isSeedanceModel(resolveVideoModelAlias(modelId, 't2v')) ||
     isSeedanceModel(resolveVideoModelAlias(modelId, 'ia2v')) ||
     isSeedanceModel(resolveVideoModelAlias(modelId, 'v2v'))
+  );
+}
+
+export function isHappyHorseModelSelection(modelId: string | null | undefined): boolean {
+  if (!modelId) return false;
+  return (
+    isHappyHorseModel(modelId) ||
+    isHappyHorseModel(resolveVideoModelAlias(modelId, 't2v')) ||
+    isHappyHorseModel(resolveVideoModelAlias(modelId, 'i2v')) ||
+    isHappyHorseModel(resolveVideoModelAlias(modelId, 'v2v'))
   );
 }
 

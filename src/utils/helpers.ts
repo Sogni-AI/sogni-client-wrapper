@@ -57,6 +57,10 @@ export function isSeedanceVideoModel(modelId: string): boolean {
   return modelId.startsWith('seedance-2-0');
 }
 
+export function isHappyHorseVideoModel(modelId: string): boolean {
+  return modelId.startsWith('happyhorse-1.1');
+}
+
 /**
  * Get the maximum number of context images supported by a model
  */
@@ -384,6 +388,41 @@ export function validateProjectConfig(config: ProjectConfig): void {
         throw new SogniValidationError(
           'Seedance audio URL references require at least one image or video reference'
         );
+      }
+    }
+
+    if (isHappyHorseVideoModel(config.modelId)) {
+      if (config.fps !== undefined && config.fps !== 24) {
+        throw new SogniValidationError('HappyHorse video models require fps to be 24');
+      }
+
+      if (config.duration !== undefined) {
+        if (typeof config.duration !== 'number' || config.duration < 3 || config.duration > 15) {
+          throw new SogniValidationError('HappyHorse video duration must be between 3 and 15 seconds');
+        }
+      }
+
+      const imageAssetCount =
+        (config.referenceImage ? 1 : 0) +
+        (config.referenceImageEnd ? 1 : 0) +
+        referenceImageUrls.length;
+      const videoAssetCount = (config.referenceVideo ? 1 : 0) + referenceVideoUrls.length;
+      const audioAssetCount =
+        (config.referenceAudio ? 1 : 0) +
+        (config.referenceAudioIdentity ? 1 : 0) +
+        referenceAudioUrls.length;
+
+      // HappyHorse takes image references only (i2v: 1 first_frame, r2v: up to 9
+      // reference_image); it has native always-on synchronized audio and does
+      // not accept reference videos or audios.
+      if (imageAssetCount > 9) {
+        throw new SogniValidationError('HappyHorse supports at most 9 image references per request');
+      }
+      if (videoAssetCount > 0) {
+        throw new SogniValidationError('HappyHorse does not support reference videos');
+      }
+      if (audioAssetCount > 0) {
+        throw new SogniValidationError('HappyHorse does not support reference audios; audio is generated natively');
       }
     }
   }

@@ -66,6 +66,7 @@ import {
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
+import { runHappyHorseReferencesTests } from './happyhorse-references-tests';
 import { runWorkflowExecutorTests } from './workflow-executor-tests';
 import { runCostApprovalTests } from './cost-approval-tests';
 
@@ -3474,6 +3475,11 @@ async function runTests() {
   const seedanceRefResults = runSeedanceReferencesTests();
   testsPassed += seedanceRefResults.passed;
   testsFailed += seedanceRefResults.failed;
+
+  // HappyHorse reference-limit + failure-normalizer tests
+  const happyHorseRefResults = runHappyHorseReferencesTests();
+  testsPassed += happyHorseRefResults.passed;
+  testsFailed += happyHorseRefResults.failed;
 
   // Workflow executor — per-slot retry-callback primitive
   const executorResults = await runWorkflowExecutorTests();

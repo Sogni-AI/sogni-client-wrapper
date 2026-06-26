@@ -1248,7 +1248,7 @@ export class SogniClientWrapper extends EventEmitter {
    * Get recommended settings for a model
    */
   private getRecommendedSettings(modelId: string): ModelInfo['recommendedSettings'] {
-    if (this.isSeedanceModel(modelId)) {
+    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
       return { fps: 24 };
     }
 
@@ -1293,9 +1293,16 @@ export class SogniClientWrapper extends EventEmitter {
     return modelId.startsWith('seedance-2-0');
   }
 
+  private isHappyHorseModel(modelId: string): boolean {
+    return modelId.startsWith('happyhorse-1.1');
+  }
+
   private getVideoDurationBounds(modelId: string): { min: number; max: number } {
     if (this.isSeedanceModel(modelId)) {
       return { min: 4, max: 15 };
+    }
+    if (this.isHappyHorseModel(modelId)) {
+      return { min: 3, max: 15 };
     }
     if (this.isLtx2Model(modelId)) {
       return { min: 1, max: 20 };
@@ -1307,16 +1314,20 @@ export class SogniClientWrapper extends EventEmitter {
     if (this.isWanModel(modelId)) {
       return 16;
     }
-    if (this.isSeedanceModel(modelId)) {
+    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
       return 24;
     }
     return fps;
   }
 
   private getVideoFps(modelId: string, fps: number | undefined): number {
-    if (this.isSeedanceModel(modelId)) {
+    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
       if (fps !== undefined && fps !== 24) {
-        throw new SogniValidationError('Seedance video models require fps to be 24');
+        throw new SogniValidationError(
+          this.isHappyHorseModel(modelId)
+            ? 'HappyHorse video models require fps to be 24'
+            : 'Seedance video models require fps to be 24',
+        );
       }
       return 24;
     }
@@ -1333,7 +1344,7 @@ export class SogniClientWrapper extends EventEmitter {
       return Math.round(duration * 16) + 1;
     }
 
-    if (this.isSeedanceModel(modelId)) {
+    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
       return Math.round(duration * 24) + 1;
     }
 

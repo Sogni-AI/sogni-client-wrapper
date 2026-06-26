@@ -8,7 +8,15 @@ import { parseAspectRatio } from "./imageDimensions.js";
 // Model IDs & Types
 // ============================================================================
 
-export type VideoModelId = "wan22" | "ltx23" | "seedance2" | "seedance2-mini" | "seedance2-fast";
+export type VideoModelId =
+  | "wan22"
+  | "ltx23"
+  | "seedance2"
+  | "seedance2-mini"
+  | "seedance2-fast"
+  | "happyhorse-1.1-t2v"
+  | "happyhorse-1.1-i2v"
+  | "happyhorse-1.1-r2v";
 export type VideoQualityTier = "fast" | "hq" | "pro";
 export type Ltx23Workflow = "t2v" | "i2v" | "a2v" | "ia2v";
 
@@ -130,7 +138,151 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     minDimension: 1,
     maxDimension: 1280,
   },
+  // Alibaba HappyHorse 1.1 routes through Sogni Socket's vendor-job path to
+  // Alibaba DashScope (Singapore). The socket re-derives ratio from
+  // width/height and duration from frames/fps for vendor models, so we use
+  // permissive constraints here. Unlike Seedance there are no mini/fast tiers —
+  // each mode (t2v/i2v/r2v) is its own canonical model id. 1080P is the upper
+  // bound, so maxDimension is capped at 1920.
+  "happyhorse-1.1-t2v": {
+    model: "happyhorse-1.1-t2v",
+    fps: 24,
+    dimensionDivisor: 1,
+    minDimension: 1,
+    maxDimension: 1920,
+  },
+  "happyhorse-1.1-i2v": {
+    model: "happyhorse-1.1-i2v",
+    fps: 24,
+    dimensionDivisor: 1,
+    minDimension: 1,
+    maxDimension: 1920,
+  },
+  "happyhorse-1.1-r2v": {
+    model: "happyhorse-1.1-r2v",
+    fps: 24,
+    dimensionDivisor: 1,
+    minDimension: 1,
+    maxDimension: 1920,
+  },
 };
+
+// ============================================================================
+// HappyHorse 1.1 capability contract (canonical source of truth)
+// ============================================================================
+//
+// Downstream consumers (creative-agent, sogni-chat, the CLI skill) read this to
+// gate duration/resolution/ratio/reference inputs before dispatch. It captures
+// the per-mode capabilities that VideoModelConfig (a worker-dimension shape)
+// cannot express. Mirrors the role of the Seedance reference-limit catalog.
+
+export type HappyHorseMode = "t2v" | "i2v" | "r2v";
+export type HappyHorseResolution = "720P" | "1080P";
+
+export interface HappyHorseModelSettings {
+  /** Canonical vendor model id (matches the socket tier and Alibaba `model`). */
+  readonly model: string;
+  readonly mode: HappyHorseMode;
+  /** HappyHorse always renders at 24 fps. */
+  readonly fps: 24;
+  /** Inclusive duration bounds in whole seconds. */
+  readonly minDuration: 3;
+  readonly maxDuration: 15;
+  /** Resolutions sent in the request as the strings "720P"/"1080P". */
+  readonly resolutions: readonly HappyHorseResolution[];
+  /**
+   * HappyHorse renders a native synchronized audio track; it is always on and
+   * is NOT user-toggleable (no `generateAudio`/`audio` parameter is sent).
+   */
+  readonly nativeAudio: true;
+  readonly supportedRatios: readonly string[];
+  /** Max image references for this mode (i2v: first_frame, r2v: reference_image). */
+  readonly maxReferenceImages: number;
+  /** HappyHorse does not accept reference videos. */
+  readonly maxReferenceVideos: 0;
+  /** HappyHorse does not accept reference audios (audio is native). */
+  readonly maxReferenceAudios: 0;
+  /** Third-party vendor model — requires Premium Spark. */
+  readonly premium: true;
+}
+
+/** Aspect ratios accepted by HappyHorse 1.1 (verified against the live API). */
+export const HAPPYHORSE_SUPPORTED_RATIOS: readonly string[] = Object.freeze([
+  "16:9",
+  "9:16",
+  "1:1",
+  "4:3",
+  "3:4",
+  "4:5",
+  "5:4",
+  "9:21",
+  "21:9",
+]);
+
+export const HAPPYHORSE_RESOLUTIONS: readonly HappyHorseResolution[] = Object.freeze([
+  "720P",
+  "1080P",
+]);
+
+export const HAPPYHORSE_VIDEO_MODELS: Readonly<Record<string, HappyHorseModelSettings>> =
+  Object.freeze({
+    "happyhorse-1.1-t2v": Object.freeze({
+      model: "happyhorse-1.1-t2v",
+      mode: "t2v",
+      fps: 24,
+      minDuration: 3,
+      maxDuration: 15,
+      resolutions: HAPPYHORSE_RESOLUTIONS,
+      nativeAudio: true,
+      supportedRatios: HAPPYHORSE_SUPPORTED_RATIOS,
+      maxReferenceImages: 0,
+      maxReferenceVideos: 0,
+      maxReferenceAudios: 0,
+      premium: true,
+    }),
+    "happyhorse-1.1-i2v": Object.freeze({
+      model: "happyhorse-1.1-i2v",
+      mode: "i2v",
+      fps: 24,
+      minDuration: 3,
+      maxDuration: 15,
+      resolutions: HAPPYHORSE_RESOLUTIONS,
+      nativeAudio: true,
+      supportedRatios: HAPPYHORSE_SUPPORTED_RATIOS,
+      maxReferenceImages: 1,
+      maxReferenceVideos: 0,
+      maxReferenceAudios: 0,
+      premium: true,
+    }),
+    "happyhorse-1.1-r2v": Object.freeze({
+      model: "happyhorse-1.1-r2v",
+      mode: "r2v",
+      fps: 24,
+      minDuration: 3,
+      maxDuration: 15,
+      resolutions: HAPPYHORSE_RESOLUTIONS,
+      nativeAudio: true,
+      supportedRatios: HAPPYHORSE_SUPPORTED_RATIOS,
+      maxReferenceImages: 9,
+      maxReferenceVideos: 0,
+      maxReferenceAudios: 0,
+      premium: true,
+    }),
+  });
+
+/** All three HappyHorse 1.1 model ids, in t2v/i2v/r2v order. */
+export const HAPPYHORSE_MODEL_IDS: readonly string[] = Object.freeze([
+  "happyhorse-1.1-t2v",
+  "happyhorse-1.1-i2v",
+  "happyhorse-1.1-r2v",
+]);
+
+export function getHappyHorseModelSettings(
+  modelId: string | null | undefined,
+): HappyHorseModelSettings | null {
+  if (!modelId) return null;
+  return HAPPYHORSE_VIDEO_MODELS[modelId] ?? null;
+}
 
 /** Switch this to change the default video model everywhere */
 export const DEFAULT_VIDEO_MODEL: VideoModelId = "ltx23";

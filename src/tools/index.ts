@@ -17,6 +17,7 @@ export {
 export type { ModelOption } from './shared/modelRegistry.js';
 export * from './shared/policyChecks.js';
 export * from './shared/seedancePolicyErrors.js';
+export * from './shared/happyhorsePolicyErrors.js';
 export {
   SEEDANCE_REFERENCE_LIMITS,
   SeedanceReferenceLimitError,
@@ -27,6 +28,24 @@ export type {
   SeedanceReferenceLimitKind,
   SeedanceReferenceCounts,
 } from './shared/seedanceReferences.js';
+export {
+  HAPPYHORSE_REFERENCE_LIMITS,
+  HappyHorseReferenceLimitError,
+  getHappyHorseReferenceLimits,
+  validateHappyHorseReferenceCounts,
+} from './shared/happyhorseReferences.js';
+export type {
+  HappyHorseReferenceLimits,
+  HappyHorseReferenceLimitKind,
+  HappyHorseReferenceCounts,
+} from './shared/happyhorseReferences.js';
+// HappyHorse 1.1 LLM tool guidance — re-exported from the `./tools` subpath so
+// consumers composing the generate_video manifest can pick it up alongside the
+// Seedance markers. Authored in contracts/toolPromptMarkers.ts.
+export {
+  HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION,
+  HAPPYHORSE_TOOL_REFERENCE_GUIDANCE,
+} from '../contracts/toolPromptMarkers.js';
 export * from './shared/llmHelpers.js';
 export * from './shared/promptRefinementCache.js';
 export * from './shared/imageEncoding.js';

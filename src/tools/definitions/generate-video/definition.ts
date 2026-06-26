@@ -9,6 +9,7 @@ import {
   LITERAL_VIDEO_PROMPT_OVERRIDE,
   SEEDANCE_EXPAND_PROMPT_DESCRIPTION,
   SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE,
+  HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION,
 } from '../../../contracts/toolPromptMarkers.js';
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
 
@@ -77,10 +78,21 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
         },
         videoModel: {
           type: "string",
-          enum: ["ltx23", "wan22", "seedance2", "seedance2-mini", "seedance2-fast"],
+          enum: [
+            "ltx23",
+            "wan22",
+            "seedance2",
+            "seedance2-mini",
+            "seedance2-fast",
+            "happyhorse-1.1-t2v",
+            "happyhorse-1.1-i2v",
+            "happyhorse-1.1-r2v",
+          ],
           description:
             'Video model. "ltx23" (default): LTX 2.3 with native audio; Fast/HQ use the distilled 8-step worker and Default Media Quality Pro uses the non-distilled dev worker. "wan22": Fast 4-step, simple motion, no audio. Default: "ltx23". Seedance quality is selected only by model: use "seedance2-mini" for Seedance 2.0 Mini or faster/lower-cost 720p iteration, use "seedance2-fast" only when the user explicitly asks for Seedance Fast / seedance-fast, and use "seedance2" for the full Seedance 2.0 model, explicit non-fast/full-quality requests, 1080p/4K requests, or generated/uploaded storyboard images unless the user explicitly asks for a draft, Mini, or the fast model. Do not use Default Media Quality Fast/HQ/Pro or targetResolution to represent Seedance quality. ' +
-            SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE,
+            SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE +
+            ' ' +
+            HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION,
         },
         generateAudio: {
           type: "boolean",

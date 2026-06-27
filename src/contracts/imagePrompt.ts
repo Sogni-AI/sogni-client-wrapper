@@ -8,6 +8,7 @@ export type ImagePromptingType =
   | 'sd15'
   | 'pony'
   | 'fast'
+  | 'krea2'
   | 'sd3'
   | 'editing'
   | 'video';
@@ -67,6 +68,13 @@ const FAST_GUIDE = `Turbo, Lightning, and LCM models are optimized for speed (2-
 - Don't use extremely long, multi-sentence prompts.
 Example: "a majestic lion in golden savanna, sunset, cinematic"`;
 
+const KREA2_GUIDE = `Krea 2 is a next-gen model that responds best to natural-language descriptions, not keyword lists.
+- Write flowing, descriptive prose: the subject and its attributes first, then environment, composition/framing, lighting, and the medium or art style.
+- Long, detailed prompts yield the best results — but the model also handles short prompts well, so add detail that matters and skip empty quality boosters.
+- It runs at very low / no guidance (distilled turbo), so be clear and direct; negative prompts have little effect.
+- For text in the image, spell out the exact words and wrap them in quotes, e.g. a sign reading "OPEN".
+- Supports high resolution (up to ~2K); describe fine texture and detail when you want it.`;
+
 const SD3_GUIDE = `SD3 has improved natural language understanding, multi-subject composition, and typography rendering.
 - Write clear, descriptive natural language prompts — not keyword lists.
 - You can be specific about spatial relationships: "on the left", "in the background", "above".
@@ -89,6 +97,7 @@ const PROMPTING_GUIDES: Record<ImagePromptingType, string> = {
   sd15: SD15_GUIDE,
   pony: PONY_GUIDE,
   fast: FAST_GUIDE,
+  krea2: KREA2_GUIDE,
   sd3: SD3_GUIDE,
   editing: EDITING_GUIDE,
   video: '',

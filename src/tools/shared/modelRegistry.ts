@@ -36,6 +36,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'gpt-image-2', displayName: 'GPT Image 2' },
     { key: 'z-turbo', displayName: 'Z-Image Turbo' },
     { key: 'z-image', displayName: 'Z-Image' },
+    { key: 'krea-2-turbo', displayName: 'Krea 2 Turbo' },
     { key: 'chroma-v46-flash', displayName: 'Chroma v.46 Flash' },
     { key: 'chroma-detail', displayName: 'Chroma Detail' },
     { key: 'flux1-krea', displayName: 'Flux.1 Krea' },

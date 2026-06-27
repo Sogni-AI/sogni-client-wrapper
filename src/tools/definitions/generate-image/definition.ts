@@ -48,7 +48,7 @@ VIDEO KEYFRAMES: When generating images intended as first+last frames for video 
           type: 'string',
           enum: [
             'gpt-image-2',
-            'z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2', 'pony-v7',
+            'z-turbo', 'z-image', 'krea-2-turbo', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2', 'pony-v7',
             'qwen-2512', 'qwen-2512-lightning',
             'albedo-xl', 'animagine-xl', 'anima-pencil-xl', 'art-universe-xl', 'hyphoria-real',
             'analog-madness-xl', 'cyberrealistic-xl', 'real-dream-xl', 'faetastic-xl',

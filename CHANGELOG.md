@@ -1,3 +1,10 @@
+# [3.6.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.5.1...v3.6.0) (2026-07-02)
+
+
+### Features
+
+* **chat-run:** type the managed-agent storyboard runtimeConfig fields ([ce68708](https://github.com/Sogni-AI/sogni-intelligence-client/commit/ce68708))
+
 # [2.2.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v2.1.0...v2.2.0) (2026-05-18)
 
 

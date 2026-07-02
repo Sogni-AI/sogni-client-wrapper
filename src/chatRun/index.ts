@@ -32,6 +32,7 @@
  */
 
 import type { BackboneVersionManifest } from '../contracts/backboneDurableWorkflow.js';
+import type { CampaignStoryboard } from '../contracts/storyboard.js';
 
 export const CHAT_RUN_SCHEMA_VERSION = '2026-05-14.1' as const;
 
@@ -99,6 +100,33 @@ export interface ChatRunRuntimeConfig {
    * `jobConfirmationThresholdUsd` preset.
    */
   jobConfirmationThresholdUsd?: number;
+  /**
+   * Approved-storyboard typed state rebuilt from the conversation by the
+   * client (Managed Agent compatibility channel, KB decision D33). The
+   * storyboard metadata marker is stripped from API-bound messages, so
+   * without this typed state the hosted runtime cannot rebuild the approved
+   * storyboard and continuations trip the typed
+   * `missing_approved_storyboard_state` recovery. First-party clients
+   * derive all three storyboard fields with creative-agent's
+   * `buildManagedAgentCompatibilityRuntimeConfig` rather than by hand.
+   * These fields previously rode the request loosely (untyped, silently
+   * dropped on shape mismatch); typing them here is the C0 contract
+   * promotion from the 2026-07-01 managed-agent state review.
+   */
+  campaignStoryboard?: CampaignStoryboard;
+  /** Visible approved storyboard script text paired with the storyboard. */
+  approvedStoryboardScript?: string;
+  /**
+   * Index of the already-rendered storyboard board image within the run's
+   * generated-image results, when one exists. Session-scoped; the server
+   * never derives or seeds this index across runs.
+   */
+  generatedStoryboardImageIndex?: number;
+  /**
+   * Host-app media model preferences (per-capability model pin map). The
+   * executor treats unknown keys as inert; the shape is host-owned.
+   */
+  mediaModelPreferences?: Record<string, unknown>;
 }
 
 export interface ChatRunRequestSnapshot {

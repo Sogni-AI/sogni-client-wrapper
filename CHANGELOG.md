@@ -1,3 +1,10 @@
+# [3.7.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.6.0...v3.7.0) (2026-07-05)
+
+
+### Features
+
+* **account:** expose subscription status, account info, and billingMode types ([b8b608f](https://github.com/Sogni-AI/sogni-intelligence-client/commit/b8b608f5e3177398e35399b667499eb230e214d9))
+
 # [3.6.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.5.1...v3.6.0) (2026-07-02)
 
 

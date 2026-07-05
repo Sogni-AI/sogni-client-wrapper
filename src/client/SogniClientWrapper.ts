@@ -18,6 +18,8 @@ import type {
   ConnectionState,
   ModelInfo,
   BalanceInfo,
+  AccountInfo,
+  SubscriptionEntitlementSnapshot,
   SizePreset,
   GetModelsOptions,
   ClientEventCallbacks,
@@ -542,6 +544,43 @@ export class SogniClientWrapper extends EventEmitter {
       sogni: parseFloat(balances.sogni.net) || 0,
       spark: parseFloat(balances.spark.net) || 0,
       lastUpdated: new Date(),
+    };
+  }
+
+  /**
+   * Fetch the authenticated account's subscription entitlement snapshot from
+   * the server (Sogni Unlimited / Unlimited Pro). When no subscription exists,
+   * the snapshot has `active: false` and `status: 'none'`.
+   *
+   * Also refreshes the cached `subscription` returned by getAccountInfo().
+   */
+  async getSubscriptionStatus(): Promise<SubscriptionEntitlementSnapshot> {
+    await this.ensureConnected();
+
+    try {
+      return await this.client!.account.getSubscriptionStatus();
+    } catch (error) {
+      throw SogniError.fromError(error, 'GET_SUBSCRIPTION_STATUS_FAILED');
+    }
+  }
+
+  /**
+   * Identity and entitlement snapshot for the authenticated account
+   * (username, wallet, network, cached subscription). Reads locally cached
+   * account state — call getSubscriptionStatus() first when a
+   * server-authoritative entitlement answer is required.
+   */
+  async getAccountInfo(): Promise<AccountInfo> {
+    await this.ensureConnected();
+
+    const account = this.client!.account.currentAccount;
+    return {
+      username: account?.username,
+      email: account?.email,
+      walletAddress: account?.walletAddress,
+      network: account?.network ?? null,
+      isUnlimited: account?.isUnlimited ?? false,
+      subscription: account?.subscription,
     };
   }
 

@@ -11,6 +11,11 @@ import type {
   AudioProjectParams as SogniAudioProjectParams,
   SupernetType,
   TokenType,
+  BillingMode,
+  SubscriptionEntitlementSnapshot,
+  SubscriptionStatus,
+  SubscriptionPlanId,
+  SubscriptionUsage,
   ImageOutputFormat,
   VideoOutputFormat,
   AudioOutputFormat,
@@ -69,6 +74,11 @@ export type {
   AvailableModel,
   SupernetType,
   TokenType,
+  BillingMode,
+  SubscriptionEntitlementSnapshot,
+  SubscriptionStatus,
+  SubscriptionPlanId,
+  SubscriptionUsage,
   ImageOutputFormat,
   VideoOutputFormat,
   AudioOutputFormat,
@@ -514,9 +524,41 @@ export interface BalanceInfo {
   
   /** Total balance in USD equivalent (if available) */
   usdEquivalent?: number;
-  
+
   /** Last updated timestamp */
   lastUpdated: Date;
+}
+
+/**
+ * Identity and entitlement snapshot for the authenticated account.
+ * Returned by {@link SogniClientWrapper.getAccountInfo}.
+ */
+export interface AccountInfo {
+  /** Username of the authenticated account, when known */
+  username?: string;
+
+  /** Email of the authenticated account, when known */
+  email?: string;
+
+  /** Wallet address of the authenticated account, when known */
+  walletAddress?: string;
+
+  /** Current network type, or null before the account has connected */
+  network: SupernetType | null;
+
+  /**
+   * True when the account has an effective Unlimited entitlement
+   * (`"unlimited"` or `"unlimited_pro"`). False when no entitlement snapshot
+   * has been fetched yet — call getSubscriptionStatus() first for a
+   * server-authoritative answer.
+   */
+  isUnlimited: boolean;
+
+  /**
+   * Most recently cached subscription entitlement snapshot. Undefined until a
+   * socket entitlement snapshot arrives or getSubscriptionStatus() is called.
+   */
+  subscription?: SubscriptionEntitlementSnapshot;
 }
 
 /**

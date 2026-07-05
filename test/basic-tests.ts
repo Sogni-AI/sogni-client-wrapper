@@ -1491,6 +1491,142 @@ async function runTests() {
     }
   })();
 
+  await test('Should expose subscription status and account info from the SDK account API', async () => {
+    const originalCreateInstance = (SogniClient as any).createInstance;
+
+    let statusCalls = 0;
+    const snapshot = { active: true, status: 'active', tier: 'unlimited' };
+
+    try {
+      (SogniClient as any).createInstance = async () => ({
+        account: {
+          login: async () => {},
+          getSubscriptionStatus: async () => {
+            statusCalls++;
+            return snapshot;
+          },
+          currentAccount: {
+            username: 'krunkosaurus',
+            email: 'k@example.com',
+            walletAddress: '0xabc',
+            network: 'fast',
+            isUnlimited: true,
+            subscription: snapshot,
+          },
+        },
+        projects: {
+          waitForModels: async () => {},
+          on: () => {},
+          off: () => {},
+        },
+        chat: {
+          on: () => {},
+          off: () => {},
+        },
+        apiClient: {
+          socket: {
+            disconnect: () => {},
+          },
+        },
+      });
+
+      const client = new SogniClientWrapper({
+        authType: 'apiKey',
+        apiKey: 'test-api-key',
+        autoConnect: false,
+      });
+      await client.connect();
+
+      const status = await client.getSubscriptionStatus();
+      if (statusCalls !== 1) {
+        throw new Error('getSubscriptionStatus should delegate to account.getSubscriptionStatus');
+      }
+      if (status.active !== true || status.tier !== 'unlimited') {
+        throw new Error('getSubscriptionStatus should return the SDK snapshot verbatim');
+      }
+
+      const info = await client.getAccountInfo();
+      if (info.username !== 'krunkosaurus' || info.isUnlimited !== true) {
+        throw new Error('getAccountInfo should surface username and isUnlimited from currentAccount');
+      }
+      if (info.subscription !== snapshot || info.network !== 'fast') {
+        throw new Error('getAccountInfo should surface cached subscription snapshot and network');
+      }
+
+      await client.disconnect();
+    } finally {
+      (SogniClient as any).createInstance = originalCreateInstance;
+    }
+  })();
+
+  await test('Should pass billingMode through createProject to the SDK', async () => {
+    const originalCreateInstance = (SogniClient as any).createInstance;
+
+    let capturedParams: any = null;
+
+    try {
+      (SogniClient as any).createInstance = async () => ({
+        account: {
+          login: async () => {},
+        },
+        projects: {
+          waitForModels: async () => {},
+          on: () => {},
+          off: () => {},
+          create: async (params: any) => {
+            capturedParams = params;
+            return {
+              id: 'proj-1',
+              on: () => {},
+              off: () => {},
+            };
+          },
+        },
+        chat: {
+          on: () => {},
+          off: () => {},
+        },
+        apiClient: {
+          socket: {
+            disconnect: () => {},
+          },
+        },
+      });
+
+      const client = new SogniClientWrapper({
+        authType: 'apiKey',
+        apiKey: 'test-api-key',
+        autoConnect: false,
+      });
+      await client.connect();
+
+      const config: ImageProjectConfig = {
+        type: 'image',
+        modelId: 'test-model',
+        positivePrompt: 'a duck',
+        width: 512,
+        height: 512,
+        billingMode: 'auto',
+        waitForCompletion: false,
+      };
+      await client.createProject(config);
+
+      if (!capturedParams) {
+        throw new Error('projects.create was not called');
+      }
+      if (capturedParams.billingMode !== 'auto') {
+        throw new Error(`billingMode should pass through to the SDK (got ${capturedParams.billingMode})`);
+      }
+      if (capturedParams.tokenType !== 'spark') {
+        throw new Error('tokenType default should remain spark for backward compatibility');
+      }
+
+      await client.disconnect();
+    } finally {
+      (SogniClient as any).createInstance = originalCreateInstance;
+    }
+  })();
+
   // Test 57: Sogni tool helper exports
   await test('Should export Sogni tool helpers and definitions', () => {
     if (!SogniTools.generateImage || !SogniTools.generateVideo || !SogniTools.generateMusic) {

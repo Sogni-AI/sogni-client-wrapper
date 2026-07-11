@@ -1,17 +1,9 @@
-import type { SogniChatMessage } from '../runtime/chatTypes.js';
-import type { ToolDefinition } from '../tools/definitions/types.js';
-import { getRandomTheme } from './randomThemes.js';
+import type { SogniChatMessage } from "../runtime/chatTypes.js";
+import type { ToolDefinition } from "../tools/definitions/types.js";
+import { getRandomTheme } from "./randomThemes.js";
 
 export type ImagePromptingType =
-  | 'flux'
-  | 'sdxl'
-  | 'sd15'
-  | 'pony'
-  | 'fast'
-  | 'krea2'
-  | 'sd3'
-  | 'editing'
-  | 'video';
+  "flux" | "sdxl" | "sd15" | "pony" | "fast" | "sd3" | "editing" | "video";
 
 export interface BuildImagePromptMessagesInput {
   prompt: string;
@@ -23,12 +15,15 @@ export interface BuildImagePromptMessagesInput {
 
 export const IMAGE_PROMPT_MAX_TOKENS = 1024;
 
-const FLUX_GUIDE = `FLUX & Next-Gen models use natural language descriptions, not keyword lists.
-- Write flowing, descriptive prose: subject, environment, lighting, mood.
-- Be specific about what you want rather than using abstract quality boosters.
-- You can mix descriptive phrases with comma-separated keywords, but lean toward sentences.
+const FLUX_GUIDE = `FLUX and advanced next-gen image models use detailed natural-language descriptions, not keyword lists.
+- Plan internally before writing: identify the subject, mood, best-fitting medium/style, composition/framing, lighting, and grounded details.
+- Preserve the user's original subjects, actions, colors, spatial relationships, and requested medium. Do not add new objects, props, characters, or animals unless clearly implied.
+- Write one cohesive paragraph with practical T2I structure: subject and attributes first, then action/pose, spatial layout, environment, composition/framing, lighting, and medium/style.
 - Camera/lens terms and lighting descriptions work well.
-- Keep guidance context in mind: these models use very low guidance (1-5), so prompts should be clear and direct.`;
+- Be specific and concrete instead of using abstract quality boosters. Add detail that improves the image, but avoid inventing unsupported clothing, materials, colors, or scene details.
+- If the user requests visible text, labels, typography, or signage, specify the exact words and wrap them in quotes.
+- If the user's prompt is already detailed, lightly polish and finalize it rather than heavily expanding or changing direction.
+- Keep low-guidance behavior in mind: prompts should be clear, direct, faithful, and parseable.`;
 
 const SDXL_GUIDE = `SDXL models work well with a hybrid approach: natural language descriptions combined with comma-separated quality/style keywords.
 Prompt structure (in this order):
@@ -68,13 +63,6 @@ const FAST_GUIDE = `Turbo, Lightning, and LCM models are optimized for speed (2-
 - Don't use extremely long, multi-sentence prompts.
 Example: "a majestic lion in golden savanna, sunset, cinematic"`;
 
-const KREA2_GUIDE = `Krea 2 is a next-gen model that responds best to natural-language descriptions, not keyword lists.
-- Write flowing, descriptive prose: the subject and its attributes first, then environment, composition/framing, lighting, and the medium or art style.
-- Long, detailed prompts yield the best results — but the model also handles short prompts well, so add detail that matters and skip empty quality boosters.
-- It runs at very low / no guidance (distilled turbo), so be clear and direct; negative prompts have little effect.
-- For text in the image, spell out the exact words and wrap them in quotes, e.g. a sign reading "OPEN".
-- Supports high resolution (up to ~2K); describe fine texture and detail when you want it.`;
-
 const SD3_GUIDE = `SD3 has improved natural language understanding, multi-subject composition, and typography rendering.
 - Write clear, descriptive natural language prompts — not keyword lists.
 - You can be specific about spatial relationships: "on the left", "in the background", "above".
@@ -97,13 +85,15 @@ const PROMPTING_GUIDES: Record<ImagePromptingType, string> = {
   sd15: SD15_GUIDE,
   pony: PONY_GUIDE,
   fast: FAST_GUIDE,
-  krea2: KREA2_GUIDE,
   sd3: SD3_GUIDE,
   editing: EDITING_GUIDE,
-  video: '',
+  video: "",
 };
 
-function buildSystemPrompt(promptingType: ImagePromptingType, modelTitle: string): string {
+function buildSystemPrompt(
+  promptingType: ImagePromptingType,
+  modelTitle: string,
+): string {
   const guide = PROMPTING_GUIDES[promptingType] || PROMPTING_GUIDES.sdxl;
 
   return `You are an expert prompt engineer for AI image generation models. The user will give you a short idea or rough prompt. Your job is to expand and enhance it into an optimized prompt for the "${modelTitle}" model, then return it via the enhance_prompt tool.
@@ -122,48 +112,51 @@ RULES:
 }
 
 export const IMAGE_PROMPT_TOOL: ToolDefinition = {
-  type: 'function',
+  type: "function",
   function: {
-    name: 'enhance_prompt',
-    description: 'Output the enhanced image generation prompt',
+    name: "enhance_prompt",
+    description: "Output the enhanced image generation prompt",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         prompt: {
-          type: 'string',
-          description: 'The enhanced image generation prompt optimized for the target model',
+          type: "string",
+          description:
+            "The enhanced image generation prompt optimized for the target model",
         },
       },
-      required: ['prompt'],
+      required: ["prompt"],
     },
   },
 };
 
 function normalizeBuildImagePromptInput(
   inputOrPrompt: BuildImagePromptMessagesInput | string,
-  stylePrompt = '',
-  promptingType: ImagePromptingType = 'sdxl',
-  modelTitle = 'Unknown Model',
+  stylePrompt = "",
+  promptingType: ImagePromptingType = "sdxl",
+  modelTitle = "Unknown Model",
 ): Required<BuildImagePromptMessagesInput> {
-  if (typeof inputOrPrompt === 'string') {
+  if (typeof inputOrPrompt === "string") {
     return {
       prompt: inputOrPrompt,
       stylePrompt,
       promptingType,
       modelTitle,
-      randomTheme: '',
+      randomTheme: "",
     };
   }
   return {
     prompt: inputOrPrompt.prompt,
-    stylePrompt: inputOrPrompt.stylePrompt ?? '',
-    promptingType: inputOrPrompt.promptingType ?? 'sdxl',
-    modelTitle: inputOrPrompt.modelTitle ?? 'Unknown Model',
-    randomTheme: inputOrPrompt.randomTheme ?? '',
+    stylePrompt: inputOrPrompt.stylePrompt ?? "",
+    promptingType: inputOrPrompt.promptingType ?? "sdxl",
+    modelTitle: inputOrPrompt.modelTitle ?? "Unknown Model",
+    randomTheme: inputOrPrompt.randomTheme ?? "",
   };
 }
 
-export function buildImagePromptMessages(input: BuildImagePromptMessagesInput): SogniChatMessage[];
+export function buildImagePromptMessages(
+  input: BuildImagePromptMessagesInput,
+): SogniChatMessage[];
 export function buildImagePromptMessages(
   prompt: string,
   stylePrompt: string,
@@ -172,13 +165,21 @@ export function buildImagePromptMessages(
 ): SogniChatMessage[];
 export function buildImagePromptMessages(
   inputOrPrompt: BuildImagePromptMessagesInput | string,
-  stylePrompt = '',
-  promptingType: ImagePromptingType = 'sdxl',
-  modelTitle = 'Unknown Model',
+  stylePrompt = "",
+  promptingType: ImagePromptingType = "sdxl",
+  modelTitle = "Unknown Model",
 ): SogniChatMessage[] {
-  const input = normalizeBuildImagePromptInput(inputOrPrompt, stylePrompt, promptingType, modelTitle);
+  const input = normalizeBuildImagePromptInput(
+    inputOrPrompt,
+    stylePrompt,
+    promptingType,
+    modelTitle,
+  );
   const messages: SogniChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(input.promptingType, input.modelTitle) },
+    {
+      role: "system",
+      content: buildSystemPrompt(input.promptingType, input.modelTitle),
+    },
   ];
   let userMessage: string;
   if (input.prompt.trim()) {
@@ -193,10 +194,10 @@ export function buildImagePromptMessages(
       userMessage += `\n\nUse this style as inspiration: ${input.stylePrompt}`;
     }
   }
-  messages.push({ role: 'user', content: userMessage });
+  messages.push({ role: "user", content: userMessage });
   return messages;
 }
 
 export function parseToolCallPrompt(args: Record<string, unknown>): string {
-  return String(args.prompt || '').trim();
+  return String(args.prompt || "").trim();
 }

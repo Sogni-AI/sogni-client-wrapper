@@ -226,6 +226,22 @@ export function runHappyHorseReferencesTests(): { passed: number; failed: number
   // Bare (GPT) form is NOT a HappyHorse reference.
   expect('happyhorse parse rejects bare Image 2', hhFormat.parse('Image 2'), null);
 
+  // Krea Identity Edit uses context_image_N tokens and must not fall back to GPT-style refs.
+  const kreaResolution = getModelRefFormatResolution('krea2_identity_edit_v1_2');
+  const kreaAliasResolution = getModelRefFormatResolution('krea-2-identity-edit');
+  const darkBeastResolution = getModelRefFormatResolution('dark-beast-krea2-identity-edit');
+  expect(
+    "formatModelRef('krea2_identity_edit_v1_2',1,'image') === 'context_image_0'",
+    formatModelRef('krea2_identity_edit_v1_2', 1, 'image'),
+    'context_image_0',
+  );
+  expect('Krea identity raw id did not fall back', kreaResolution.fell_back, false);
+  expect('Krea identity raw id resolved model_id', kreaResolution.model_id, 'krea-identity-edit');
+  expect('Krea identity alias did not fall back', kreaAliasResolution.fell_back, false);
+  expect('Krea identity alias resolved model_id', kreaAliasResolution.model_id, 'krea-identity-edit');
+  expect('Dark Beast Krea selector did not fall back', darkBeastResolution.fell_back, false);
+  expect('Dark Beast Krea selector resolved model_id', darkBeastResolution.model_id, 'krea-identity-edit');
+
   console.log(`\nhappyhorse references: ${testsPassed} passed, ${testsFailed} failed`);
   return { passed: testsPassed, failed: testsFailed };
 }

@@ -46,8 +46,8 @@ const GPT_IMAGE_MODEL_ALIAS_VALUES = [
 
 export const GPT_IMAGE_MODEL_ALIASES: ReadonlySet<string> = new Set(GPT_IMAGE_MODEL_ALIAS_VALUES);
 
-const VERSIONED_NON_GPT_IMAGE_MODEL_NAME_PATTERN = String.raw`(?:flux(?:[\s.-]?(?:1|2|one|two|krea))|qwen(?:[\s.-]?(?:image|2512|edit|lightning))|z[-\s]?image|z[-\s]?turbo|chroma[-\s]?(?:detail|flash|v?\.?46)|pony[-\s]?v?\d+|sdxl|albedo(?:[-\s]?xl)?|animagine(?:[-\s]?xl)?|anima\s*pencil(?:[-\s]?xl)?|art\s*universe(?:[-\s]?xl)?|hyphoria|analog\s*madness(?:[-\s]?xl)?|cyberrealistic(?:[-\s]?xl)?|real\s*dream(?:[-\s]?xl)?|faetastic(?:[-\s]?xl)?|zavychroma(?:[-\s]?xl)?|pony[-\s]?faetality|dreamshaper(?:[-\s]?xl)?)`;
-const FAMILY_NON_GPT_IMAGE_MODEL_NAME_PATTERN = String.raw`(?:flux|qwen|chroma)`;
+const VERSIONED_NON_GPT_IMAGE_MODEL_NAME_PATTERN = String.raw`(?:flux(?:[\s.-]?(?:1|2|one|two|krea))|qwen(?:[\s.-]?(?:image|2512|edit|lightning))|krea(?:[\s.-]?(?:2|two))?(?:[\s.-]?(?:turbo|identity|edit|lora|v?1\.?2))*|dark[\s.-]?beast(?:[\s.-]?(?:krea(?:[\s.-]?2|2)?|z(?:[-\s]?image)?|identity|edit|turbo))*|z[-\s]?image|z[-\s]?turbo|chroma[-\s]?(?:1[-\s]?hd|detail|flash|v?\.?46)|one[-\s]?obsession(?:[-\s]?v?2\.?2)?|pony[-\s]?v?\d+|sdxl|albedo(?:[-\s]?xl)?|animagine(?:[-\s]?xl)?|anima\s*pencil(?:[-\s]?xl)?|art\s*universe(?:[-\s]?xl)?|hyphoria|analog\s*madness(?:[-\s]?xl)?|cyberrealistic(?:[-\s]?xl)?|real\s*dream(?:[-\s]?xl)?|faetastic(?:[-\s]?xl)?|zavychroma(?:[-\s]?xl)?|pony[-\s]?faetality|dreamshaper(?:[-\s]?xl)?)`;
+const FAMILY_NON_GPT_IMAGE_MODEL_NAME_PATTERN = String.raw`(?:flux|qwen|chroma|krea|dark[\s.-]?beast)`;
 const EXPLICIT_ADULT_IMAGE_REQUEST_PATTERN = /\b(?:nude|nudity|naked|topless|porn|pornographic|explicit\s+sex|hardcore|nsfw)\b/i;
 const GPT_IMAGE_TOOL_NAMES = new Set(['generate_image', 'edit_image']);
 

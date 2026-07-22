@@ -65,6 +65,12 @@ export function isHappyHorseVideoModel(modelId: string): boolean {
  * Get the maximum number of context images supported by a model
  */
 export function getMaxContextImages(modelId: string): number {
+  if (
+    modelId === 'krea2_identity_edit_v1_2' ||
+    modelId === 'dark_beast_krea2_identity_edit_v1_2'
+  ) {
+    return 2;
+  }
   if (modelId.includes('qwen_image_edit')) {
     return 3;
   }

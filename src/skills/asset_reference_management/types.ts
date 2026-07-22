@@ -56,6 +56,7 @@ export type KnownAssetModelId =
   | 'gpt-image-2'
   | 'wan'
   | 'qwen-image-edit'
+  | 'krea-identity-edit'
   | 'flux';
 
 /**

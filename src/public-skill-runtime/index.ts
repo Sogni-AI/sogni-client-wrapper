@@ -38,6 +38,27 @@ export interface SkillVideoModelConfig {
   supportsNativeAudio?: boolean;
 }
 
+export interface SkillModelDefaults {
+  workflow?: SkillVideoWorkflow;
+  family?: 'ltx23' | 'ltx2' | 'wan22' | 'seedance2' | 'krea2-identity-edit';
+  defaultWidth?: number;
+  defaultHeight?: number;
+  minDimension?: number;
+  maxDimension?: number;
+  dimensionMultiple?: number;
+  steps?: number;
+  guidance?: number;
+  fps?: number;
+  internalFps?: number;
+  frameStep?: number;
+  minFrames?: number;
+  maxFrames?: number;
+  sampler?: string;
+  scheduler?: string;
+  shift?: number;
+  supportsNativeAudio?: boolean;
+}
+
 interface SkillQualityTier {
   model: string;
   steps: number | null;
@@ -49,7 +70,7 @@ interface SkillQualityTier {
 }
 
 export interface SkillRuntimeConfig {
-  modelDefaults?: Record<string, Partial<SkillVideoModelConfig>>;
+  modelDefaults?: Record<string, SkillModelDefaults>;
   videoModels?: Partial<Record<SkillVideoWorkflow, string>>;
 }
 
@@ -177,7 +198,7 @@ function isLtxWorkflow(workflow: string | null | undefined): workflow is LtxWork
   return workflow === 't2v' || workflow === 'i2v' || workflow === 'ia2v' || workflow === 'a2v' || workflow === 'v2v';
 }
 
-export const SKILL_RUNTIME_VERSION = '2026-05-13.1';
+export const SKILL_RUNTIME_VERSION = '2026-07-18.1';
 
 export type PublicSkillSignalSource =
   | 'planner'
@@ -915,10 +936,21 @@ const CONTEXT_MODEL_REF_FORMAT: ModelRefFormat = {
 };
 
 export function getModelRefFormat(modelId: string): ModelRefFormat {
-  const trimmed = modelId.trim().toLowerCase();
+  const trimmed = modelId.trim().toLowerCase().replace(/[_.\s]+/g, '-').replace(/-+/g, '-');
   if (trimmed.startsWith('seedance')) return SEEDANCE_MODEL_REF_FORMAT;
   if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) return GPT_IMAGE_MODEL_REF_FORMAT;
-  if (trimmed.startsWith('ltx') || trimmed.startsWith('wan') || trimmed.startsWith('qwen-image')) return CONTEXT_MODEL_REF_FORMAT;
+  if (
+    trimmed.startsWith('ltx') ||
+    trimmed.startsWith('wan') ||
+    trimmed.startsWith('qwen-image') ||
+    trimmed === 'krea-identity-edit' ||
+    trimmed.startsWith('krea-2-identity-edit') ||
+    trimmed.startsWith('krea2-identity-edit') ||
+    trimmed.startsWith('dark-beast-krea2-identity-edit') ||
+    trimmed.startsWith('dark-beast-krea-2-identity-edit')
+  ) {
+    return CONTEXT_MODEL_REF_FORMAT;
+  }
   console.warn(`[SOGNI RUNTIME] Unknown model_id "${modelId}" fell back to GPT Image model_ref format.`);
   return GPT_IMAGE_MODEL_REF_FORMAT;
 }
@@ -971,7 +1003,7 @@ export const IMAGE_GENERATION_SKILL: SkillManifest = {
   id: 'image_generation',
   name: 'Image generation',
   description:
-    'Text-to-image synthesis (Flux). Use when the user wants a new image generated from a prompt with no source asset.',
+    'Text-to-image synthesis with Sogni image models including Z-Image, Krea 2 Turbo, Dark Beast Krea 2, Chroma, Flux, Qwen image, and GPT Image 2. Use when the user wants a new image generated from a prompt with no source asset.',
   toolNames: ['generate_image'],
   constraints: [
     'For persona-driven requests, defer to image_editing — personas must be conditioned on reference photos, never generated from scratch.',
@@ -982,10 +1014,11 @@ export const IMAGE_EDITING_SKILL: SkillManifest = {
   id: 'image_editing',
   name: 'Image editing',
   description:
-    'Edit, restore, restyle, refine, or change the camera angle of an existing image. Includes persona-conditioned edits — persona images should use edit_image and reference photos rather than text-to-image.',
+    'Edit, restore, restyle, refine, or change the camera angle of an existing image. Includes persona-conditioned edits and Krea 2 Identity Edit models — persona images should use edit_image and reference photos rather than text-to-image.',
   toolNames: ['edit_image', 'restore_photo', 'apply_style', 'change_angle', 'refine_result'],
   constraints: [
     'For persona image output, use edit_image with a reference photo rather than generate_image.',
+    'Krea 2 Identity Edit and Dark Beast Krea 2 Identity Edit use edit_image with 1-2 context images, context_image_N refs, 512-2048 px output, default steps=10, guidance=1, sampler=euler, and scheduler=simple.',
     'refine_result acts on a prior generation in the session; do not call it before any image has been produced or uploaded.',
   ],
 };
@@ -1964,6 +1997,49 @@ export const QUALITY_TIERS = Object.freeze({
   }
 } satisfies Record<'fast' | 'hq' | 'pro', SkillQualityTier>);
 
+export const IMAGE_MODEL_DEFAULTS: Readonly<Record<string, SkillModelDefaults>> = Object.freeze({
+  krea2_identity_edit_v1_2: {
+    family: 'krea2-identity-edit',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    minDimension: 512,
+    maxDimension: 2048,
+    dimensionMultiple: 16,
+    steps: 10,
+    guidance: 1.0,
+    sampler: 'euler',
+    scheduler: 'simple'
+  },
+  dark_beast_krea2_identity_edit_v1_2: {
+    family: 'krea2-identity-edit',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    minDimension: 512,
+    maxDimension: 2048,
+    dimensionMultiple: 16,
+    steps: 10,
+    guidance: 1.0,
+    sampler: 'euler',
+    scheduler: 'simple'
+  }
+});
+
+export const IMAGE_MODEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  'krea-identity-edit': 'krea2_identity_edit_v1_2',
+  'krea-2-identity-edit': 'krea2_identity_edit_v1_2',
+  'krea2-identity-edit': 'krea2_identity_edit_v1_2',
+  'krea2-identity-edit-v1-2': 'krea2_identity_edit_v1_2',
+  'krea-2-identity-edit-v1-2': 'krea2_identity_edit_v1_2',
+  'krea-2-identity-edit-lora': 'krea2_identity_edit_v1_2',
+  'krea-2-identity-edit-lora-v1-2': 'krea2_identity_edit_v1_2',
+  'dark-beast-krea2-identity-edit': 'dark_beast_krea2_identity_edit_v1_2',
+  'dark-beast-krea-2-identity-edit': 'dark_beast_krea2_identity_edit_v1_2',
+  'dark-beast-krea2-identity-edit-v1-2': 'dark_beast_krea2_identity_edit_v1_2',
+  'dark-beast-krea-2-identity-edit-v1-2': 'dark_beast_krea2_identity_edit_v1_2',
+  'dark-beast-krea-2-identity-edit-lora': 'dark_beast_krea2_identity_edit_v1_2',
+  'dark-beast-krea-2-identity-edit-lora-v1-2': 'dark_beast_krea2_identity_edit_v1_2'
+});
+
 export function isLtx2Model(modelId: string | null | undefined): boolean {
   return modelId?.startsWith('ltx2-') || modelId?.startsWith('ltx23-') || false;
 }
@@ -2007,6 +2083,14 @@ export function resolveVideoModelAlias(
     return SEEDANCE_WORKFLOW_MODELS[workflow];
   }
   return VIDEO_MODEL_ALIASES[key] || modelId;
+}
+
+export function resolveImageModelAlias(modelId: string | null | undefined): string | null | undefined {
+  if (!modelId) return modelId;
+  const key = String(modelId).trim().toLowerCase();
+  if (IMAGE_MODEL_DEFAULTS[key]) return key;
+  const aliasKey = key.replace(/[_.\s]+/g, '-').replace(/-+/g, '-');
+  return IMAGE_MODEL_ALIASES[key] || IMAGE_MODEL_ALIASES[aliasKey] || modelId;
 }
 
 export function getBuiltinVideoModelConfig(
@@ -2062,6 +2146,15 @@ export function getBuiltinVideoModelConfig(
     };
   }
   return null;
+}
+
+export function getBuiltinImageModelDefaults(
+  modelId: string | null | undefined,
+): SkillModelDefaults | null {
+  if (!modelId) return null;
+  const id = resolveImageModelAlias(modelId);
+  if (!id) return null;
+  return IMAGE_MODEL_DEFAULTS[id] || null;
 }
 
 export function normalizeVideoWorkflow(value: string | null | undefined): SkillVideoWorkflow | null {
@@ -2281,10 +2374,12 @@ export function workflowRequiresImage(workflow: SkillVideoWorkflow | null | unde
 export function getModelDefaults(
   modelId: string | null | undefined,
   config?: SkillRuntimeConfig | null,
-): Partial<SkillVideoModelConfig> | null {
+): SkillModelDefaults | null {
   if (!modelId) return null;
-  const normalizedModelId = resolveVideoModelAlias(modelId) || modelId;
-  const builtin = getBuiltinVideoModelConfig(normalizedModelId);
+  const normalizedModelId = resolveImageModelAlias(resolveVideoModelAlias(modelId) || modelId) || modelId;
+  const builtin =
+    getBuiltinVideoModelConfig(normalizedModelId) ||
+    getBuiltinImageModelDefaults(normalizedModelId);
   const entry = config?.modelDefaults?.[normalizedModelId] || config?.modelDefaults?.[modelId];
   if (!entry || typeof entry !== 'object') return builtin;
   return { ...(builtin || {}), ...entry };
@@ -8656,7 +8751,7 @@ export function inferDefaultVideoSteps(modelId: string | null | undefined): numb
 
 export function resolveVideoSteps(
   modelId: string | null | undefined,
-  modelDefaults: Partial<SkillVideoModelConfig> | null | undefined,
+  modelDefaults: SkillModelDefaults | null | undefined,
   explicitSteps: number | null | undefined,
 ): number | undefined {
   if (typeof explicitSteps === 'number' && Number.isFinite(explicitSteps)) return explicitSteps;

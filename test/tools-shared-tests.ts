@@ -3,6 +3,7 @@
  */
 import {
   extractDynamicPromptBranches,
+  getModelOptions,
   isStoryboardKeyframeBatchPrompt,
   maybeAlignNumberOfVariationsToDynamicBranchCount,
   textExplicitlyRequestsMultipleImageOutputs,
@@ -78,6 +79,18 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
     'multiImageIntent: "make it bigger" (no multi-image signal)',
     textExplicitlyRequestsMultipleImageOutputs('make it bigger'),
     false,
+  );
+
+  expect(
+    'model registry: edit_image includes Krea identity edit models',
+    getModelOptions('edit_image').map(option => option.key).includes('krea-identity-edit')
+      && getModelOptions('edit_image').map(option => option.key).includes('dark-beast-krea2-identity-edit'),
+    true,
+  );
+  expect(
+    'model registry: generate_image includes Dark Beast Krea 2',
+    getModelOptions('generate_image').map(option => option.key).includes('dark-beast-krea2'),
+    true,
   );
 
   // maybeAlignNumberOfVariationsToDynamicBranchCount

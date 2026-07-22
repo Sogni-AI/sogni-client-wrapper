@@ -44,6 +44,8 @@ import {
   compileForModel,
   compileSeedanceStoryboardPromptFromProject,
   compileVideoStoryboardImagePrompt,
+  formatModelRef,
+  getModelDefaults,
   inferStoryboardLayoutSpec,
 } from '../src/public-skill-runtime/index.js';
 import {
@@ -799,6 +801,12 @@ async function runTests() {
     if (getMaxContextImages('flux-1-schnell') !== 6) {
       throw new Error('Flux should support 6 context images');
     }
+    if (getMaxContextImages('krea2_identity_edit_v1_2') !== 2) {
+      throw new Error('Krea 2 Identity Edit should support 2 context images');
+    }
+    if (getMaxContextImages('dark_beast_krea2_identity_edit_v1_2') !== 2) {
+      throw new Error('Dark Beast Krea 2 Identity Edit should support 2 context images');
+    }
     if (getMaxContextImages('kontext-model') !== 2) {
       throw new Error('Kontext should support 2 context images');
     }
@@ -812,11 +820,40 @@ async function runTests() {
     if (!supportsContextImages('qwen_image_edit_2511_fp8')) {
       throw new Error('Qwen should support context images');
     }
+    if (!supportsContextImages('krea2_identity_edit_v1_2')) {
+      throw new Error('Krea 2 Identity Edit should support context images');
+    }
     if (!supportsContextImages('flux-1-schnell')) {
       throw new Error('Flux should support context images');
     }
     if (supportsContextImages('sd-xl-base')) {
       throw new Error('SD-XL should not support context images');
+    }
+  })();
+
+  await test('public skill runtime exposes Krea identity edit defaults and refs', () => {
+    const defaults = getModelDefaults('krea2_identity_edit_v1_2');
+    if (!defaults) {
+      throw new Error('Expected Krea 2 Identity Edit defaults');
+    }
+    if (defaults.steps !== 10 || defaults.guidance !== 1) {
+      throw new Error('Krea 2 Identity Edit defaults should use steps=10 and guidance=1');
+    }
+    if (defaults.sampler !== 'euler' || defaults.scheduler !== 'simple') {
+      throw new Error('Krea 2 Identity Edit defaults should include sampler=euler and scheduler=simple');
+    }
+    if (defaults.maxDimension !== 2048) {
+      throw new Error('Krea 2 Identity Edit maxDimension should be 2048');
+    }
+    const aliasDefaults = getModelDefaults('Krea 2 Identity Edit LoRA v1.2');
+    if (!aliasDefaults || aliasDefaults.sampler !== 'euler') {
+      throw new Error('Krea 2 Identity Edit aliases should resolve to builtin defaults');
+    }
+    if (formatModelRef('dark_beast_krea2_identity_edit_v1_2', 2, 'image') !== 'context_image_1') {
+      throw new Error('Dark Beast Krea 2 Identity Edit should use context_image_N refs');
+    }
+    if (formatModelRef('dark-beast-krea-2-identity-edit', 2, 'image') !== 'context_image_1') {
+      throw new Error('Dark Beast Krea 2 Identity Edit aliases should use context_image_N refs');
     }
   })();
 

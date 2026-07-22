@@ -126,11 +126,34 @@ const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
   ltx23: CONTEXT_FORMAT,
   wan: CONTEXT_FORMAT,
   'qwen-image-edit': CONTEXT_FORMAT,
+  'krea-identity-edit': CONTEXT_FORMAT,
   flux: GPT_IMAGE_2_FORMAT,
 };
 
 function cloneGlobalRegex(regex: RegExp): RegExp {
   return new RegExp(regex.source, regex.flags.includes('g') ? regex.flags : `${regex.flags}g`);
+}
+
+function normalizeModelRefId(modelId: string): string {
+  return modelId.trim().toLowerCase().replace(/[_.\s]+/g, '-').replace(/-+/g, '-');
+}
+
+function resolveContextModelRefId(modelId: string): KnownAssetModelId | null {
+  if (modelId.startsWith('wan')) return 'wan';
+  if (modelId.startsWith('qwen-image')) {
+    return 'qwen-image-edit';
+  }
+  if (
+    modelId === 'krea-identity-edit' ||
+    modelId.startsWith('krea-2-identity-edit') ||
+    modelId.startsWith('krea2-identity-edit') ||
+    modelId.startsWith('dark-beast-krea2-identity-edit') ||
+    modelId.startsWith('dark-beast-krea-2-identity-edit')
+  ) {
+    return 'krea-identity-edit';
+  }
+  if (modelId.startsWith('ltx')) return 'ltx23';
+  return null;
 }
 
 /**
@@ -142,7 +165,7 @@ export function getModelRefFormat(modelId: string): ModelRefFormat {
 }
 
 export function getModelRefFormatResolution(modelId: string): ModelRefFormatResolution {
-  const trimmed = modelId.trim().toLowerCase();
+  const trimmed = normalizeModelRefId(modelId);
   if (trimmed in MODEL_REF_FORMATS) {
     return {
       format: MODEL_REF_FORMATS[trimmed as KnownAssetModelId],
@@ -161,14 +184,11 @@ export function getModelRefFormatResolution(modelId: string): ModelRefFormatReso
       fell_back: false,
     };
   }
-  if (
-    trimmed.startsWith('ltx') ||
-    trimmed.startsWith('wan') ||
-    trimmed.startsWith('qwen-image')
-  ) {
+  const contextModelRefId = resolveContextModelRefId(trimmed);
+  if (contextModelRefId) {
     return {
       format: CONTEXT_FORMAT,
-      model_id: trimmed.startsWith('wan') ? 'wan' : trimmed.startsWith('qwen-image') ? 'qwen-image-edit' : 'ltx23',
+      model_id: contextModelRefId,
       fell_back: false,
     };
   }

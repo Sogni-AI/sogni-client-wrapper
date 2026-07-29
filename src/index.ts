@@ -91,6 +91,7 @@ export type {
   InputMedia,
   ProjectEvent,
   JobEvent,
+  JobPreparation,
   // ControlNet types
   ControlNetParams,
   ControlNetName,

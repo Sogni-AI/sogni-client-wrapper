@@ -2,12 +2,14 @@
  * Unit tests for the public-safe tool-arg normalization helpers.
  */
 import {
+  generateImageDefinition,
   extractDynamicPromptBranches,
   getModelOptions,
   isStoryboardKeyframeBatchPrompt,
   maybeAlignNumberOfVariationsToDynamicBranchCount,
   textExplicitlyRequestsMultipleImageOutputs,
 } from '../src/tools/index';
+import { validateAndNormalizeHostedToolArguments } from '../src/contracts/index';
 
 let testsPassed = 0;
 let testsFailed = 0;
@@ -92,6 +94,37 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
     getModelOptions('generate_image').map(option => option.key).includes('dark-beast-krea2'),
     true,
   );
+  const generateImageProperties = generateImageDefinition.function.parameters.properties ?? {};
+  expect(
+    'generate_image exposes ordered LoRA arrays',
+    {
+      loras: generateImageProperties.loras?.maxItems,
+      loraStrengths: generateImageProperties.loraStrengths?.maxItems,
+    },
+    { loras: 8, loraStrengths: 8 },
+  );
+  const mismatchedLoras = validateAndNormalizeHostedToolArguments(
+    [generateImageDefinition],
+    'generate_image',
+    {
+      prompt: 'portrait',
+      model: 'krea-2-turbo',
+      loras: ['krea2-detail-enhancer', 'krea2-amateur'],
+      loraStrengths: [-2],
+    },
+  );
+  expect('generate_image rejects mismatched LoRA arrays', mismatchedLoras.ok, false);
+  const bipolarLoras = validateAndNormalizeHostedToolArguments(
+    [generateImageDefinition],
+    'generate_image',
+    {
+      prompt: 'portrait',
+      model: 'krea-2-turbo',
+      loras: ['krea2-detail-enhancer', 'krea2-amateur'],
+      loraStrengths: [3, -2],
+    },
+  );
+  expect('generate_image accepts ordered bipolar LoRA strengths', bipolarLoras.ok, true);
 
   // maybeAlignNumberOfVariationsToDynamicBranchCount
   expect(

@@ -65,6 +65,7 @@ import type {
   InputMedia,
   ProjectEvent,
   JobEvent,
+  JobPreparation,
 } from '@sogni-ai/sogni-client';
 
 // Re-export types from Sogni SDK
@@ -129,6 +130,7 @@ export type {
   InputMedia,
   ProjectEvent,
   JobEvent,
+  JobPreparation,
 };
 
 /**

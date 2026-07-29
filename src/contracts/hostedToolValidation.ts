@@ -414,11 +414,26 @@ export function validateAndNormalizeHostedToolArguments(
     type: schema.type ?? 'object',
   };
   const cleaned = validateValueAgainstSchema('', args, normalizedSchema, context).value;
+  const cleanedRecord = isRecord(cleaned) ? cleaned : args;
+
+  if (toolName === 'generate_image') {
+    const loras = cleanedRecord.loras;
+    const strengths = cleanedRecord.loraStrengths;
+    if (Array.isArray(strengths) && !Array.isArray(loras)) {
+      context.errors.push('Argument "loraStrengths" requires "loras"');
+    } else if (
+      Array.isArray(loras)
+      && Array.isArray(strengths)
+      && loras.length !== strengths.length
+    ) {
+      context.errors.push('Arguments "loras" and "loraStrengths" must contain the same number of entries');
+    }
+  }
 
   return {
     ok: context.errors.length === 0,
     errors: context.errors,
-    cleaned: isRecord(cleaned) ? cleaned : args,
+    cleaned: cleanedRecord,
     warnings: context.warnings,
   };
 }

@@ -22,6 +22,7 @@ import {
   type VideoProjectConfig,
   type AudioProjectConfig,
   type SogniClientConfig,
+  type SogniAttributionConfig,
   type TokenAuthConfig,
   type CookieAuthConfig,
   type ApiKeyAuthConfig,
@@ -177,6 +178,58 @@ async function runTests() {
       autoConnect: false,
     });
     if (!client) throw new Error('Client not created with custom config');
+  })();
+
+  await test('Should pass immutable attribution defaults to the underlying SDK client', async () => {
+    const attribution: SogniAttributionConfig = {
+      connection: {
+        interactionKind: 'external_agent',
+        agentFramework: 'codex',
+        agentSurface: 'personal_skill',
+      },
+      workload: {
+        workloadKind: 'agent_mediated',
+        agentFramework: 'codex',
+        agentSurface: 'personal_skill',
+      },
+    };
+    let capturedConfig: Record<string, unknown> | undefined;
+    const originalCreateInstance = SogniClient.createInstance;
+    const eventTarget = { on: () => undefined, off: () => undefined };
+    (SogniClient as any).createInstance = async (config: Record<string, unknown>) => {
+      capturedConfig = config;
+      return {
+        projects: {
+          ...eventTarget,
+          waitForModels: async () => undefined,
+        },
+        chat: eventTarget,
+        dispose: () => undefined,
+      };
+    };
+
+    try {
+      const client = new SogniClientWrapper({
+        apiKey: 'test-api-key',
+        attribution,
+        autoConnect: false,
+      });
+      attribution.connection!.agentFramework = 'mutated-after-construction';
+      await client.connect();
+      const capturedAttribution = capturedConfig?.attribution as SogniAttributionConfig | undefined;
+      if (capturedAttribution === attribution) {
+        throw new Error('Attribution defaults should be isolated from caller mutation');
+      }
+      if (capturedAttribution?.connection?.agentFramework !== 'codex') {
+        throw new Error('Attribution defaults changed after wrapper construction');
+      }
+      if (!Object.isFrozen(capturedAttribution) || !Object.isFrozen(capturedAttribution.connection)) {
+        throw new Error('Attribution defaults should be frozen');
+      }
+      await client.dispose();
+    } finally {
+      (SogniClient as any).createInstance = originalCreateInstance;
+    }
   })();
 
   // Test 8: Event emitter functionality
@@ -1644,6 +1697,13 @@ async function runTests() {
         width: 512,
         height: 512,
         billingMode: 'auto',
+        attribution: {
+          workloadKind: 'agent_mediated',
+          agentFramework: 'codex',
+          operationScope: 'top_level',
+          operationId: 'op-root',
+          rootOperationId: 'op-root',
+        },
         waitForCompletion: false,
       };
       await client.createProject(config);
@@ -1656,6 +1716,9 @@ async function runTests() {
       }
       if (capturedParams.tokenType !== 'spark') {
         throw new Error('tokenType default should remain spark for backward compatibility');
+      }
+      if (capturedParams.attribution !== config.attribution) {
+        throw new Error('Per-project attribution should pass through to the SDK unchanged');
       }
 
       await client.disconnect();

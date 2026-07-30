@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 import { SogniClient, Project, Job, ChatStream } from '@sogni-ai/sogni-client';
 import type {
   SogniClientConfig,
+  SogniAttributionConfig,
   AuthType,
   ProjectConfig,
   ImageProjectConfig,
@@ -75,6 +76,22 @@ const MAX_VIDEO_DIMENSION = 1536;
 const VIDEO_DIMENSION_MULTIPLE = 16;
 const LTX2_FRAME_STEP = 8;
 
+function freezeAttributionDefaults(
+  attribution: SogniAttributionConfig | undefined,
+): SogniAttributionConfig | undefined {
+  if (!attribution) return undefined;
+  const connection = attribution.connection
+    ? Object.freeze({ ...attribution.connection })
+    : undefined;
+  const workload = attribution.workload
+    ? Object.freeze({ ...attribution.workload })
+    : undefined;
+  return Object.freeze({
+    ...(connection ? { connection } : {}),
+    ...(workload ? { workload } : {}),
+  });
+}
+
 /**
  * Internal configuration type with resolved defaults
  */
@@ -83,6 +100,7 @@ interface InternalConfig {
   password: string;
   apiKey?: string;
   appSource?: string;
+  attribution?: SogniAttributionConfig;
   appId: string;
   network: 'fast' | 'relaxed';
   testnet?: boolean;
@@ -133,6 +151,7 @@ export class SogniClientWrapper extends EventEmitter {
       password: config.password || '',
       apiKey: config.apiKey,
       appSource: config.appSource?.trim() || undefined,
+      attribution: freezeAttributionDefaults(config.attribution),
       appId: config.appId || generateAppId(),
       network: config.network || 'fast',
       testnet: config.testnet,
@@ -200,6 +219,7 @@ export class SogniClientWrapper extends EventEmitter {
         authType: this.config.authType,
         apiKey: this.config.apiKey,
         appSource: this.config.appSource,
+        attribution: this.config.attribution,
         testnet: this.config.testnet,
         socketEndpoint: this.config.socketEndpoint,
         restEndpoint: this.config.restEndpoint,
@@ -207,6 +227,7 @@ export class SogniClientWrapper extends EventEmitter {
         multiInstance: this.config.multiInstance,
       } as Parameters<typeof SogniClient.createInstance>[0] & {
         appSource?: string;
+        attribution?: SogniAttributionConfig;
       };
 
       // Create client instance with auth type

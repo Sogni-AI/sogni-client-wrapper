@@ -63,6 +63,17 @@ import type {
   VideoControlNetName,
   VideoControlNetParams,
   InputMedia,
+  SogniAttributionConfig,
+  InteractionKind,
+  WorkloadKind,
+  OperationScope,
+  AgentSurface,
+  ExecutionMode,
+  AgentAttributionMetadata,
+  ConnectionAttribution,
+  WorkloadAttributionDefaults,
+  WorkloadAttributionInput,
+  OperationLineage,
   ProjectEvent,
   JobEvent,
   JobPreparation,
@@ -128,6 +139,17 @@ export type {
   VideoControlNetName,
   VideoControlNetParams,
   InputMedia,
+  SogniAttributionConfig,
+  InteractionKind,
+  WorkloadKind,
+  OperationScope,
+  AgentSurface,
+  ExecutionMode,
+  AgentAttributionMetadata,
+  ConnectionAttribution,
+  WorkloadAttributionDefaults,
+  WorkloadAttributionInput,
+  OperationLineage,
   ProjectEvent,
   JobEvent,
   JobPreparation,
@@ -153,6 +175,9 @@ interface BaseClientConfig {
 
   /** Optional client app/source label for server-side attribution */
   appSource?: string;
+
+  /** Immutable connection and per-workload attribution defaults. */
+  attribution?: SogniAttributionConfig;
 
   /** Network type to use */
   network?: SupernetType;
@@ -274,6 +299,9 @@ interface BaseProjectConfig {
 
   /** Auto-resize video reference assets to supported dimensions (video only) */
   autoResizeVideoAssets?: boolean;
+
+  /** Attribution overrides for this logical project operation. */
+  attribution?: WorkloadAttributionInput;
 }
 
 /**

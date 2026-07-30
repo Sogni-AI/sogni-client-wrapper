@@ -1,3 +1,17 @@
+## [3.11.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.10.1...v3.11.0) (2026-07-30)
+
+### Features
+
+* **media:** add typed, language-agnostic image-edit routing helpers that default
+  identity-sensitive referenced-person and character edits to Krea 2 Identity Edit
+* **tools:** align edit-image contracts around concise Krea delta prompts, ordered
+  references, explicit model overrides, and worker-owned execution defaults
+
+### Bug Fixes
+
+* **deps:** align Sogni Client 5.3.1 and Protocol alpha.10 without a nested stale
+  Protocol copy
+
 ## [3.10.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.10.0...v3.10.1) (2026-07-30)
 
 ### Bug Fixes

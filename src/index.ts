@@ -9,6 +9,17 @@ export { SogniClientWrapper } from './client/SogniClientWrapper.js';
 // Types
 export type {
   SogniClientConfig,
+  SogniAttributionConfig,
+  InteractionKind,
+  WorkloadKind,
+  OperationScope,
+  AgentSurface,
+  ExecutionMode,
+  AgentAttributionMetadata,
+  ConnectionAttribution,
+  WorkloadAttributionDefaults,
+  WorkloadAttributionInput,
+  OperationLineage,
   AuthType,
   TokenAuthConfig,
   CookieAuthConfig,

@@ -1,3 +1,9 @@
+## [3.10.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.10.0...v3.10.1) (2026-07-30)
+
+### Bug Fixes
+
+* **deps:** consume Protocol alpha.10 for current Krea image schemas and prompt contracts
+
 # [3.7.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.6.0...v3.7.0) (2026-07-05)
 
 

@@ -66,6 +66,11 @@ import {
   buildLtxScriptMessages,
   buildWanScriptMessages,
 } from '../src/contracts/index.js';
+import {
+  buildImageEditExecutionControls,
+  isKreaIdentityEditModel,
+  resolveImageEditModelForProfile,
+} from '../src/media/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
@@ -907,6 +912,114 @@ async function runTests() {
     }
     if (formatModelRef('dark-beast-krea-2-identity-edit', 2, 'image') !== 'context_image_1') {
       throw new Error('Dark Beast Krea 2 Identity Edit aliases should use context_image_N refs');
+    }
+  })();
+
+  await test('typed identity-sensitive edits default to Krea without overriding explicit models', () => {
+    const routed = resolveImageEditModelForProfile({
+      imageEditProfile: 'identity_sensitive_portrait',
+      fallbackModel: 'qwen',
+    });
+    if (routed !== 'krea-identity-edit') {
+      throw new Error(`Expected Krea identity default, got ${String(routed)}`);
+    }
+
+    const explicit = resolveImageEditModelForProfile({
+      imageEditProfile: 'identity_sensitive_portrait',
+      explicitModelPreference: 'flux2',
+      fallbackModel: 'qwen',
+    });
+    if (explicit !== 'flux2') {
+      throw new Error(`Expected explicit model to win, got ${String(explicit)}`);
+    }
+
+    const ordinary = resolveImageEditModelForProfile({
+      imageEditProfile: 'general_edit',
+      fallbackModel: 'qwen-lightning',
+    });
+    if (ordinary !== 'qwen-lightning') {
+      throw new Error(`Expected ordinary fallback, got ${String(ordinary)}`);
+    }
+  })();
+
+  await test('Krea identity execution controls remain worker-owned', () => {
+    if (!isKreaIdentityEditModel('krea2_identity_edit_v1_2')) {
+      throw new Error('Expected raw Krea identity model id to be recognized');
+    }
+    const kreaControls = buildImageEditExecutionControls(
+      'krea2_identity_edit_v1_2',
+      {
+        steps: 10,
+        guidance: 1,
+        sampler: 'euler',
+        scheduler: 'simple',
+      },
+    );
+    if (Object.keys(kreaControls).length !== 0) {
+      throw new Error('Krea identity execution controls should be omitted');
+    }
+
+    const explicitKreaControls = buildImageEditExecutionControls(
+      'krea2_identity_edit_v1_2',
+      {
+        steps: 10,
+        guidance: 1,
+        sampler: 'euler',
+        scheduler: 'simple',
+      },
+      {
+        steps: 12,
+        guidance: 1,
+        sampler: 'dpmpp_2m',
+        scheduler: 'beta',
+      },
+    );
+    if (
+      explicitKreaControls.steps !== 12
+      || explicitKreaControls.guidance !== 1
+      || explicitKreaControls.sampler !== 'dpmpp_2m'
+      || explicitKreaControls.scheduler !== 'beta'
+    ) {
+      throw new Error('Explicit Krea controls should win without restoring implicit defaults');
+    }
+
+    const qwenControls = buildImageEditExecutionControls(
+      'qwen_image_edit_2511_fp8',
+      {
+        steps: 20,
+        guidance: 4,
+        sampler: 'euler',
+        scheduler: 'simple',
+      },
+    );
+    if (
+      qwenControls.steps !== 20
+      || qwenControls.guidance !== 4
+      || qwenControls.sampler !== 'euler'
+      || qwenControls.scheduler !== 'simple'
+    ) {
+      throw new Error('Non-Krea execution controls should be preserved');
+    }
+  })();
+
+  await test('public edit-image prompt contract matches typed Krea routing policy', () => {
+    const contract = PROMPT_CONTRACTS.find(
+      candidate => candidate.toolName === 'edit_image',
+    );
+    if (!contract) throw new Error('Expected edit_image prompt contract');
+    const normalizedDescription = contract.baseDescription.replace(/\s+/g, ' ');
+    for (const phrase of [
+      'any language; never route from keyword or regex matching',
+      'An explicitly requested model always wins',
+      'model tier and worker choose current execution defaults',
+      'concise 1-4 sentence delta instruction',
+    ]) {
+      if (!normalizedDescription.includes(phrase)) {
+        throw new Error(`edit_image prompt contract is missing: ${phrase}`);
+      }
+    }
+    if (normalizedDescription.includes('default to 10 steps')) {
+      throw new Error('edit_image prompt contract must not pin stale Krea defaults');
     }
   })();
 

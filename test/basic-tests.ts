@@ -68,6 +68,9 @@ import {
 } from '../src/contracts/index.js';
 import {
   buildImageEditExecutionControls,
+  calculateVideoDimensions,
+  calculateVideoFrames,
+  getVideoModelConfig,
   isKreaIdentityEditModel,
   resolveImageEditModelForProfile,
 } from '../src/media/index.js';
@@ -104,6 +107,98 @@ async function runTests() {
     if (!SogniError) throw new Error('SogniError not imported');
     if (!ClientEvent) throw new Error('ClientEvent not imported');
     if (!generateAppId) throw new Error('generateAppId not imported');
+  })();
+
+  await test('Should expose canonical MiniMax H3 video configurations', () => {
+    const expected = {
+      'minimax-h3-t2v': 'minimax-h3-fl2va-fp8_t2v',
+      'minimax-h3-i2v': 'minimax-h3-fl2va-fp8_i2v',
+      'minimax-h3-flf2v': 'minimax-h3-fl2va-fp8_flf2v',
+    } as const;
+    for (const [selector, model] of Object.entries(expected)) {
+      const config = getVideoModelConfig(selector as keyof typeof expected);
+      if (config.model !== model) throw new Error(`${selector} mapped to ${config.model}`);
+      if (config.fps !== 24 || config.steps !== 20 || config.guidance !== 1) {
+        throw new Error(`${selector} sampling defaults do not match the model contract`);
+      }
+      if (
+        config.nativeAudio !== true ||
+        config.supportsAudioToggle !== true ||
+        config.supportsNegativePrompt !== false
+      ) {
+        throw new Error(`${selector} audio/negative-prompt capabilities are incorrect`);
+      }
+    }
+  })();
+
+  await test('Should expose silent-output controls across audio-capable video tools', () => {
+    for (const definition of [
+      generateVideoDefinition,
+      animatePhotoDefinition,
+      soundToVideoDefinition,
+      videoToVideoDefinition,
+    ]) {
+      const generateAudio = definition.function.parameters.properties.generateAudio;
+      if (generateAudio?.type !== 'boolean') {
+        throw new Error(`${definition.function.name} does not expose generateAudio`);
+      }
+    }
+
+    const soundToVideoAudioDescription = String(
+      soundToVideoDefinition.function.parameters.properties.generateAudio.description ?? '',
+    );
+    if (!soundToVideoAudioDescription.includes('returned video has no audio track')) {
+      throw new Error('sound_to_video does not explain silent output');
+    }
+    if (!soundToVideoAudioDescription.includes('reference audio is still required')) {
+      throw new Error('sound_to_video does not preserve the audio-input requirement');
+    }
+
+    const videoToVideoAudioDescription = String(
+      videoToVideoDefinition.function.parameters.properties.generateAudio.description ?? '',
+    );
+    if (!videoToVideoAudioDescription.includes('returned video should include')) {
+      throw new Error('video_to_video does not explain silent output');
+    }
+  })();
+
+  await test('Should snap MiniMax H3 durations to its model frame grid', () => {
+    const model = 'minimax-h3-t2v';
+    const frames = [
+      calculateVideoFrames(1, model),
+      calculateVideoFrames(5, model),
+      calculateVideoFrames(8, model),
+      calculateVideoFrames(10, model),
+      calculateVideoFrames(15, model),
+      calculateVideoFrames(20, model),
+    ];
+    const expected = [124, 124, 192, 243, 362, 362];
+    if (JSON.stringify(frames) !== JSON.stringify(expected)) {
+      throw new Error(`Unexpected H3 frame counts: ${frames.join(', ')}`);
+    }
+    if (frames.some((value) => (value - 124) % 17 !== 0)) {
+      throw new Error('An H3 frame count fell off the 124 + n*17 grid');
+    }
+  })();
+
+  await test('Should keep MiniMax H3 dimensions on-grid and under its pixel budget', () => {
+    const landscape = calculateVideoDimensions(1920, 1080, 768, 'minimax-h3-i2v');
+    const portrait = calculateVideoDimensions(1080, 1920, 768, 'minimax-h3-i2v');
+    const square = calculateVideoDimensions(1344, 1344, undefined, 'minimax-h3-i2v', '1344x1344');
+    if (landscape.width !== 1344 || landscape.height !== 768) {
+      throw new Error(`Unexpected H3 landscape dimensions: ${landscape.width}x${landscape.height}`);
+    }
+    if (portrait.width !== 768 || portrait.height !== 1344) {
+      throw new Error(`Unexpected H3 portrait dimensions: ${portrait.width}x${portrait.height}`);
+    }
+    for (const dimensions of [landscape, portrait, square]) {
+      if (dimensions.width % 32 !== 0 || dimensions.height % 32 !== 0) {
+        throw new Error(`H3 dimensions are off-grid: ${dimensions.width}x${dimensions.height}`);
+      }
+      if (dimensions.width * dimensions.height > 1_032_192) {
+        throw new Error(`H3 dimensions exceed maxPixels: ${dimensions.width}x${dimensions.height}`);
+      }
+    }
   })();
 
   // Test 2: AppId generation

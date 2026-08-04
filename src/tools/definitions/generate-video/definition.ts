@@ -74,7 +74,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
         negativePrompt: {
           type: "string",
           description:
-            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set for seedance2, seedance2-mini, or seedance2-fast.",
+            "Advanced LTX/WAN only. Use this field only when the user explicitly asks to set a separate negative prompt. MiniMax H3 has no negative-prompt input; put requested exclusions in prompt. Do not set for MiniMax H3, Seedance, or HappyHorse.",
         },
         videoModel: {
           type: "string",
@@ -84,12 +84,13 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
             "seedance2",
             "seedance2-mini",
             "seedance2-fast",
+            "minimax-h3-t2v",
             "happyhorse-1.1-t2v",
             "happyhorse-1.1-i2v",
             "happyhorse-1.1-r2v",
           ],
           description:
-            'Video model. "ltx23" (default): LTX 2.3 with native audio; Fast/HQ use the distilled 8-step worker and Default Media Quality Pro uses the non-distilled dev worker. "wan22": Fast 4-step, simple motion, no audio. Default: "ltx23". Seedance quality is selected only by model: use "seedance2-mini" for Seedance 2.0 Mini or faster/lower-cost 720p iteration, use "seedance2-fast" only when the user explicitly asks for Seedance Fast / seedance-fast, and use "seedance2" for the full Seedance 2.0 model, explicit non-fast/full-quality requests, 1080p/4K requests, or generated/uploaded storyboard images unless the user explicitly asks for a draft, Mini, or the fast model. Do not use Default Media Quality Fast/HQ/Pro or targetResolution to represent Seedance quality. ' +
+            'Video model. "ltx23" (default): LTX 2.3 with native audio. "wan22": quick simple motion without audio. "minimax-h3-t2v": MiniMax H3 text-to-video with native audio, fixed 24fps, 5.17-15.08s, and a 768p-class 32px-grid canvas; use animate_photo for H3 image-conditioned modes. Seedance quality is selected only by model: use "seedance2-mini" for Seedance 2.0 Mini or faster/lower-cost 720p iteration, use "seedance2-fast" only when the user explicitly asks for Seedance Fast / seedance-fast, and use "seedance2" for the full Seedance 2.0 model, explicit non-fast/full-quality requests, 1080p/4K requests, or generated/uploaded storyboard images unless the user explicitly asks for a draft, Mini, or the fast model. Do not use Default Media Quality Fast/HQ/Pro or targetResolution to represent Seedance quality. ' +
             SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE +
             ' ' +
             HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION,
@@ -97,7 +98,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
         generateAudio: {
           type: "boolean",
           description:
-            "Seedance only. Whether Seedance should generate a native audio track. Omit by default; set false only when the user explicitly asks for silent output or no audio.",
+            "Whether the returned video should include generated/native audio. Omit to include audio by default; set false only when the user explicitly asks for silent output or no audio. Supported by LTX, MiniMax H3, and Seedance; not supported by WAN or HappyHorse.",
         },
         referenceImageIndices: {
           type: "array",

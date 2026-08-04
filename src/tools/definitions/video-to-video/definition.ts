@@ -93,7 +93,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         generateAudio: {
           type: "boolean",
           description:
-            'Seedance V2V only. Whether Seedance should generate/retain a native audio track. Omit by default; set false only when the user explicitly asks for silent output or no audio. Use only with controlMode="seedance-v2v".',
+            "Whether the returned video should include generated or retained audio. Omit to include audio by default; set false when the user asks for silent output or no audio.",
         },
         targetResolution: {
           type: "number",

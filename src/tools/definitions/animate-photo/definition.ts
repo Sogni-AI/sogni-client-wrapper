@@ -64,19 +64,24 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         },
         videoModel: {
           type: "string",
-          enum: ["ltx23", "wan22"],
+          enum: ["ltx23", "wan22", "minimax-h3-i2v", "minimax-h3-flf2v"],
           description:
-            'Which video model to use. "ltx23" (default): LTX 2.3 with native audio; Fast/HQ use the distilled 8-step worker and Default Media Quality Pro uses the non-distilled dev worker; per-clip duration 2-20s. "wan22": Fast 4-step, simple motion, no audio; per-clip duration capped at 10s (the worker rejects clips above 161 frames). For any wan22 total longer than 10s, batch multiple <=10s clips via sourceImageIndices and stitch them — never request a single >10s wan22 clip. Use ltx23 for most requests. Use wan22 for quick simple motions without audio. Default: "ltx23". Do not set seedance2, seedance2-mini, or seedance2-fast here; use generate_video with referenceImageIndices and @Image role text for Seedance.',
+            'Which video model to use. "ltx23" (default): LTX 2.3 with native audio. "wan22": quick simple motion without audio, up to 10s. "minimax-h3-i2v": MiniMax H3 from one first frame. "minimax-h3-flf2v": MiniMax H3 between required first and last frames; use frameRole="both" and provide the end frame. H3 generates native audio at fixed 24fps for 5.17-15.08s and has no negative-prompt input. Do not set Seedance here; use generate_video with Seedance references.',
         },
         negativePrompt: {
           type: "string",
           description:
-            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not use this field for Seedance workflows.",
+            "Advanced LTX/WAN only. Use this field only when the user explicitly asks to set a separate negative prompt. MiniMax H3 has no negative-prompt input; put requested exclusions in prompt.",
+        },
+        generateAudio: {
+          type: "boolean",
+          description:
+            "Whether the returned video should include generated/native audio. Omit to include audio by default; set false only when the user explicitly asks for silent output or no audio. Supported by LTX and MiniMax H3; ignored by audio-less WAN.",
         },
         duration: {
           type: "number",
           description:
-            'Video duration in seconds. Default: 5. Use when the user explicitly requests a specific length (e.g., "make a 10 second video"). Per-model maximum: ltx23 = 20s, wan22 = 10s (worker hard-rejects longer clips). For totals beyond the per-model cap, batch multiple clips via sourceImageIndices instead of requesting a single oversized clip.',
+            'Video duration in seconds. Default: 5. Per-model range: ltx23 = 2-20s, wan22 = 2-10s, MiniMax H3 = 5.17-15.08s snapped to its valid frame grid. For longer totals, batch clips via sourceImageIndices.',
         },
         targetResolution: {
           type: "number",
@@ -119,7 +124,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: "string",
           enum: ["start", "end", "both"],
           description:
-            'How to use the source image(s) for non-Seedance video generation. "start" (default): image is the first frame — video animates forward from it. "end": image is the last frame — video leads up to it. "both": two images provided — interpolates between start and end frames. For single clips using "both", set sourceImageIndex to the start frame and endImageIndex to the end frame. For sourceImageIndices fan-out using repeated -1, use frameRole="end" only when every clip should use that image as the last/end frame and no first/start frame should be supplied. Use frameRole="both" and set endImageIndex=-1 when every segment must use the uploaded image as both its first and last frame. For adjacent generated-image transitions, use frameRole="both" with matching sourceImageIndices and endImageIndices arrays. Omit endImageIndex/endImageIndices only when each source image should also be its own end frame. The handler inspects different start/end frames and generates a detailed transition prompt automatically.',
+            'How to use the source image(s). "start" (default): first frame. "end": last frame. "both": interpolate between first and last frames. For end-frame fan-out, use frameRole="end" with sourceImageIndices. MiniMax H3 i2v supports only "start"; MiniMax H3 flf2v requires "both" plus an end image. For single clips using "both", set sourceImageIndex and endImageIndex; fan-out can use matching sourceImageIndices/endImageIndices.',
         },
         endImageIndex: {
           type: "number",

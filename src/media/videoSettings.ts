@@ -11,6 +11,9 @@ import { parseAspectRatio } from "./imageDimensions.js";
 export type VideoModelId =
   | "wan22"
   | "ltx23"
+  | "minimax-h3-t2v"
+  | "minimax-h3-i2v"
+  | "minimax-h3-flf2v"
   | "seedance2"
   | "seedance2-mini"
   | "seedance2-fast"
@@ -44,6 +47,20 @@ export interface VideoModelConfig {
   resolutionTiers?: number[];
   /** Source image shorter-side threshold: below this -> use lower tier */
   resolutionThreshold?: number;
+  /** First valid frame count on the model's sampling grid. */
+  frameBase?: number;
+  /** Distance between valid frame counts. */
+  frameStep?: number;
+  minFrames?: number;
+  maxFrames?: number;
+  /** Maximum width × height accepted by the model. */
+  maxPixels?: number;
+  /** Whether the model produces a native audio track. */
+  nativeAudio?: boolean;
+  /** Whether callers can request a returned video without an audio track. */
+  supportsAudioToggle?: boolean;
+  /** Whether the model accepts a separate negative prompt. */
+  supportsNegativePrompt?: boolean;
 }
 
 export const LTX23_DISTILLED_MODEL_IDS: Record<Ltx23Workflow, string> = {
@@ -111,6 +128,66 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     strength: 0.9,
     resolutionTiers: [1088, 768],
     resolutionThreshold: 720,
+  },
+  "minimax-h3-t2v": {
+    model: "minimax-h3-fl2va-fp8_t2v",
+    fps: 24,
+    steps: 20,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "res_multistep",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-i2v": {
+    model: "minimax-h3-fl2va-fp8_i2v",
+    fps: 24,
+    steps: 20,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "res_multistep",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-flf2v": {
+    model: "minimax-h3-fl2va-fp8_flf2v",
+    fps: 24,
+    steps: 20,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "res_multistep",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
   },
   // Seedance 2.0 routes through Sogni Socket's vendor-job path to BytePlus.
   // The socket re-derives ratio from width/height and duration from
@@ -373,22 +450,28 @@ export function calculateVideoDimensions(
     effectiveH = srcArea / effectiveW;
   }
 
-  // Resolution tier logic: snap shorter side to a fixed tier (e.g. LTX 2.3: 1088 or 768)
+  // Resolution tier logic: snap shorter side to a fixed tier (e.g. LTX 2.3:
+  // 1088/768 and MiniMax H3: 768). Explicit supported tiers use this same
+  // path so their canonical landscape/portrait dimensions remain exact.
+  const roundedTarget = targetResolution === undefined
+    ? undefined
+    : Math.round(targetResolution / divisor) * divisor;
   if (
     parsed?.type !== "exact" &&
     config.resolutionTiers &&
     config.resolutionTiers.length > 0 &&
-    targetResolution === undefined
+    (roundedTarget === undefined || config.resolutionTiers.includes(roundedTarget))
   ) {
     const srcShorter = Math.min(effectiveW, effectiveH);
     const threshold =
       config.resolutionThreshold ??
       config.resolutionTiers[config.resolutionTiers.length - 1];
     // Pick tier: use highest tier unless source is below threshold
-    const tier =
+    const tier = roundedTarget ?? (
       srcShorter < threshold
-        ? config.resolutionTiers[config.resolutionTiers.length - 1] // lower tier (768)
-        : config.resolutionTiers[0]; // higher tier (1088)
+        ? config.resolutionTiers[config.resolutionTiers.length - 1]
+        : config.resolutionTiers[0]
+    );
 
     let w: number, h: number;
     if (effectiveW <= effectiveH) {
@@ -403,7 +486,7 @@ export function calculateVideoDimensions(
     w = Math.min(maxDim, w);
     h = Math.min(maxDim, h);
 
-    return { width: w, height: h };
+    return constrainVideoDimensions(w, h, config);
   }
 
   // General logic for models without resolution tiers (WAN 2.2)
@@ -446,6 +529,33 @@ export function calculateVideoDimensions(
   w = Math.max(minDim, Math.min(maxDim, w));
   h = Math.max(minDim, Math.min(maxDim, h));
 
+  return constrainVideoDimensions(w, h, config);
+}
+
+function constrainVideoDimensions(
+  width: number,
+  height: number,
+  config: VideoModelConfig,
+): { width: number; height: number } {
+  const divisor = config.dimensionDivisor;
+  const minDim = config.minDimension;
+  const maxDim = config.maxDimension;
+  let w = Math.max(minDim, Math.min(maxDim, Math.round(width / divisor) * divisor));
+  let h = Math.max(minDim, Math.min(maxDim, Math.round(height / divisor) * divisor));
+
+  if (config.maxPixels && w * h > config.maxPixels) {
+    const scale = Math.sqrt(config.maxPixels / (w * h));
+    w = Math.max(minDim, Math.floor((w * scale) / divisor) * divisor);
+    h = Math.max(minDim, Math.floor((h * scale) / divisor) * divisor);
+
+    // Floating-point rounding at the boundary can still leave a grid point one
+    // step over budget. Reduce the axis that removes the most pixels first.
+    while (w * h > config.maxPixels && (w > minDim || h > minDim)) {
+      if ((h >= w && h > minDim) || w <= minDim) h -= divisor;
+      else w -= divisor;
+    }
+  }
+
   return { width: w, height: h };
 }
 
@@ -460,8 +570,10 @@ export function calculateVideoFrames(
   // actually generates — counting frames against the output fps would double
   // the request beyond the worker's frame budget.
   const generationFps = config.internalFps ?? config.fps;
-  // LTX 2.3 frames must satisfy (frames - 1) % 8 === 0
-  // WAN 2.2 uses same formula for compatibility
-  const rawFrames = generationFps * duration + 1;
-  return Math.round((rawFrames - 1) / 8) * 8 + 1;
+  const frameBase = config.frameBase ?? 1;
+  const frameStep = config.frameStep ?? 8;
+  const rawFrames = generationFps * duration + (frameBase === 1 ? 1 : 0);
+  const snapped = frameBase + Math.round((rawFrames - frameBase) / frameStep) * frameStep;
+  const capped = Math.min(config.maxFrames ?? snapped, snapped);
+  return Math.max(config.minFrames ?? capped, capped);
 }

@@ -1,3 +1,10 @@
+## [3.12.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.12.5...v3.12.6) (2026-08-04)
+
+
+### Bug Fixes
+
+* **deps:** consume sogni-client 5.4.0 ([735c875](https://github.com/Sogni-AI/sogni-intelligence-client/commit/735c875f34ae33f001308dd563eb30dbeafdd32c))
+
 ## [3.11.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.10.1...v3.11.0) (2026-07-30)
 
 ### Features

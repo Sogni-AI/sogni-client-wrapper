@@ -119,6 +119,33 @@ const CONTEXT_FORMAT: ModelRefFormat = {
   scanRegex: /context_(?:image|video|audio)_\d+/g,
 };
 
+/**
+ * MiniMax H3 Ref2VA labels references with the literal tags its text encoder
+ * splices in front of the prompt — `<Picture 1>`, `<Video 1>`, `<Audio 1>` —
+ * 1-based per type, angle brackets included. Writing the same tags in the
+ * prompt shares a token sequence with the encoder's own reference labels,
+ * which is why prose aliases ("the second photo") underperform. Note the
+ * image label is Picture, not Image, and a reference video's own soundtrack
+ * consumes the next Audio ordinal before standalone audio clips.
+ */
+const MINIMAX_H3_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `<Video ${index}>`;
+    if (type === 'audio') return `<Audio ${index}>`;
+    return `<Picture ${index}>`;
+  },
+  parse(token) {
+    const m = /^<(Picture|Video|Audio)\s+(\d+)>$/.exec(token.trim());
+    if (!m) return null;
+    const kind = m[1]!;
+    const idx = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(idx) || idx < 1) return null;
+    const t: AssetType = kind === 'Video' ? 'video' : kind === 'Audio' ? 'audio' : 'image';
+    return { index: idx, type: t };
+  },
+  scanRegex: /<(?:Picture|Video|Audio)\s+\d+>/g,
+};
+
 const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
   seedance: SEEDANCE_FORMAT,
   happyhorse: HAPPYHORSE_FORMAT,
@@ -128,6 +155,7 @@ const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
   'qwen-image-edit': CONTEXT_FORMAT,
   'krea-identity-edit': CONTEXT_FORMAT,
   flux: GPT_IMAGE_2_FORMAT,
+  'minimax-h3': MINIMAX_H3_FORMAT,
 };
 
 function cloneGlobalRegex(regex: RegExp): RegExp {
@@ -177,6 +205,9 @@ export function getModelRefFormatResolution(modelId: string): ModelRefFormatReso
   // (e.g. "ltx23-fast", "seedance-1080p").
   if (trimmed.startsWith('seedance')) return { format: SEEDANCE_FORMAT, model_id: 'seedance', fell_back: false };
   if (trimmed.startsWith('happyhorse')) return { format: HAPPYHORSE_FORMAT, model_id: 'happyhorse', fell_back: false };
+  // Covers the full backend ids too: 'minimax-h3-ref2va-fp8_r2v' normalizes to
+  // 'minimax-h3-ref2va-fp8-r2v'.
+  if (trimmed.startsWith('minimax')) return { format: MINIMAX_H3_FORMAT, model_id: 'minimax-h3', fell_back: false };
   if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) {
     return {
       format: GPT_IMAGE_2_FORMAT,

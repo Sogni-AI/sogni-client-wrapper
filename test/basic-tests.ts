@@ -1009,6 +1009,15 @@ async function runTests() {
     if (formatModelRef('dark-beast-krea-2-identity-edit', 2, 'image') !== 'context_image_1') {
       throw new Error('Dark Beast Krea 2 Identity Edit aliases should use context_image_N refs');
     }
+    if (formatModelRef('minimax-h3', 1, 'image') !== '<Picture 1>') {
+      throw new Error('MiniMax H3 should use <Picture N> image refs, not the GPT fallback');
+    }
+    if (formatModelRef('minimax-h3-ref2va-fp8_r2v', 2, 'video') !== '<Video 2>') {
+      throw new Error('Full MiniMax H3 r2v backend id should resolve to <Video N> refs');
+    }
+    if (formatModelRef('minimax-h3-r2v', 3, 'audio') !== '<Audio 3>') {
+      throw new Error('MiniMax H3 r2v alias should resolve to <Audio N> refs');
+    }
   })();
 
   await test('typed identity-sensitive edits default to Krea without overriding explicit models', () => {

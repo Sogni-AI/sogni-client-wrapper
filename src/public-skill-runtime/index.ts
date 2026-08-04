@@ -935,9 +935,64 @@ const CONTEXT_MODEL_REF_FORMAT: ModelRefFormat = {
   scanRegex: /context_(?:image|video|audio)_\d+/g,
 };
 
+/**
+ * MiniMax H3 Ref2VA labels references with the literal tags its text encoder
+ * splices in front of the prompt — `<Picture 1>`, `<Video 1>`, `<Audio 1>` —
+ * 1-based per type, angle brackets included. The image label is Picture, not
+ * Image, and a reference video's own soundtrack consumes the next Audio
+ * ordinal before standalone audio clips. Mirrors the internal
+ * asset_reference_management registry.
+ */
+const MINIMAX_H3_MODEL_REF_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `<Video ${index}>`;
+    if (type === 'audio') return `<Audio ${index}>`;
+    return `<Picture ${index}>`;
+  },
+  parse(token) {
+    const m = /^<(Picture|Video|Audio)\s+(\d+)>$/.exec(token.trim());
+    if (!m) return null;
+    const index = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(index) || index < 1) return null;
+    return {
+      index,
+      type: m[1] === 'Video' ? 'video' : m[1] === 'Audio' ? 'audio' : 'image',
+    };
+  },
+  scanRegex: /<(?:Picture|Video|Audio)\s+\d+>/g,
+};
+
+/**
+ * HappyHorse r2v tags reference images as bracketed ordinals — `[Image 1]`.
+ * Mirrors the internal registry; previously this runtime silently fell back
+ * to the bare GPT `Image N` form for HappyHorse ids.
+ */
+const HAPPYHORSE_MODEL_REF_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `[Video ${index}]`;
+    if (type === 'audio') return `[Audio ${index}]`;
+    return `[Image ${index}]`;
+  },
+  parse(token) {
+    const m = /^\[(Image|Video|Audio)\s+(\d+)\]$/.exec(token.trim());
+    if (!m) return null;
+    const index = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(index) || index < 1) return null;
+    return {
+      index,
+      type: m[1] === 'Video' ? 'video' : m[1] === 'Audio' ? 'audio' : 'image',
+    };
+  },
+  scanRegex: /\[(?:Image|Video|Audio)\s+\d+\]/g,
+};
+
 export function getModelRefFormat(modelId: string): ModelRefFormat {
   const trimmed = modelId.trim().toLowerCase().replace(/[_.\s]+/g, '-').replace(/-+/g, '-');
   if (trimmed.startsWith('seedance')) return SEEDANCE_MODEL_REF_FORMAT;
+  // Full backend ids normalize into these prefixes too:
+  // 'minimax-h3-ref2va-fp8_r2v' -> 'minimax-h3-ref2va-fp8-r2v'.
+  if (trimmed.startsWith('minimax')) return MINIMAX_H3_MODEL_REF_FORMAT;
+  if (trimmed.startsWith('happyhorse')) return HAPPYHORSE_MODEL_REF_FORMAT;
   if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) return GPT_IMAGE_MODEL_REF_FORMAT;
   if (
     trimmed.startsWith('ltx') ||

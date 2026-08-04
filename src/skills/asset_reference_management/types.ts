@@ -57,7 +57,8 @@ export type KnownAssetModelId =
   | 'wan'
   | 'qwen-image-edit'
   | 'krea-identity-edit'
-  | 'flux';
+  | 'flux'
+  | 'minimax-h3';
 
 /**
  * Result of `validateAssetReferences()` — surfaces concrete dangling

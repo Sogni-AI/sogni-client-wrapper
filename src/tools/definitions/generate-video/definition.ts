@@ -88,9 +88,10 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
             "happyhorse-1.1-t2v",
             "happyhorse-1.1-i2v",
             "happyhorse-1.1-r2v",
+            "minimax-h3-r2v",
           ],
           description:
-            'Video model. "ltx23" (default): LTX 2.3 with native audio. "wan22": quick simple motion without audio. "minimax-h3-t2v": MiniMax H3 text-to-video with native audio, fixed 24fps, 5.17-15.08s, and a 768p-class 32px-grid canvas; use animate_photo for H3 image-conditioned modes. Seedance quality is selected only by model: use "seedance2-mini" for Seedance 2.0 Mini or faster/lower-cost 720p iteration, use "seedance2-fast" only when the user explicitly asks for Seedance Fast / seedance-fast, and use "seedance2" for the full Seedance 2.0 model, explicit non-fast/full-quality requests, 1080p/4K requests, or generated/uploaded storyboard images unless the user explicitly asks for a draft, Mini, or the fast model. Do not use Default Media Quality Fast/HQ/Pro or targetResolution to represent Seedance quality. ' +
+            'Video model. "ltx23" (default): LTX 2.3 with native audio. "wan22": quick simple motion without audio. "minimax-h3-t2v": MiniMax H3 text-to-video with native audio, fixed 24fps, 5.17-15.08s, and a 768p-class 32px-grid canvas; use animate_photo for H3 image-conditioned modes. "minimax-h3-r2v": MiniMax H3 reference-to-video with up to 9 images, 3 videos, and 3 audios (12 files total); at least one image is required. Select references with referenceImageIndices/referenceVideoIndices/referenceAudioIndices and address them as <Picture 1>/<Video 1>/<Audio 1> in the prompt. Seedance quality is selected only by model: use "seedance2-mini" for Seedance 2.0 Mini or faster/lower-cost 720p iteration, use "seedance2-fast" only when the user explicitly asks for Seedance Fast / seedance-fast, and use "seedance2" for the full Seedance 2.0 model, explicit non-fast/full-quality requests, 1080p/4K requests, or generated/uploaded storyboard images unless the user explicitly asks for a draft, Mini, or the fast model. Do not use Default Media Quality Fast/HQ/Pro or targetResolution to represent Seedance quality. ' +
             SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE +
             ' ' +
             HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION,
@@ -104,19 +105,19 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
           type: "array",
           items: { type: "number" },
           description:
-            "Seedance only. Image references for @Image tags. Use negative indices for uploaded images (-1 first upload, -2 second upload) and non-negative indices for generated image results. Omit by default: uploaded images are auto-forwarded as @Image references. Anchor frame intent in the prompt with @Image tags: \"Use @Image1 as the opening shot reference. Begin the video with a composition, subject placement, lighting, mood, and camera framing that closely match @Image1.\" (or @Image2 as the final shot reference). For seamless-loop or \"first frame and last frame identical\" requests with a single uploaded image, anchor it explicitly as both: \"Use @Image1 as both the first frame and last frame so the video loops cleanly back to the opening composition.\" Do not use animate_photo sourceImageIndex/frameRole/endImageIndex for Seedance.",
+            "Seedance or MiniMax H3 r2v image references. Use negative indices for uploaded images and non-negative indices for generated image results. Seedance uses @Image tags. H3 r2v requires at least one image and uses <Picture 1>, <Picture 2>, and so on in selection order; these are loose references, not locked frames.",
         },
         referenceVideoIndices: {
           type: "array",
           items: { type: "number" },
           description:
-            'Seedance only. Optional loose video references. Use negative indices for uploaded videos (-1 first uploaded video, -2 second uploaded video) and non-negative indices for generated video results. Omit by default: uploaded videos are auto-forwarded as @Video references. Set to choose a subset or include previously generated video URLs. Do not use this for uploaded source-video transforms, upscales, enhancements, restyles, or remasters; use video_to_video with controlMode="seedance-v2v" instead.',
+            'Seedance or MiniMax H3 r2v loose video references. Use negative indices for uploaded videos and non-negative indices for generated video results. Seedance uses @Video tags; H3 uses <Video 1>, <Video 2>, and so on in selection order. Do not use this for source-video transforms; use video_to_video instead.',
         },
         referenceAudioIndices: {
           type: "array",
           items: { type: "number" },
           description:
-            'Seedance only. Optional loose audio references. Use negative indices for uploaded audio files (-1 first uploaded audio, -2 second uploaded audio) and non-negative indices for generated audio results. Omit by default: uploaded audio is auto-forwarded as @Audio references when the Seedance request also has an image or video reference. Use this only for loose background, mood, timing, or style references under an image/video-anchored Seedance shot. If the uploaded audio is the primary sync target, lip-sync target, or requested as sound-to-video/audio-sync, use sound_to_video with videoModel="seedance2-mini" instead unless the user asks for full Seedance. Audio-only Seedance requests are unsupported; use sound_to_video for uploaded-audio-only workflows.',
+            'Seedance or MiniMax H3 r2v loose audio references. Use negative indices for uploaded audio files and non-negative indices for generated audio results. Seedance uses @Audio tags; H3 uses <Audio 1>, <Audio 2>, and so on in selection order. H3 audio/video references supplement a required image and cannot replace it.',
         },
         width: {
           type: "number",

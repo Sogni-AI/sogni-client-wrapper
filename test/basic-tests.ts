@@ -114,6 +114,7 @@ async function runTests() {
       'minimax-h3-t2v': 'minimax-h3-fl2va-fp8_t2v',
       'minimax-h3-i2v': 'minimax-h3-fl2va-fp8_i2v',
       'minimax-h3-flf2v': 'minimax-h3-fl2va-fp8_flf2v',
+      'minimax-h3-r2v': 'minimax-h3-ref2va-fp8_r2v',
     } as const;
     for (const [selector, model] of Object.entries(expected)) {
       const config = getVideoModelConfig(selector as keyof typeof expected);

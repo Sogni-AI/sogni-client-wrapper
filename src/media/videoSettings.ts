@@ -14,6 +14,7 @@ export type VideoModelId =
   | "minimax-h3-t2v"
   | "minimax-h3-i2v"
   | "minimax-h3-flf2v"
+  | "minimax-h3-r2v"
   | "seedance2"
   | "seedance2-mini"
   | "seedance2-fast"
@@ -171,6 +172,26 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
   },
   "minimax-h3-flf2v": {
     model: "minimax-h3-fl2va-fp8_flf2v",
+    fps: 24,
+    steps: 20,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "res_multistep",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-r2v": {
+    model: "minimax-h3-ref2va-fp8_r2v",
     fps: 24,
     steps: 20,
     guidance: 1,

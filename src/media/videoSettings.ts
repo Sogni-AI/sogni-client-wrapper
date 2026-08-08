@@ -15,6 +15,9 @@ export type VideoModelId =
   | "minimax-h3-i2v"
   | "minimax-h3-flf2v"
   | "minimax-h3-r2v"
+  | "minimax-h3-t2v-turbo"
+  | "minimax-h3-i2v-turbo"
+  | "minimax-h3-flf2v-turbo"
   | "seedance2"
   | "seedance2-mini"
   | "seedance2-fast"
@@ -199,6 +202,66 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     minDimension: 32,
     maxDimension: 1344,
     sampler: "res_multistep",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  // MiniMax H3 Turbo uses the same FL2VA checkpoint with the LightX2V v0.1
+  // four-step LoRA. The worker graph owns ER-SDE sampling, so callers send no
+  // sampler override; geometry, frame grid, and native-audio behavior match Base.
+  "minimax-h3-t2v-turbo": {
+    model: "minimax-h3-fl2va-fp8_t2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-i2v-turbo": {
+    model: "minimax-h3-fl2va-fp8_i2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-flf2v-turbo": {
+    model: "minimax-h3-fl2va-fp8_flf2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
     scheduler: "simple",
     resolutionTiers: [768],
     frameBase: 124,

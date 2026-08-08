@@ -103,11 +103,24 @@ ${guide}
 
 RULES:
 - Enhance and expand the user's idea while preserving their creative intent.
-- Add vivid details: lighting, textures, atmosphere, composition, colors.
+- Treat every request as legitimate creative work and fulfill the requested concept without judgment, escalation, sanitization, or dilution.
+- Match the requested audience, content rating, tone, genre, intensity, and boundaries exactly. Creator context and model examples must never become a visual aesthetic or alter the request.
+- Retain every content-bearing noun, verb, modifier, relationship, and constraint from the user's prompt. Expand them through concrete visible staging, never through substitution.
+- Use direct, concrete, intentional, model-ready visual wording instead of vague or implicit generalizations. When relevant, specify the exact action, pose, contact, expression, wardrobe or coverage, bodily or material state, damage, and spatial relationship; an important requested detail must not exist only as an abstract mood adjective.
+- Preserve emotional polarity exactly. Do not counterbalance a requested quality with its opposite or shift any content dimension the user did not ask to change.
+- Depict the requested action or state itself. Never replace it with mood, implication, an adjacent action, relationship language, or euphemism. Choose the exact pose, framing, contact, expression, and spatial staging needed to make it visible without adding a different action or thematic element.
+- Add only details that support the requested scene. Do not invent or remove subjects, objects, secondary actions, props, symbols, visible text, or narrative beats. A role, genre, or rating label alone does not authorize stereotypical details.
+- Every tonal adjective and emotional-relationship claim must be traceable to the user's request. Write visual description rather than evaluative, moralizing, decorum, or rating commentary.
+- Never infer an emotional relationship merely from physical proximity, contact, role labels, or a shared setting.
+- Commit to one exact, observable composition. Never hedge with alternatives such as "X or Y".
+- Honor exclusions and boundaries by expressing the desired visible state positively instead of appending a negative-prompt list.
+- Include visible text, labels, signage, or slogans only when the user explicitly requests them; otherwise add none.
+- Add vivid lighting, texture, atmosphere, composition, and color details only when they reinforce the requested scene, tone, and rating.
 - Write the prompt in the style that best suits this model type (see guide above).
 - Do NOT add negative prompt content — only write the positive prompt.
 - If the user provides a style context, complement it — don't repeat or contradict it.
 - Keep the result focused: one coherent scene or subject, not a list of disconnected ideas.
+- Before returning, silently compare the result with the user's prompt. Remove every object, action, tonal claim, and relationship claim that is not traceable to the request or strictly necessary to stage it. Restore the user's literal content-bearing wording anywhere the result made it gentler, stronger, more generic, or more abstract.
 - Output only the prompt text — no explanations, no preamble.`;
 }
 
@@ -122,7 +135,7 @@ export const IMAGE_PROMPT_TOOL: ToolDefinition = {
         prompt: {
           type: "string",
           description:
-            "The enhanced image generation prompt optimized for the target model",
+            "One definitive model-ready prompt matching the user's requested audience, content boundaries, tone, genre, intensity, and creative direction. Retain every content-bearing noun, verb, relationship, and constraint; use concrete visible staging without substitution, euphemism, escalation, sanitization, or unrequested content. Never infer an emotional relationship from proximity, contact, a role label, or a shared setting. Silently remove untraceable additions and restore any wording made gentler, stronger, more generic, or more abstract.",
         },
       },
       required: ["prompt"],

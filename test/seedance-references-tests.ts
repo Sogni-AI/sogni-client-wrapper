@@ -4,6 +4,8 @@
  */
 import {
   SEEDANCE_REFERENCE_LIMITS,
+  SEEDANCE_REFERENCE_LIMITS_BY_MODEL,
+  getSeedanceReferenceLimits,
   SeedanceReferenceLimitError,
   validateSeedanceReferenceCounts,
 } from '../src/tools/index';
@@ -139,10 +141,70 @@ export function runSeedanceReferencesTests(): { passed: number; failed: number }
       && /Seedance can use up to 12 total references per video; this request included 15\./.test(err.message),
   );
 
+  // Per-model caps: Seedance 2.5 is NOT bounded by the 2.0 family numbers.
+  expect(
+    'per-model: seedance-2-0 is 9/3/3/12',
+    getSeedanceReferenceLimits('seedance-2-0'),
+    { images: 9, videos: 3, audios: 3, assets: 12 },
+  );
+  expect(
+    'per-model: seedance-2-0-mini is 9/3/3/12',
+    getSeedanceReferenceLimits('seedance-2-0-mini'),
+    { images: 9, videos: 3, audios: 3, assets: 12 },
+  );
+  expect(
+    'per-model: seedance-2-0-fast is 9/3/3/12',
+    getSeedanceReferenceLimits('seedance-2-0-fast'),
+    { images: 9, videos: 3, audios: 3, assets: 12 },
+  );
+  expect(
+    'per-model: seedance-2-5 is 30/10/10/30',
+    getSeedanceReferenceLimits('seedance-2-5'),
+    { images: 30, videos: 10, audios: 10, assets: 30 },
+  );
+  expectThrows(
+    'per-model: unknown model throws instead of defaulting',
+    () => getSeedanceReferenceLimits('seedance-9-9'),
+    (err) => err instanceof Error && /No Seedance reference limits are defined/.test(err.message),
+  );
+
+  // A 2.5 request that would be rejected under the 2.0 caps must pass.
+  expect(
+    'validate: 20/5/5 ok on seedance-2-5',
+    (() => {
+      validateSeedanceReferenceCounts({ images: 20, videos: 5, audios: 5 }, 'seedance-2-5');
+      return 'ok';
+    })(),
+    'ok',
+  );
+  expect(
+    'validate: at-cap 30/0/0 ok on seedance-2-5',
+    (() => {
+      validateSeedanceReferenceCounts({ images: 30, videos: 0, audios: 0 }, 'seedance-2-5');
+      return 'ok';
+    })(),
+    'ok',
+  );
+  expectThrows(
+    'validate: 31 images rejected on seedance-2-5',
+    () => validateSeedanceReferenceCounts({ images: 31, videos: 0, audios: 0 }, 'seedance-2-5'),
+    (err) => err instanceof SeedanceReferenceLimitError && err.maxCount === 30,
+  );
+  expectThrows(
+    'validate: 10 images still rejected on seedance-2-0',
+    () => validateSeedanceReferenceCounts({ images: 10, videos: 0, audios: 0 }, 'seedance-2-0'),
+    (err) => err instanceof SeedanceReferenceLimitError && err.maxCount === 9,
+  );
+
   // Constants are frozen
   expect(
     'SEEDANCE_REFERENCE_LIMITS is frozen',
     Object.isFrozen(SEEDANCE_REFERENCE_LIMITS),
+    true,
+  );
+  expect(
+    'SEEDANCE_REFERENCE_LIMITS_BY_MODEL is frozen',
+    Object.isFrozen(SEEDANCE_REFERENCE_LIMITS_BY_MODEL),
     true,
   );
 

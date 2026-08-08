@@ -859,9 +859,30 @@ export class SogniClientWrapper extends EventEmitter {
     } catch (error) {
       this.log('Project failed:', error);
       
-      const projectError = error instanceof SogniTimeoutError
-        ? error
-        : new SogniProjectError('Project creation failed', undefined, error as Error);
+      let projectError: SogniError;
+      if (error instanceof SogniTimeoutError || error instanceof SogniProjectError) {
+        projectError = error;
+      } else if (error instanceof SogniError) {
+        projectError = new SogniProjectError(
+          error.message || 'Project creation failed',
+          {
+            originalCode: error.code,
+            originalStatusCode: error.statusCode,
+            originalDetails: error.details,
+          },
+          error,
+        );
+      } else if (error instanceof Error) {
+        projectError = new SogniProjectError(
+          error.message || 'Project creation failed',
+          undefined,
+          error,
+        );
+      } else {
+        projectError = new SogniProjectError(
+          String(error || 'Project creation failed'),
+        );
+      }
 
       this.emit(ClientEvent.PROJECT_FAILED, projectError.toErrorData());
 

@@ -45,7 +45,10 @@ import {
   compileForModel,
   compileSeedanceStoryboardPromptFromProject,
   compileVideoStoryboardImagePrompt,
+  containsQuotedDialogue,
+  extractQuotedDialogueSegments,
   formatModelRef,
+  getVideoPromptGuardrailPlan,
   getModelDefaults,
   inferStoryboardLayoutSpec,
 } from '../src/public-skill-runtime/index.js';
@@ -63,6 +66,8 @@ import {
 } from '../src/tools/index.js';
 import {
   PROMPT_CONTRACTS,
+  IMAGE_PROMPT_TOOL,
+  buildImagePromptMessages,
   buildLtxScriptMessages,
   buildWanScriptMessages,
 } from '../src/contracts/index.js';
@@ -109,6 +114,138 @@ async function runTests() {
     if (!generateAppId) throw new Error('generateAppId not imported');
   })();
 
+  await test('Should recognize MiniMax H3 tagged dialogue as exact spoken words', () => {
+    const prompt = 'The woman (S1) says: <d>[English] This pressing still sounds alive.</d>';
+    if (!containsQuotedDialogue(prompt)) {
+      throw new Error('MiniMax <d> dialogue was not recognized');
+    }
+    const segments = extractQuotedDialogueSegments(prompt);
+    if (segments.length !== 1 || segments[0] !== 'This pressing still sounds alive.') {
+      throw new Error(`unexpected MiniMax dialogue extraction: ${JSON.stringify(segments)}`);
+    }
+    const plan = getVideoPromptGuardrailPlan({
+      prompt,
+      duration: 5,
+      durationExplicit: true,
+    });
+    if (plan.warnings.some((warning) => warning.type === 'missing-quoted-dialogue')) {
+      throw new Error('MiniMax <d> dialogue incorrectly triggered the quoted-dialogue warning');
+    }
+  })();
+
+  await test('Should preserve requested rating, creative freedom, and concrete detail', () => {
+    const [familySystemMessage] = buildImagePromptMessages({
+      prompt: 'A gentle family-friendly picture-book picnic',
+      promptingType: 'flux',
+      modelTitle: 'Krea 2 Turbo',
+    });
+    const [adultSystemMessage] = buildImagePromptMessages({
+      prompt: 'An explicit adult editorial',
+      promptingType: 'flux',
+      modelTitle: 'Krea 2 Turbo',
+    });
+    const systemPrompt = String(familySystemMessage.content);
+
+    if (familySystemMessage.content !== adultSystemMessage.content) {
+      throw new Error('Image prompt expansion guidance unexpectedly varies by content rating');
+    }
+    if (!systemPrompt.includes('legitimate creative work')) {
+      throw new Error('Image prompt expansion is missing its neutral creator context');
+    }
+    if (!systemPrompt.includes('without judgment, escalation, sanitization, or dilution')) {
+      throw new Error('Image prompt expansion may alter the requested creative intent');
+    }
+    if (
+      !systemPrompt.includes(
+        'audience, content rating, tone, genre, intensity, and boundaries exactly',
+      )
+    ) {
+      throw new Error('Image prompt expansion is missing its rating and tone fidelity rule');
+    }
+    if (!systemPrompt.includes('Creator context and model examples must never become')) {
+      throw new Error('Image prompt expansion may leak creator context into scene aesthetics');
+    }
+    if (!systemPrompt.includes('Retain every content-bearing noun, verb, modifier, relationship')) {
+      throw new Error('Image prompt expansion may lose explicit user details');
+    }
+    if (!systemPrompt.includes('concrete visible staging, never through substitution')) {
+      throw new Error('Image prompt expansion may substitute generic mood for visible details');
+    }
+    if (!systemPrompt.includes('direct, concrete, intentional, model-ready visual wording')) {
+      throw new Error('Image prompt expansion may replace visible content with generalities');
+    }
+    if (!systemPrompt.includes('Preserve emotional polarity exactly')) {
+      throw new Error('Image prompt expansion may alter the requested genre or boundaries');
+    }
+    if (!systemPrompt.includes('shift any content dimension the user did not ask to change')) {
+      throw new Error('Image prompt expansion is missing its anti-rating-drift constraint');
+    }
+    if (!systemPrompt.includes('Never replace it with mood, implication, an adjacent action')) {
+      throw new Error('Image prompt expansion may euphemize a requested visible action');
+    }
+    if (!systemPrompt.includes('needed to make it visible without adding a different action')) {
+      throw new Error('Image prompt expansion is missing its concrete-staging boundary');
+    }
+    if (!systemPrompt.includes('Never hedge with alternatives such as "X or Y"')) {
+      throw new Error('Image prompt expansion may emit indecisive visual alternatives');
+    }
+    if (!systemPrompt.includes('role, genre, or rating label alone does not authorize')) {
+      throw new Error('Image prompt expansion may invent stereotypical or rating-shifting content');
+    }
+    if (!systemPrompt.includes('Add only details that support the requested scene')) {
+      throw new Error('Image prompt expansion is missing its anti-invention guard');
+    }
+    if (!systemPrompt.includes('subjects, objects, secondary actions, props, symbols, visible text')) {
+      throw new Error('Image prompt expansion may invent incidental scene content');
+    }
+    if (!systemPrompt.includes('Every tonal adjective and emotional-relationship claim')) {
+      throw new Error('Image prompt expansion may invent tonal or relationship framing');
+    }
+    if (!systemPrompt.includes('Never infer an emotional relationship merely from physical')) {
+      throw new Error('Image prompt expansion may infer unrequested emotional relationships');
+    }
+    if (!systemPrompt.includes('rather than evaluative, moralizing, decorum, or rating commentary')) {
+      throw new Error('Image prompt expansion may inject tone-washing commentary');
+    }
+    if (!systemPrompt.includes('Honor exclusions and boundaries')) {
+      throw new Error('Image prompt expansion may lose requested content boundaries');
+    }
+    if (!systemPrompt.includes('Include visible text, labels, signage, or slogans only')) {
+      throw new Error('Image prompt expansion may invent visible text');
+    }
+    if (!systemPrompt.includes("silently compare the result with the user's prompt")) {
+      throw new Error('Image prompt expansion is missing its final fidelity audit');
+    }
+    if (!systemPrompt.includes('Restore the user\'s literal content-bearing wording')) {
+      throw new Error('Image prompt expansion may retain softened or abstracted wording');
+    }
+    if (
+      systemPrompt.includes('dominatrix') ||
+      systemPrompt.includes('adult professional') ||
+      systemPrompt.includes('explicit adult') ||
+      systemPrompt.includes('family-friendly')
+    ) {
+      throw new Error('Image prompt expansion contains rating-specific priming');
+    }
+    const promptProperty = IMAGE_PROMPT_TOOL.function.parameters.properties.prompt;
+    const promptDescription = String(promptProperty.description);
+    if (!promptDescription.includes("user's requested audience, content boundaries, tone, genre")) {
+      throw new Error('Enhance-prompt tool schema is missing its rating-fidelity constraint');
+    }
+    if (!promptDescription.includes('Retain every content-bearing noun, verb, relationship')) {
+      throw new Error('Enhance-prompt tool schema is missing its concrete-detail rule');
+    }
+    if (!promptDescription.includes('without substitution, euphemism, escalation, sanitization')) {
+      throw new Error('Enhance-prompt tool schema is missing its anti-invention constraint');
+    }
+    if (!promptDescription.includes('Silently remove untraceable additions')) {
+      throw new Error('Enhance-prompt tool schema is missing its final fidelity check');
+    }
+    if (!promptDescription.includes('Never infer an emotional relationship from proximity')) {
+      throw new Error('Enhance-prompt tool schema may allow unrequested relationship framing');
+    }
+  })();
+
   await test('Should expose canonical MiniMax H3 video configurations', () => {
     const expected = {
       'minimax-h3-t2v': 'minimax-h3-fl2va-fp8_t2v',
@@ -129,6 +266,61 @@ async function runTests() {
       ) {
         throw new Error(`${selector} audio/negative-prompt capabilities are incorrect`);
       }
+    }
+
+    const turboExpected = {
+      'minimax-h3-t2v-turbo': 'minimax-h3-fl2va-fp8_t2v_turbo',
+      'minimax-h3-i2v-turbo': 'minimax-h3-fl2va-fp8_i2v_turbo',
+      'minimax-h3-flf2v-turbo': 'minimax-h3-fl2va-fp8_flf2v_turbo',
+    } as const;
+    for (const [selector, model] of Object.entries(turboExpected)) {
+      const config = getVideoModelConfig(selector as keyof typeof turboExpected);
+      if (config.model !== model) throw new Error(`${selector} mapped to ${config.model}`);
+      if (config.fps !== 24 || config.steps !== 4 || config.guidance !== 1) {
+        throw new Error(`${selector} sampling defaults do not match the Turbo contract`);
+      }
+      if (config.sampler !== undefined || config.scheduler !== 'simple') {
+        throw new Error(`${selector} must leave ER-SDE sampler selection to the worker graph`);
+      }
+      if (
+        config.nativeAudio !== true ||
+        config.supportsAudioToggle !== true ||
+        config.supportsNegativePrompt !== false
+      ) {
+        throw new Error(`${selector} audio/negative-prompt capabilities are incorrect`);
+      }
+    }
+  })();
+
+  await test('Should expose only real MiniMax H3 Turbo tools and video-only Ref2VA guidance', () => {
+    const generateParams = generateVideoDefinition.function.parameters.properties;
+    const generateModels = generateParams.videoModel.enum ?? [];
+    const animateModels = animatePhotoDefinition.function.parameters.properties.videoModel.enum ?? [];
+    if (!generateModels.includes('minimax-h3-t2v-turbo')) {
+      throw new Error('generate_video is missing MiniMax H3 T2V Turbo');
+    }
+    for (const selector of ['minimax-h3-i2v-turbo', 'minimax-h3-flf2v-turbo']) {
+      if (!animateModels.includes(selector)) {
+        throw new Error(`animate_photo is missing ${selector}`);
+      }
+    }
+    if (generateModels.includes('minimax-h3-r2v-turbo') || animateModels.includes('minimax-h3-r2v-turbo')) {
+      throw new Error('tool definitions expose nonexistent MiniMax H3 R2V Turbo');
+    }
+    const h3Docs = [
+      generateParams.videoModel.description,
+      generateParams.referenceImageIndices.description,
+      generateParams.referenceVideoIndices.description,
+      generateParams.referenceAudioIndices.description,
+    ].map((value) => String(value ?? '')).join('\n');
+    if (!h3Docs.includes('at least one visual reference (image or video)')) {
+      throw new Error('Ref2VA docs do not permit a video-only visual reference');
+    }
+    if (!h3Docs.includes('audio alone is invalid')) {
+      throw new Error('Ref2VA docs do not reject audio-only input');
+    }
+    if (/at least one image is required|supplement a required image/i.test(h3Docs)) {
+      throw new Error('Ref2VA docs still require an image instead of an image or video');
     }
   })();
 
@@ -1263,6 +1455,50 @@ async function runTests() {
     }
     if ('stylePrompt' in capturedParams) {
       throw new Error('stylePrompt should not be injected when omitted');
+    }
+  })();
+
+  await test('Should preserve the underlying project creation failure', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+    const sdkError = Object.assign(new Error('Target worker 474 cannot run this model'), {
+      code: 'WORKER_UNAVAILABLE',
+    });
+
+    (client as any).client = {
+      projects: {
+        create: async () => {
+          throw sdkError;
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    try {
+      await client.createProject({
+        type: 'video',
+        modelId: 'minimax-h3-ref2va-fp8_r2v',
+        positivePrompt: 'A reference-led test.',
+        numberOfMedia: 1,
+        waitForCompletion: false,
+      });
+      throw new Error('Expected project creation to fail');
+    } catch (error) {
+      if (!(error instanceof SogniError)) {
+        throw new Error('Expected a typed SogniError');
+      }
+      if (error.message !== sdkError.message) {
+        throw new Error(`Expected the SDK failure message, got: ${error.message}`);
+      }
+      if (error.originalError !== sdkError) {
+        throw new Error('Expected the original SDK error to remain attached');
+      }
     }
   })();
 

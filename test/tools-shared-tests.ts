@@ -94,6 +94,25 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
     getModelOptions('generate_image').map(option => option.key).includes('dark-beast-krea2'),
     true,
   );
+  const generateVideoModelKeys = getModelOptions('generate_video').map(option => option.key);
+  const animatePhotoModelKeys = getModelOptions('animate_photo').map(option => option.key);
+  expect(
+    'model registry: generate_video includes only the H3 T2V Turbo selector',
+    {
+      t2vTurbo: generateVideoModelKeys.includes('minimax-h3-t2v-turbo'),
+      r2vTurbo: generateVideoModelKeys.includes('minimax-h3-r2v-turbo'),
+    },
+    { t2vTurbo: true, r2vTurbo: false },
+  );
+  expect(
+    'model registry: animate_photo includes H3 I2V and FLF2V Turbo selectors',
+    {
+      i2vTurbo: animatePhotoModelKeys.includes('minimax-h3-i2v-turbo'),
+      flf2vTurbo: animatePhotoModelKeys.includes('minimax-h3-flf2v-turbo'),
+      r2vTurbo: animatePhotoModelKeys.includes('minimax-h3-r2v-turbo'),
+    },
+    { i2vTurbo: true, flf2vTurbo: true, r2vTurbo: false },
+  );
   const generateImageProperties = generateImageDefinition.function.parameters.properties ?? {};
   expect(
     'generate_image exposes ordered LoRA arrays',

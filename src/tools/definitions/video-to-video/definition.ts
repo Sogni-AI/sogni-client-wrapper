@@ -82,13 +82,13 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         negativePrompt: {
           type: "string",
           description:
-            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set when controlMode is seedance-v2v or videoModel is seedance2/seedance2-mini/seedance2-fast.",
+            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set when controlMode is seedance-v2v or videoModel is seedance2/seedance2-mini/seedance2-fast/seedance2-5.",
         },
         videoModel: {
           type: "string",
-          enum: ["ltx23-v2v", "wan22-animate", "seedance2", "seedance2-mini", "seedance2-fast"],
+          enum: ["ltx23-v2v", "wan22-animate", "seedance2", "seedance2-mini", "seedance2-fast", "seedance2-5"],
           description:
-            'Model selector for this video-to-video request. Usually omit; controlMode chooses the non-Seedance model. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts or explicit Mini requests, use "seedance2-fast" only when the user asks for Seedance Fast / seedance-fast, and use "seedance2" for full/non-fast Seedance or 1080p/4K. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro or from 480p/720p resolution requests alone.',
+            'Model selector for this video-to-video request. Usually omit; controlMode chooses the non-Seedance model. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts or explicit Mini requests, use "seedance2-fast" only when the user asks for Seedance Fast / seedance-fast, and use "seedance2" for full/non-fast Seedance or 1080p/4K. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro or from 480p/720p resolution requests alone. "seedance2-5": Seedance 2.5, the newest Seedance generation — 480p and 720p ONLY (it cannot render 1080p or 4K), 4-30s per clip at a fixed 24 fps, native audio, first-and-last-frame conditioning, and a much larger reference budget than the 2.0 family: up to 30 images, 10 videos, and 10 audios, with no more than 30 reference media files in total. Choose "seedance2-5" when the user asks for Seedance 2.5, wants a single continuous Seedance clip longer than 15s (2.5 renders up to 30s in one call instead of being split and stitched), or wants a first-and-last-frame Seedance transition. Keep "seedance2" for 1080p/4K requests, which Seedance 2.5 cannot satisfy.',
         },
         generateAudio: {
           type: "boolean",
@@ -125,9 +125,9 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         duration: {
           type: "number",
           description:
-            'Output video duration in seconds. Range: 2-20 for WAN/LTX modes and 4-15 for controlMode="seedance-v2v". If omitted, the tool matches the uploaded source video duration when available (capped to the selected model range); otherwise it falls back to 10s for WAN Animate Move/Replace and 5s for LTX-2.3/Seedance modes. For long stitched/bulk WAN Animate Move/Replace work with no explicit per-clip length, prefer about 10s clips rather than 5s chunks. Only pass this when the user explicitly requests a different length.',
+            'Output video duration in seconds. Range: 2-20 for WAN/LTX modes, 4-15 for controlMode="seedance-v2v" on seedance2/seedance2-mini/seedance2-fast, and 4-30 for controlMode="seedance-v2v" on seedance2-5. If omitted, the tool matches the uploaded source video duration when available (capped to the selected model range); otherwise it falls back to 10s for WAN Animate Move/Replace and 5s for LTX-2.3/Seedance modes. For long stitched/bulk WAN Animate Move/Replace work with no explicit per-clip length, prefer about 10s clips rather than 5s chunks. Only pass this when the user explicitly requests a different length.',
           minimum: 2,
-          maximum: 20,
+          maximum: 30,
         },
         numberOfVariations: {
           type: "number",

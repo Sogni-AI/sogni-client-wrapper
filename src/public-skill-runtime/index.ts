@@ -1739,7 +1739,10 @@ export const SEEDANCE_WORKFLOW_MODELS = Object.freeze({
   t2vMini: 'seedance-2-0-mini',
   t2vFast: 'seedance-2-0-fast',
   ia2v: 'seedance-2-0',
-  v2v: 'seedance-2-0'
+  v2v: 'seedance-2-0',
+  // Seedance 2.5 is a single canonical model id across every workflow it
+  // supports (t2v, i2v, flf2v, r2v, ia2v, v2v), like the 2.0 family.
+  t2v25: 'seedance-2-5'
 });
 
 // Alibaba HappyHorse 1.1 — three discrete vendor models (no mini/fast variants).
@@ -1961,6 +1964,22 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
     minFrames: 97,
     maxFrames: 361,
     supportsNativeAudio: true
+  },
+  // Seedance 2.5: 480p/720p only like Mini/Fast, but 4-30s instead of 4-15s,
+  // so maxFrames is 30 * 24 + 1 rather than 15 * 24 + 1.
+  [SEEDANCE_WORKFLOW_MODELS.t2v25]: {
+    workflow: 't2v',
+    family: 'seedance2',
+    defaultWidth: 1280,
+    defaultHeight: 720,
+    minDimension: 1,
+    maxDimension: 1280,
+    dimensionMultiple: 1,
+    fps: 24,
+    frameStep: 1,
+    minFrames: 97,
+    maxFrames: 721,
+    supportsNativeAudio: true
   }
 } satisfies Record<string, SkillVideoModelConfig>);
 
@@ -2028,7 +2047,11 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   'seedance2-fast': SEEDANCE_WORKFLOW_MODELS.t2vFast,
   'seedance2-fast-t2v': SEEDANCE_WORKFLOW_MODELS.t2vFast,
   'seedance2-ia2v': SEEDANCE_WORKFLOW_MODELS.ia2v,
-  'seedance2-v2v': SEEDANCE_WORKFLOW_MODELS.v2v
+  'seedance2-v2v': SEEDANCE_WORKFLOW_MODELS.v2v,
+  'seedance2-5': SEEDANCE_WORKFLOW_MODELS.t2v25,
+  'seedance2-5-t2v': SEEDANCE_WORKFLOW_MODELS.t2v25,
+  'seedance2-5-ia2v': SEEDANCE_WORKFLOW_MODELS.t2v25,
+  'seedance2-5-v2v': SEEDANCE_WORKFLOW_MODELS.t2v25
 } satisfies Record<string, string>);
 
 export const QUALITY_TIERS = Object.freeze({
@@ -2247,7 +2270,7 @@ export function promptExplicitlyDisablesSpeech(prompt: string | null | undefined
 }
 
 export function containsQuotedDialogue(prompt: string | null | undefined): boolean {
-  return /"[^"]{1,400}"/.test(prompt || '');
+  return extractQuotedDialogueSegments(prompt).length > 0;
 }
 
 export function promptMentionsSpeech(prompt: string | null | undefined): boolean {
@@ -2290,9 +2313,14 @@ export function normalizeScreenplayDialogueQuotes(
 
 export function extractQuotedDialogueSegments(prompt: string | null | undefined): string[] {
   const matches: string[] = [];
+  const taggedPattern = /<d>\s*(?:\[[^\]\r\n]{1,40}\]\s*)?([\s\S]{1,800}?)\s*<\/d>/gi;
+  const untaggedPrompt = String(prompt || '').replace(taggedPattern, (_block, dialogue: string) => {
+    matches.push(dialogue.trim());
+    return ' ';
+  });
   const pattern = /"([^"]{1,800})"/g;
   let match;
-  while ((match = pattern.exec(prompt || '')) !== null) {
+  while ((match = pattern.exec(untaggedPrompt)) !== null) {
     matches.push(match[1]);
   }
   return matches;
@@ -3678,7 +3706,7 @@ export interface StoryboardVideoHostedWorkflowBuildOptions {
   imageOutputFormat?: 'png' | 'jpg' | 'jpeg' | 'webp';
   imageWidth?: number;
   imageHeight?: number;
-  videoModel?: 'seedance2' | 'seedance2-mini' | 'seedance2-fast' | string;
+  videoModel?: 'seedance2' | 'seedance2-mini' | 'seedance2-fast' | 'seedance2-5' | string;
   videoDurationSec?: number;
   videoTargetResolution?: number;
   generateAudio?: boolean;

@@ -20,6 +20,8 @@ export * from './shared/seedancePolicyErrors.js';
 export * from './shared/happyhorsePolicyErrors.js';
 export {
   SEEDANCE_REFERENCE_LIMITS,
+  SEEDANCE_REFERENCE_LIMITS_BY_MODEL,
+  getSeedanceReferenceLimits,
   SeedanceReferenceLimitError,
   validateSeedanceReferenceCounts,
 } from './shared/seedanceReferences.js';

@@ -21,6 +21,7 @@ export type VideoModelId =
   | "seedance2"
   | "seedance2-mini"
   | "seedance2-fast"
+  | "seedance2-5"
   | "happyhorse-1.1-t2v"
   | "happyhorse-1.1-i2v"
   | "happyhorse-1.1-r2v";
@@ -298,6 +299,17 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     dimensionDivisor: 1,
     minDimension: 1,
     maxDimension: 1280,
+  },
+  // Seedance 2.5 is 480p/720p only (maxDimension 1280) but renders up to 30s
+  // per call, so its frame ceiling is double the 2.0 family's.
+  "seedance2-5": {
+    model: "seedance-2-5",
+    fps: 24,
+    dimensionDivisor: 1,
+    minDimension: 1,
+    maxDimension: 1280,
+    minFrames: 97,
+    maxFrames: 721,
   },
   // Alibaba HappyHorse 1.1 routes through Sogni Socket's vendor-job path to
   // Alibaba DashScope (Singapore). The socket re-derives ratio from

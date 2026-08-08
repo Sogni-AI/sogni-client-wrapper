@@ -51,6 +51,7 @@ import {
   getVideoPromptGuardrailPlan,
   getModelDefaults,
   inferStoryboardLayoutSpec,
+  resolveVideoModelAlias,
 } from '../src/public-skill-runtime/index.js';
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
@@ -1174,6 +1175,26 @@ async function runTests() {
     }
     if (supportsContextImages('sd-xl-base')) {
       throw new Error('SD-XL should not support context images');
+    }
+  })();
+
+  await test('public skill runtime exposes LTX 2.3 Eros routing requirements', () => {
+    const modelId = resolveVideoModelAlias('ltx23-eros', 'i2v');
+    if (modelId !== 'ltx23-22b-10eros-v1.4-fp8mixed_i2v') {
+      throw new Error(`Unexpected Eros model id: ${modelId}`);
+    }
+    const defaults = getModelDefaults(modelId);
+    if (!defaults) {
+      throw new Error('Expected LTX 2.3 Eros defaults');
+    }
+    if (defaults.workflow !== 'i2v' || defaults.steps !== 9 || defaults.guidance !== 1) {
+      throw new Error('Eros should use the i2v 9-step guidance=1 workflow');
+    }
+    if (defaults.sampler !== 'euler_ancestral' || defaults.scheduler !== 'manual_sigmas') {
+      throw new Error('Eros sampler defaults are incorrect');
+    }
+    if (defaults.minVramGB !== 30 || defaults.requiresDisabledSafetyFilter !== true) {
+      throw new Error('Eros runtime requirements are incorrect');
     }
   })();
 

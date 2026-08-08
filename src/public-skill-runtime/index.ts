@@ -36,6 +36,8 @@ export interface SkillVideoModelConfig {
   scheduler?: string;
   shift?: number;
   supportsNativeAudio?: boolean;
+  minVramGB?: number;
+  requiresDisabledSafetyFilter?: boolean;
 }
 
 export interface SkillModelDefaults {
@@ -57,6 +59,8 @@ export interface SkillModelDefaults {
   scheduler?: string;
   shift?: number;
   supportsNativeAudio?: boolean;
+  minVramGB?: number;
+  requiresDisabledSafetyFilter?: boolean;
 }
 
 interface SkillQualityTier {
@@ -1717,6 +1721,8 @@ export const LTX23_WORKFLOW_MODELS = Object.freeze({
   v2v: 'ltx23-22b-fp8_v2v_distilled'
 } satisfies Record<LtxWorkflow, string>);
 
+export const LTX23_EROS_MODEL_ID = 'ltx23-22b-10eros-v1.4-fp8mixed_i2v';
+
 export const LTX23_DEV_WORKFLOW_MODELS = Object.freeze({
   t2v: 'ltx23-22b-fp8_t2v_dev',
   i2v: 'ltx23-22b-fp8_i2v_dev',
@@ -1790,6 +1796,26 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
     sampler: 'euler_ancestral',
     scheduler: 'simple',
     supportsNativeAudio: true
+  },
+  [LTX23_EROS_MODEL_ID]: {
+    workflow: 'i2v',
+    family: 'ltx23',
+    defaultWidth: 1920,
+    defaultHeight: 1088,
+    minDimension: 640,
+    maxDimension: 2048,
+    dimensionMultiple: 64,
+    steps: 9,
+    guidance: 1.0,
+    fps: 24,
+    frameStep: 8,
+    minFrames: 25,
+    maxFrames: 505,
+    sampler: 'euler_ancestral',
+    scheduler: 'manual_sigmas',
+    supportsNativeAudio: true,
+    minVramGB: 30,
+    requiresDisabledSafetyFilter: true
   },
   [LTX23_WORKFLOW_MODELS.ia2v]: {
     workflow: 'ia2v',
@@ -2034,6 +2060,8 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   'ltx23-ia2v': LTX23_WORKFLOW_MODELS.ia2v,
   'ltx23-a2v': LTX23_WORKFLOW_MODELS.a2v,
   'ltx23-v2v': LTX23_WORKFLOW_MODELS.v2v,
+  'ltx23-eros': LTX23_EROS_MODEL_ID,
+  '10eros': LTX23_EROS_MODEL_ID,
   wan22: 'wan_v2.2-14b-fp8_t2v_lightx2v',
   'wan22-t2v': 'wan_v2.2-14b-fp8_t2v_lightx2v',
   'wan22-i2v': 'wan_v2.2-14b-fp8_i2v_lightx2v',

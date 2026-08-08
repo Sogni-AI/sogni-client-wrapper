@@ -1370,8 +1370,16 @@ export class SogniClientWrapper extends EventEmitter {
     return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
   }
 
+  // Every Seedance generation shares the fixed-24fps / mp4 vendor envelope, so
+  // this must match the whole family — `seedance-2-0*` AND `seedance-2-5*`.
+  // Anchoring it to 'seedance-2-0' silently dropped 2.5 out of the fps forcing,
+  // the frame math, and the duration bounds below.
   private isSeedanceModel(modelId: string): boolean {
-    return modelId.startsWith('seedance-2-0');
+    return modelId.startsWith('seedance-2-');
+  }
+
+  private isSeedance25Model(modelId: string): boolean {
+    return modelId.startsWith('seedance-2-5');
   }
 
   private isHappyHorseModel(modelId: string): boolean {
@@ -1380,7 +1388,8 @@ export class SogniClientWrapper extends EventEmitter {
 
   private getVideoDurationBounds(modelId: string): { min: number; max: number } {
     if (this.isSeedanceModel(modelId)) {
-      return { min: 4, max: 15 };
+      // Seedance 2.5 renders up to 30s in a single call; the 2.0 family stops at 15s.
+      return { min: 4, max: this.isSeedance25Model(modelId) ? 30 : 15 };
     }
     if (this.isHappyHorseModel(modelId)) {
       return { min: 3, max: 15 };

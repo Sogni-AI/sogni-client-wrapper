@@ -2154,8 +2154,12 @@ export function isWanModel(modelId: string | null | undefined): boolean {
   return modelId?.startsWith('wan_') || false;
 }
 
+// Matches the whole Seedance family — `seedance-2-0*` AND `seedance-2-5*`.
+// Anchoring this to 'seedance-2-0' made isSeedanceModelSelection() false for an
+// explicit Seedance 2.5 selection, which discarded the storyboard plan, and made
+// inferDefaultVideoSteps() hand a step count to an external-API vendor model.
 export function isSeedanceModel(modelId: string | null | undefined): boolean {
-  return modelId?.startsWith('seedance-2-0') || false;
+  return modelId?.startsWith('seedance-2-') || false;
 }
 
 export function isHappyHorseModel(modelId: string | null | undefined): boolean {

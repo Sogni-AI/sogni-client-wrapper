@@ -10,6 +10,10 @@ import type {
   AudioProjectConfig,
 } from '../types/index.js';
 import { SogniValidationError } from './errors.js';
+import {
+  SEEDANCE_REFERENCE_LIMITS,
+  SEEDANCE_REFERENCE_LIMITS_BY_MODEL,
+} from '../tools/shared/seedanceReferences.js';
 
 /**
  * Generate a unique app ID. Uses the universal `globalThis.crypto`
@@ -53,8 +57,20 @@ export function isLtxVideoModel(modelId: string): boolean {
   return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
 }
 
+/**
+ * True for every Seedance generation (`seedance-2-0*` and `seedance-2-5*`).
+ * The whole family shares the fixed-24fps / mp4 vendor envelope; only the
+ * duration ceiling and the reference caps differ, and those are branched on
+ * `isSeedance25VideoModel` at the point of use. Anchoring this predicate to
+ * 'seedance-2-0' silently skipped ALL Seedance validation for 2.5.
+ */
 export function isSeedanceVideoModel(modelId: string): boolean {
-  return modelId.startsWith('seedance-2-0');
+  return modelId.startsWith('seedance-2-');
+}
+
+/** Seedance 2.5 renders 4-30s and carries the larger 30/10/10/30 reference budget. */
+export function isSeedance25VideoModel(modelId: string): boolean {
+  return modelId.startsWith('seedance-2-5');
 }
 
 export function isHappyHorseVideoModel(modelId: string): boolean {
@@ -361,9 +377,22 @@ export function validateProjectConfig(config: ProjectConfig): void {
         throw new SogniValidationError('Seedance video models require fps to be 24');
       }
 
+      // Seedance 2.5 renders 4-30s and accepts 30 images / 10 videos / 10 audios
+      // (30 total); the 2.0 family renders 4-15s and accepts 9 / 3 / 3 (12 total).
+      // Caps are read from the protocol catalog rather than re-hard-coded here.
+      const isSeedance25 = isSeedance25VideoModel(config.modelId);
+      const maxSeedanceDuration = isSeedance25 ? 30 : 15;
+      const seedanceLimitsKey = SEEDANCE_REFERENCE_LIMITS_BY_MODEL[config.modelId]
+        ? config.modelId
+        : (isSeedance25 ? 'seedance-2-5' : 'seedance-2-0');
+      const seedanceLimits =
+        SEEDANCE_REFERENCE_LIMITS_BY_MODEL[seedanceLimitsKey] ?? SEEDANCE_REFERENCE_LIMITS;
+
       if (config.duration !== undefined) {
-        if (typeof config.duration !== 'number' || config.duration < 4 || config.duration > 15) {
-          throw new SogniValidationError('Seedance video duration must be between 4 and 15 seconds');
+        if (typeof config.duration !== 'number' || config.duration < 4 || config.duration > maxSeedanceDuration) {
+          throw new SogniValidationError(
+            `Seedance video duration must be between 4 and ${maxSeedanceDuration} seconds`
+          );
         }
       }
 
@@ -377,17 +406,17 @@ export function validateProjectConfig(config: ProjectConfig): void {
         (config.referenceAudioIdentity ? 1 : 0) +
         referenceAudioUrls.length;
 
-      if (imageAssetCount > 9) {
-        throw new SogniValidationError('Seedance supports at most 9 image assets per request');
+      if (imageAssetCount > seedanceLimits.images) {
+        throw new SogniValidationError(`Seedance supports at most ${seedanceLimits.images} image assets per request`);
       }
-      if (videoAssetCount > 3) {
-        throw new SogniValidationError('Seedance supports at most 3 video assets per request');
+      if (videoAssetCount > seedanceLimits.videos) {
+        throw new SogniValidationError(`Seedance supports at most ${seedanceLimits.videos} video assets per request`);
       }
-      if (audioAssetCount > 3) {
-        throw new SogniValidationError('Seedance supports at most 3 audio assets per request');
+      if (audioAssetCount > seedanceLimits.audios) {
+        throw new SogniValidationError(`Seedance supports at most ${seedanceLimits.audios} audio assets per request`);
       }
-      if (imageAssetCount + videoAssetCount + audioAssetCount > 12) {
-        throw new SogniValidationError('Seedance supports at most 12 total assets per request');
+      if (imageAssetCount + videoAssetCount + audioAssetCount > seedanceLimits.assets) {
+        throw new SogniValidationError(`Seedance supports at most ${seedanceLimits.assets} total assets per request`);
       }
 
       if (referenceAudioUrls.length > 0 && imageAssetCount === 0 && videoAssetCount === 0) {

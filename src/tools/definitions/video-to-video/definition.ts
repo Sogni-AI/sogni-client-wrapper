@@ -98,7 +98,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         targetResolution: {
           type: "number",
           description:
-            'Seedance V2V only. Short-side output resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact dimensions. For Seedance V2V Mini/Fast, 480p and 720p are supported; preserve the source video shape instead of forcing landscape pixels.',
+            'Seedance V2V only. Short-side output resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact dimensions. Seedance V2V full supports 4K; Seedance V2V Mini, Fast, and Seedance 2.5 support 480p and 720p only, so never set 1080p or 4K for "seedance2-5". Preserve the source video shape instead of forcing landscape pixels.',
         },
         sourceImageIndex: {
           type: "number",

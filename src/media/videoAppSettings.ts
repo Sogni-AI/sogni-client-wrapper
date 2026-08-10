@@ -19,6 +19,7 @@ export enum I2VModel {
 
 export enum AnimateMoveModel {
   speed = 'wan_v2.2-14b-fp8_animate-move_lightx2v',
+  animate2 = 'wan_animate_2-14b-distill-int8-convrot_animate-move',
 }
 
 export enum AnimateReplaceModel {

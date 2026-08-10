@@ -19,7 +19,7 @@ type LtxWorkflow = 't2v' | 'i2v' | 'ia2v' | 'a2v' | 'v2v';
 
 export interface SkillVideoModelConfig {
   workflow: SkillVideoWorkflow;
-  family: 'ltx23' | 'ltx2' | 'wan22' | 'seedance2';
+  family: 'ltx23' | 'ltx2' | 'wan22' | 'wan-animate2' | 'seedance2';
   defaultWidth: number;
   defaultHeight: number;
   minDimension: number;
@@ -42,7 +42,7 @@ export interface SkillVideoModelConfig {
 
 export interface SkillModelDefaults {
   workflow?: SkillVideoWorkflow;
-  family?: 'ltx23' | 'ltx2' | 'wan22' | 'seedance2' | 'krea2-identity-edit';
+  family?: 'ltx23' | 'ltx2' | 'wan22' | 'wan-animate2' | 'seedance2' | 'krea2-identity-edit';
   defaultWidth?: number;
   defaultHeight?: number;
   minDimension?: number;
@@ -1944,6 +1944,27 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
     scheduler: 'simple',
     shift: 8.0
   },
+  'wan_animate_2-14b-distill-int8-convrot_animate-move': {
+    workflow: 'animate-move',
+    family: 'wan-animate2',
+    defaultWidth: 1280,
+    defaultHeight: 720,
+    minDimension: 480,
+    maxDimension: 1280,
+    dimensionMultiple: 16,
+    steps: 10,
+    guidance: 1.0,
+    fps: 24,
+    internalFps: 24,
+    frameStep: 4,
+    minFrames: 17,
+    maxFrames: 81,
+    sampler: 'euler',
+    scheduler: 'simple',
+    shift: 5.0,
+    supportsNativeAudio: true,
+    minVramGB: 32
+  },
   'wan_v2.2-14b-fp8_animate-replace_lightx2v': {
     workflow: 'animate-replace',
     family: 'wan22',
@@ -2068,6 +2089,8 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   'wan22-s2v': 'wan_v2.2-14b-fp8_s2v_lightx2v',
   'wan22-animate-move': 'wan_v2.2-14b-fp8_animate-move_lightx2v',
   'wan22-animate-replace': 'wan_v2.2-14b-fp8_animate-replace_lightx2v',
+  'wan-animate-2': 'wan_animate_2-14b-distill-int8-convrot_animate-move',
+  'wan-animate2': 'wan_animate_2-14b-distill-int8-convrot_animate-move',
   seedance2: SEEDANCE_WORKFLOW_MODELS.t2v,
   'seedance2-t2v': SEEDANCE_WORKFLOW_MODELS.t2v,
   'seedance2-mini': SEEDANCE_WORKFLOW_MODELS.t2vMini,

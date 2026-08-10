@@ -1198,6 +1198,43 @@ async function runTests() {
     }
   })();
 
+  await test('public skill runtime exposes Wan Animate 2 as an additive model', () => {
+    const modelId = resolveVideoModelAlias('wan-animate-2', 'animate-move');
+    if (modelId !== 'wan_animate_2-14b-distill-int8-convrot_animate-move') {
+      throw new Error(`Unexpected Wan Animate 2 model id: ${modelId}`);
+    }
+    const defaults = getModelDefaults(modelId);
+    if (!defaults) throw new Error('Expected Wan Animate 2 defaults');
+    if (
+      defaults.workflow !== 'animate-move' ||
+      defaults.defaultWidth !== 1280 ||
+      defaults.defaultHeight !== 720 ||
+      defaults.steps !== 10 ||
+      defaults.fps !== 24 ||
+      defaults.maxFrames !== 81 ||
+      defaults.sampler !== 'euler' ||
+      defaults.shift !== 5 ||
+      defaults.minVramGB !== 32
+    ) {
+      throw new Error('Wan Animate 2 runtime defaults are incorrect');
+    }
+    const properties = videoToVideoDefinition.function.parameters.properties;
+    const selectors = properties.videoModel.enum ?? [];
+    if (!selectors.includes('wan-animate-2')) {
+      throw new Error('video_to_video is missing the wan-animate-2 selector');
+    }
+    for (const property of [
+      'posePrompt',
+      'poseStrength',
+      'poseStartPercent',
+      'poseEndPercent',
+      'referenceImageStrength',
+      'enableContextWindow',
+    ]) {
+      if (!properties[property]) throw new Error(`video_to_video is missing ${property}`);
+    }
+  })();
+
   await test('public skill runtime exposes Krea identity edit defaults and refs', () => {
     const defaults = getModelDefaults('krea2_identity_edit_v1_2');
     if (!defaults) {

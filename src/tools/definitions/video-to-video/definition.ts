@@ -1,6 +1,6 @@
 /**
  * Tool definition for video_to_video.
- * Based on workflow_video_to_video.mjs — WAN 2.2 Animate + LTX-2.3 V2V ControlNet.
+ * WAN Animate 2 / WAN 2.2 Animate + LTX-2.3 V2V ControlNet.
  */
 
 import type { ToolDefinition } from '../types.js';
@@ -15,7 +15,7 @@ export const definition: ToolDefinition = {
   function: {
     name: "video_to_video",
     description:
-      'Transform an existing video using AI. Uses WAN 2.2 Animate (move/replace) with a reference image to animate a photo with the video\'s motion or swap the video\'s subject, LTX-2.3 V2V ControlNet (canny/pose/depth/detailer) for video-only transforms, LTX-2.3 outpaint to extend/expand the video canvas (e.g. make a vertical clip widescreen) or inpaint to regenerate a masked region of the video, or Seedance V2V when the user explicitly asks to transform, upscale, enhance, restyle, or remaster an uploaded video with Seedance. Requires an uploaded video file. Use when the user wants to animate a photo with video motion, replace subjects in a video, restyle an existing video, extend or expand a video frame, regenerate part of a video, or enhance video quality.',
+      'Transform an existing video using AI. Supports Wan Animate 2 raw-video motion transfer with retained source audio, WAN 2.2 Animate move/replace, LTX-2.3 V2V ControlNet/outpaint/inpaint, and explicit Seedance V2V. Requires an uploaded video file. Wan Animate 2 uses the source video directly without DWPose or SAM2 preprocessing and requires a reference image.',
     parameters: {
       type: "object",
       properties: {
@@ -86,9 +86,41 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         },
         videoModel: {
           type: "string",
-          enum: ["ltx23-v2v", "wan22-animate", "seedance2", "seedance2-mini", "seedance2-fast", "seedance2-5"],
+          enum: ["ltx23-v2v", "wan22-animate", "wan-animate-2", "seedance2", "seedance2-mini", "seedance2-fast", "seedance2-5"],
           description:
-            'Model selector for this video-to-video request. Usually omit; controlMode chooses the non-Seedance model. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts or explicit Mini requests, use "seedance2-fast" only when the user asks for Seedance Fast / seedance-fast, and use "seedance2" for full/non-fast Seedance or 1080p/4K. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro or from 480p/720p resolution requests alone. "seedance2-5": Seedance 2.5, the newest Seedance generation — 480p and 720p ONLY (it cannot render 1080p or 4K), 4-30s per clip at a fixed 24 fps, native audio, first-and-last-frame conditioning, and a much larger reference budget than the 2.0 family: up to 30 images, 10 videos, and 10 audios, with no more than 30 reference media files in total. Choose "seedance2-5" when the user asks for Seedance 2.5, wants a single continuous Seedance clip longer than 15s (2.5 renders up to 30s in one call instead of being split and stitched), or wants a first-and-last-frame Seedance transition. Keep "seedance2" for 1080p/4K requests, which Seedance 2.5 cannot satisfy.',
+            'Model selector for this video-to-video request. Usually omit to keep the established model for the chosen controlMode. Set "wan-animate-2" only for explicit Wan Animate 2 requests with controlMode="animate-move"; it is fixed at 24fps, supports at most 81 frames, retains the source audio, and does not support animate-replace. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts or explicit Mini requests, use "seedance2-fast" only when the user asks for Seedance Fast / seedance-fast, and use "seedance2" for full/non-fast Seedance or 1080p/4K. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro or from 480p/720p resolution requests alone. "seedance2-5": Seedance 2.5, the newest Seedance generation — 480p and 720p ONLY (it cannot render 1080p or 4K), 4-30s per clip at a fixed 24 fps, native audio, first-and-last-frame conditioning, and a much larger reference budget than the 2.0 family: up to 30 images, 10 videos, and 10 audios, with no more than 30 reference media files in total. Choose "seedance2-5" when the user asks for Seedance 2.5, wants a single continuous Seedance clip longer than 15s (2.5 renders up to 30s in one call instead of being split and stitched), or wants a first-and-last-frame Seedance transition. Keep "seedance2" for 1080p/4K requests, which Seedance 2.5 cannot satisfy.',
+        },
+        posePrompt: {
+          type: "string",
+          description: "Wan Animate 2 only. Optional pose/camera-motion conditioning prompt, separate from the target appearance prompt.",
+        },
+        poseStrength: {
+          type: "number",
+          minimum: 0,
+          maximum: 10,
+          description: "Wan Animate 2 only. Driving-video pose conditioning strength. Default: 1.",
+        },
+        poseStartPercent: {
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+          description: "Wan Animate 2 only. Sampling fraction where pose conditioning starts. Default: 0.",
+        },
+        poseEndPercent: {
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+          description: "Wan Animate 2 only. Sampling fraction where pose conditioning ends. Must be at least poseStartPercent. Default: 1.",
+        },
+        referenceImageStrength: {
+          type: "number",
+          minimum: 0,
+          maximum: 10,
+          description: "Wan Animate 2 only. Reference-image identity conditioning strength. Default: 1.",
+        },
+        enableContextWindow: {
+          type: "boolean",
+          description: "Wan Animate 2 only. Enable the official optional 21-frame/8-overlap temporal context-window path. Default: false; leave disabled for the full-sequence release-quality recipe.",
         },
         generateAudio: {
           type: "boolean",

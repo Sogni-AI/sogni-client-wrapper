@@ -5320,7 +5320,10 @@ function extractStoryboardRequiredText(text: string): string[] {
 
   const labeledTextPattern = /\b(?:on[-\s]?screen\s+text|visible\s+text|text\s+only|text|end\s+card\s+text|final\s+text|tagline|cta|headline|title\s+card|copy)\s*:\s*([^\n]{1,260})/gi;
   for (const match of text.matchAll(labeledTextPattern)) {
-    const value = match[1] || '';
+    // In markdown storyboard tables, the next pipe ends the visible-text
+    // cell. Do not scan quoted Dialogue/VO or Audio/SFX from later cells as
+    // though it were a continuation of `Text:` in the visual cell.
+    const value = (match[1] || '').split('|')[0];
     const matchStartInText = match.index ?? 0;
     const lineStart = text.lastIndexOf('\n', matchStartInText) + 1;
     const valueStartInMatch = match[0].indexOf(value);
@@ -6138,7 +6141,7 @@ function splitStoryboardSceneSections(text: string): Array<{ number: number; hea
   // The decoration class accepts repeated combinations of bullet,
   // heading, blockquote, and emphasis markers separated by spaces.
   const matches = Array.from(text.matchAll(
-    /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})\b\s*(?:[-:.)|]\s*)?([^\n]*)/gim,
+    /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*_?\s*(\d{1,2})\b\s*(?:[-:.)|]\s*)?([^\n]*)/gim,
   ));
   if (matches.length === 0) return [];
 
@@ -6211,7 +6214,7 @@ function splitStoryboardNumberedListSceneSections(text: string): Array<{ number:
 }
 
 function splitStoryboardInlineSceneSections(text: string): Array<{ number: number; heading: string; body: string }> {
-  const markerPattern = /(^|[\s.;])((?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})(?:\s*,\s*(?:Scene|Shot|Beat|Panel|Frame)\s*\d{1,2})?\s*(?:\([^)]{0,120}\))?\s*(?:[:\-–—]\s*)?)/gi;
+  const markerPattern = /(^|[\s.;])((?:Scene|Shot|Beat|Panel|Frame)\s*_?\s*(\d{1,2})(?:\s*,\s*(?:Scene|Shot|Beat|Panel|Frame)\s*_?\s*\d{1,2})?\s*(?:\([^)]{0,120}\))?\s*(?:[:\-–—]\s*)?)/gi;
   const matches = Array.from(text.matchAll(markerPattern))
     .map(match => {
       const leading = match[1] || '';
@@ -7480,7 +7483,7 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
       if (Number.isInteger(value) && value >= 1 && value <= 64) numbersSeen.add(value);
     }
     for (const match of text.matchAll(
-      /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*(\d{1,2})\b/gim,
+      /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*_?\s*(\d{1,2})\b/gim,
     )) {
       const value = Number(match[1]);
       if (Number.isInteger(value) && value >= 1 && value <= 64) numbersSeen.add(value);

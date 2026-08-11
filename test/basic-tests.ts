@@ -2442,6 +2442,59 @@ async function runTests() {
     }
   })();
 
+  await test('Should compile canonical SCENE_01 storyboard sections', () => {
+    const brief = [
+      'Create exactly 3 sequential video storyboard frames as one composite storyboard image.',
+      'Target duration: 9 seconds.',
+      '',
+      'SCENES:',
+      'SCENE_01 - OPENING HOOK',
+      'Visual/Action: A courier races into a neon workshop carrying a sealed product case.',
+      'Camera/Motion: Wide tracking shot with a fast push-in.',
+      'Dialogue/VO: COURIER: "It is here."',
+      'Audio/SFX: Footsteps, door slam, rising synth.',
+      '',
+      'SCENE_02 - REVEAL',
+      'Visual/Action: The case opens and a glowing device rises above the workbench.',
+      'Camera/Motion: Macro insert followed by a slow orbit.',
+      'Dialogue/VO: ENGINEER: "Right on time."',
+      'Audio/SFX: Magnetic latch, electric shimmer.',
+      '',
+      'SCENE_03 - END CARD',
+      'Visual/Action: The device locks into a clean hero composition beside the brand mark.',
+      'Camera/Motion: Static hero hold.',
+      'Dialogue/VO: [no dialogue]',
+      'Audio/SFX: Final musical resolve.',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: brief,
+      userIntentText: 'Create a polished 9 second three-scene product storyboard image.',
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    if (project.scenes.length !== 3) {
+      throw new Error(`Expected 3 SCENE_ sections, got ${project.scenes.length}`);
+    }
+    if (!project.scenes[0].visual.includes('courier races')) {
+      throw new Error(`SCENE_01 visual was not preserved: ${project.scenes[0].visual}`);
+    }
+    if (!project.scenes[1].dialogue.includes('Right on time')) {
+      throw new Error(`SCENE_02 dialogue was not preserved: ${project.scenes[1].dialogue}`);
+    }
+
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: brief,
+      userIntentText: 'Create a polished 9 second three-scene product storyboard image.',
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    const audit = auditCompiledStoryboardImagePrompt({ prompt, expectedFrameCount: 3 });
+    if (!audit.ok) {
+      throw new Error(`SCENE_ storyboard audit failed: ${audit.fatalIssues.map(issue => issue.code).join(', ')}`);
+    }
+  })();
+
   await test('Should synthesize storyboard scenes from plain narration scripts', () => {
     const brief = [
       'Create one finished GPT Image 2 storyboard sheet image now using all six uploaded assets as visual references.',
@@ -2872,6 +2925,34 @@ async function runTests() {
     }
     if (!prompt.includes('Required exact visible text: "Sogni.ai"')) {
       throw new Error('Visible product label was not preserved');
+    }
+  })();
+
+  await test('Should stop visible-text parsing at markdown table cell boundaries', () => {
+    const assistantDraft = [
+      '| Beat | Time | Visual / Action | Camera | Dialogue/VO | Audio/SFX |',
+      '| :--- | :--- | :--- | :--- | :--- | :--- |',
+      '| 1 | 0s-3s | Product hero. Text: "Sogni.ai". Subtext: "Create anything." | Static hold. | "Powered by the people." | "Music swells." |',
+    ].join('\n');
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: 'Create a one-panel product storyboard.',
+      approvedScriptContext: assistantDraft,
+      frameCount: 1,
+      promptAuthorship: 'assistant',
+    });
+
+    if (!prompt.includes('Required exact visible text: "Sogni.ai"')) {
+      throw new Error('Visible brand text was not preserved');
+    }
+    if (!prompt.includes('Required exact visible text: "Create anything."')) {
+      throw new Error('Visible subtext was not preserved');
+    }
+    if (prompt.includes('Required exact visible text: "Powered by the people."')) {
+      throw new Error('Dialogue/VO leaked across the table boundary into visible text');
+    }
+    if (prompt.includes('Required exact visible text: "Music swells."')) {
+      throw new Error('Audio/SFX leaked across the table boundary into visible text');
     }
   })();
 

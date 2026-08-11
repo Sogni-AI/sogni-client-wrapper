@@ -254,13 +254,27 @@ function validateObjectAgainstSchema(
 
   for (const [name, entryValue] of Object.entries(value)) {
     if (entryValue === undefined || entryValue === null) {
-      if (name in properties || !context.stripUnknownProperties) cleaned[name] = entryValue;
+      if (
+        name in properties
+        || schema.additionalProperties === true
+        || isRecord(schema.additionalProperties)
+        || (schema.additionalProperties !== false && !context.stripUnknownProperties)
+      ) {
+        cleaned[name] = entryValue;
+      }
       continue;
     }
 
     const property = properties[name];
     if (!property) {
-      if (schema.additionalProperties === false || context.stripUnknownProperties) {
+      // An explicit JSON-Schema additionalProperties policy owns this object.
+      // The host-level stripUnknownProperties fallback applies only when the
+      // schema is silent. Otherwise an intentionally open payload such as
+      // compose_workflow_template.existing_template is reduced to `{}`.
+      if (
+        schema.additionalProperties === false
+        || (schema.additionalProperties === undefined && context.stripUnknownProperties)
+      ) {
         context.warnings.push(`Stripped unknown argument "${path ? `${path}.` : ''}${name}"`);
       } else if (isRecord(schema.additionalProperties)) {
         cleaned[name] = validateValueAgainstSchema(

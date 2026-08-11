@@ -145,6 +145,46 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
   );
   expect('generate_image accepts ordered bipolar LoRA strengths', bipolarLoras.ok, true);
 
+  const openNestedPayload = {
+    id: 'wf_existing',
+    version: 7,
+    stages: [{ id: 'storyboard', tool: 'generate_image' }],
+    nullableNote: null,
+  };
+  const openNestedResult = validateAndNormalizeHostedToolArguments(
+    [{
+      function: {
+        name: 'compose_workflow_template',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            brief: { type: 'string' },
+            existing_template: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+      },
+    }],
+    'compose_workflow_template',
+    {
+      brief: 'Change the saved template to portrait.',
+      existing_template: openNestedPayload,
+      invented_top_level_field: 'strip me',
+    },
+    { stripUnknownProperties: true },
+  );
+  expect(
+    'hosted validation preserves explicitly open nested objects while stripping closed parent fields',
+    openNestedResult.cleaned,
+    {
+      brief: 'Change the saved template to portrait.',
+      existing_template: openNestedPayload,
+    },
+  );
+
   // maybeAlignNumberOfVariationsToDynamicBranchCount
   expect(
     'align: generate_image with 2-branch + N=1 aligns to N=2',

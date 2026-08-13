@@ -53,6 +53,7 @@ export type KnownAssetModelId =
   | 'seedance'
   | 'happyhorse'
   | 'ltx23'
+  | 'ltx25'
   | 'gpt-image-2'
   | 'wan'
   | 'qwen-image-edit'

@@ -51,12 +51,17 @@ import {
   getVideoPromptGuardrailPlan,
   getModelDefaults,
   inferStoryboardLayoutSpec,
+  LTX25_DEV_WORKFLOW_MODELS as RUNTIME_LTX25_DEV_WORKFLOW_MODELS,
+  LTX25_WORKFLOW_MODELS as RUNTIME_LTX25_WORKFLOW_MODELS,
   resolveVideoModelAlias,
+  selectDefaultVideoModel,
 } from '../src/public-skill-runtime/index.js';
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
   animatePhotoDefinition,
+  extendVideoDefinition,
   generateVideoDefinition,
+  replaceVideoSegmentDefinition,
   soundToVideoDefinition,
   videoToVideoDefinition,
   collapseSingleSourceFanOutToDynamicPromptVariations,
@@ -65,6 +70,7 @@ import {
   SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE,
   SEEDANCE_STYLIZE_RECOVERY_OPTIONS,
 } from '../src/tools/index.js';
+import { GENERATION_TOOLS_MANIFEST } from '../src/openai-tools/index.js';
 import {
   PROMPT_CONTRACTS,
   IMAGE_PROMPT_TOOL,
@@ -76,8 +82,15 @@ import {
   buildImageEditExecutionControls,
   calculateVideoDimensions,
   calculateVideoFrames,
+  DEFAULT_VIDEO_MODEL,
   getVideoModelConfig,
+  getLtx25ModelNameForQuality,
+  getLtx25StepsForQuality,
+  getLtx25WorkflowModelIdForQuality,
   isKreaIdentityEditModel,
+  LTX2VideoModels,
+  LTX25_DEV_WORKFLOW_MODELS,
+  LTX25_DISTILLED_WORKFLOW_MODELS,
   resolveImageEditModelForProfile,
 } from '../src/media/index.js';
 import { SogniClient } from '@sogni-ai/sogni-client';
@@ -113,6 +126,145 @@ async function runTests() {
     if (!SogniError) throw new Error('SogniError not imported');
     if (!ClientEvent) throw new Error('ClientEvent not imported');
     if (!generateAppId) throw new Error('generateAppId not imported');
+  })();
+
+  await test('Should expose the canonical LTX 2.5 quality and workflow contract', () => {
+    if (DEFAULT_VIDEO_MODEL !== 'ltx25') throw new Error(`Unexpected default video model: ${DEFAULT_VIDEO_MODEL}`);
+    for (const workflow of ['t2v', 'i2v', 'a2v', 'ia2v', 'v2v'] as const) {
+      if (getLtx25WorkflowModelIdForQuality(workflow, 'fast') !== LTX25_DISTILLED_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`Fast ${workflow} did not resolve to the LTX 2.5 distilled model`);
+      }
+      if (getLtx25WorkflowModelIdForQuality(workflow, 'hq') !== LTX25_DISTILLED_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`HQ ${workflow} did not resolve to the LTX 2.5 distilled model`);
+      }
+      if (getLtx25WorkflowModelIdForQuality(workflow, 'pro') !== LTX25_DEV_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`Pro ${workflow} did not resolve to the LTX 2.5 Dev model`);
+      }
+    }
+    if (getLtx25StepsForQuality('fast') !== 8 || getLtx25StepsForQuality('pro') !== 30) {
+      throw new Error('LTX 2.5 quality step defaults are incorrect');
+    }
+    if (!getLtx25ModelNameForQuality('I2V', 'pro').includes('Speed LoRA')) {
+      throw new Error('LTX 2.5 Pro name must describe the required Speed LoRA path');
+    }
+    if (getVideoModelConfig('ltx25', 'pro').model !== LTX25_DEV_WORKFLOW_MODELS.i2v) {
+      throw new Error('LTX 2.5 Pro selector did not resolve to Dev I2V');
+    }
+    for (const modelId of [
+      'ltx25',
+      LTX25_DISTILLED_WORKFLOW_MODELS.i2v,
+      LTX25_DISTILLED_WORKFLOW_MODELS.ia2v,
+      LTX25_DEV_WORKFLOW_MODELS.i2v,
+      LTX25_DEV_WORKFLOW_MODELS.ia2v,
+    ] as const) {
+      if (getVideoModelConfig(modelId).strength !== 0.7) {
+        throw new Error(`Official LTX 2.5 image-guide strength is wrong for ${modelId}`);
+      }
+    }
+    for (const modelId of [...Object.values(LTX25_DISTILLED_WORKFLOW_MODELS), ...Object.values(LTX25_DEV_WORKFLOW_MODELS)]) {
+      const config = getVideoModelConfig(modelId);
+      if (config.sampler !== 'euler_ancestral' || config.scheduler !== 'manual_sigmas') {
+        throw new Error(`Official LTX 2.5 sampler contract is wrong for ${modelId}`);
+      }
+      if (config.supportsNegativePrompt !== true) {
+        throw new Error(`LTX 2.5 negative-prompt capability is missing for ${modelId}`);
+      }
+    }
+    if (getVideoModelConfig('ltx25').supportsNegativePrompt !== true) {
+      throw new Error('LTX 2.5 selector must expose negative-prompt support');
+    }
+    if (!soundToVideoDefinition.function.parameters.properties.negativePrompt) {
+      throw new Error('LTX 2.5 A2V/IA2V tool contract must expose a separate negative prompt');
+    }
+  })();
+
+  await test('Should keep generated video manifests aligned with LTX 2.5 source definitions', () => {
+    const sourceDefinitions = [
+      generateVideoDefinition,
+      animatePhotoDefinition,
+      soundToVideoDefinition,
+      videoToVideoDefinition,
+      extendVideoDefinition,
+      replaceVideoSegmentDefinition,
+    ];
+    const generatedByName = new Map(
+      GENERATION_TOOLS_MANIFEST.tools.map((definition) => [definition.function.name, definition]),
+    );
+    for (const source of sourceDefinitions) {
+      const generated = generatedByName.get(source.function.name);
+      if (!generated) throw new Error(`Generated manifest is missing ${source.function.name}`);
+      const sourceModel = source.function.parameters.properties.videoModel;
+      const generatedModel = generated.function.parameters.properties.videoModel;
+      if (
+        !generated.function.description.includes('LTX 2.5') &&
+        !generatedModel?.description?.includes('LTX 2.5')
+      ) {
+        throw new Error(`Generated ${source.function.name} descriptions are still missing the LTX 2.5 contract`);
+      }
+      if (sourceModel?.enum && JSON.stringify(generatedModel?.enum) !== JSON.stringify(sourceModel.enum)) {
+        throw new Error(`Generated ${source.function.name} model enum drifted from its source definition`);
+      }
+      if (
+        sourceModel?.enum?.includes('ltx25') &&
+        !generatedModel?.description?.includes('ltx25') &&
+        !generatedModel?.description?.includes('LTX 2.5')
+      ) {
+        throw new Error(`Generated ${source.function.name} model description still points at an older default`);
+      }
+    }
+  })();
+
+  await test('Should place LTX 2.5 first while preserving LTX 2.3 rollback model arrays', () => {
+    if (LTX2VideoModels.speedT2V[0] !== LTX25_DISTILLED_WORKFLOW_MODELS.t2v) {
+      throw new Error('LTX 2.5 distilled T2V is not first in the speed model list');
+    }
+    if (!LTX2VideoModels.speedT2V.some(modelId => modelId.startsWith('ltx23-'))) {
+      throw new Error('LTX 2.3 speed rollback model is missing');
+    }
+    if (LTX2VideoModels.qualityI2V[0] !== LTX25_DEV_WORKFLOW_MODELS.i2v) {
+      throw new Error('LTX 2.5 Dev I2V is not first in the quality model list');
+    }
+    if (LTX2VideoModels.speedV2V[0] !== LTX25_DISTILLED_WORKFLOW_MODELS.v2v ||
+        LTX2VideoModels.qualityV2V[0] !== LTX25_DEV_WORKFLOW_MODELS.v2v) {
+      throw new Error('LTX 2.5 V2V models are not first in the speed/quality arrays');
+    }
+    if (!LTX2VideoModels.speedV2V.some(modelId => modelId.startsWith('ltx23-'))) {
+      throw new Error('LTX 2.3 V2V rollback model is missing');
+    }
+  })();
+
+  await test('Should resolve public runtime LTX 2.5 aliases, defaults, and exact IDs', () => {
+    for (const workflow of ['t2v', 'i2v', 'a2v', 'ia2v', 'v2v'] as const) {
+      if (resolveVideoModelAlias('ltx25', workflow) !== RUNTIME_LTX25_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`Runtime ltx25 alias failed for ${workflow}`);
+      }
+      if (selectDefaultVideoModel(workflow, { quality: 'pro' }) !== RUNTIME_LTX25_DEV_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`Runtime LTX 2.5 Pro default failed for ${workflow}`);
+      }
+      const fastDefaults = getModelDefaults(RUNTIME_LTX25_WORKFLOW_MODELS[workflow]);
+      const proDefaults = getModelDefaults(RUNTIME_LTX25_DEV_WORKFLOW_MODELS[workflow]);
+      if (fastDefaults?.family !== 'ltx25' || fastDefaults.steps !== 8) {
+        throw new Error(`Runtime distilled defaults failed for ${workflow}`);
+      }
+      if (proDefaults?.family !== 'ltx25' || proDefaults.steps !== 30) {
+        throw new Error(`Runtime Dev defaults failed for ${workflow}`);
+      }
+    }
+    if (resolveVideoModelAlias('ltx25-v2v', 'v2v') !== RUNTIME_LTX25_WORKFLOW_MODELS.v2v) {
+      throw new Error('ltx25-v2v alias did not resolve to distilled V2V');
+    }
+  })();
+
+  await test('Should require a reference image for LTX pose controls', () => {
+    const v2v = videoToVideoDefinition.function.parameters.properties;
+    const poseDescription = String(v2v.controlMode?.description || '');
+    const sourceImageDescription = String(v2v.sourceImageIndex?.description || '');
+    if (!poseDescription.includes('pose') || !poseDescription.includes('Requires sourceImageIndex')) {
+      throw new Error('video_to_video pose guidance does not require a reference image');
+    }
+    if (!sourceImageDescription.includes('LTX pose always dispatches both the source video and a reference image')) {
+      throw new Error('sourceImageIndex guidance does not preserve the LTX pose two-input contract');
+    }
   })();
 
   await test('Should recognize MiniMax H3 tagged dialogue as exact spoken words', () => {
@@ -2278,7 +2430,7 @@ async function runTests() {
     if (!animateContract.baseDescription.includes('Do not include orchestration labels')) {
       throw new Error('animate_photo prompt contract must forbid orchestration labels in prompt-only takes');
     }
-    if (!animateContract.baseDescription.includes('For videoModel="wan22" and "ltx23", the prompt field is the positive prompt')) {
+    if (!animateContract.baseDescription.includes('For videoModel="wan22", "ltx25", and "ltx23", the prompt field is the positive prompt')) {
       throw new Error('animate_photo prompt contract must require positive prompts for WAN/LTX');
     }
     if (!animateContract.baseDescription.includes('Preserve exact quoted visible text or dialogue')) {

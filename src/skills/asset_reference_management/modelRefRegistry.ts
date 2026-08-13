@@ -151,6 +151,7 @@ const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
   happyhorse: HAPPYHORSE_FORMAT,
   'gpt-image-2': GPT_IMAGE_2_FORMAT,
   ltx23: CONTEXT_FORMAT,
+  ltx25: CONTEXT_FORMAT,
   wan: CONTEXT_FORMAT,
   'qwen-image-edit': CONTEXT_FORMAT,
   'krea-identity-edit': CONTEXT_FORMAT,
@@ -180,6 +181,7 @@ function resolveContextModelRefId(modelId: string): KnownAssetModelId | null {
   ) {
     return 'krea-identity-edit';
   }
+  if (modelId.startsWith('ltx25')) return 'ltx25';
   if (modelId.startsWith('ltx')) return 'ltx23';
   return null;
 }

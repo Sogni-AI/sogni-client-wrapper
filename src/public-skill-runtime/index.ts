@@ -16,10 +16,11 @@ import {
 import { normalizeSignalSource } from '../contracts/turnPolicy.js';
 
 type LtxWorkflow = 't2v' | 'i2v' | 'ia2v' | 'a2v' | 'v2v';
+type Ltx25Workflow = LtxWorkflow;
 
 export interface SkillVideoModelConfig {
   workflow: SkillVideoWorkflow;
-  family: 'ltx23' | 'ltx2' | 'wan22' | 'seedance2';
+  family: 'ltx25' | 'ltx23' | 'ltx2' | 'wan22' | 'seedance2';
   defaultWidth: number;
   defaultHeight: number;
   minDimension: number;
@@ -42,7 +43,7 @@ export interface SkillVideoModelConfig {
 
 export interface SkillModelDefaults {
   workflow?: SkillVideoWorkflow;
-  family?: 'ltx23' | 'ltx2' | 'wan22' | 'seedance2' | 'krea2-identity-edit';
+  family?: 'ltx25' | 'ltx23' | 'ltx2' | 'wan22' | 'seedance2' | 'krea2-identity-edit';
   defaultWidth?: number;
   defaultHeight?: number;
   minDimension?: number;
@@ -1498,6 +1499,29 @@ const PUBLIC_GPT_IMAGE_2_ADAPTER: PublicStoryboardAdapter = {
   },
 };
 
+const PUBLIC_LTX25_ADAPTER: PublicStoryboardAdapter = {
+  modelId: 'ltx25',
+  name: 'LTX 2.5',
+  supportedStages: ['scene_clip'],
+  compile(storyboard, input) {
+    if (input.stage !== 'scene_clip') throw new StoryboardAdapterUnsupportedStageError('ltx25', input.stage);
+    const scene = requireStoryboardScene('LTX25_ADAPTER', input);
+    const referenceTag = input.primaryReferenceTag ?? 'context_image_0';
+    return {
+      stage: 'scene_clip',
+      prompt: compactSceneVideoPrompt(storyboard, scene, referenceTag),
+      args: {
+        videoModel: 'ltx25',
+        duration: clampSeedanceStoryboardDuration(scene.durationSec ?? 5),
+        aspectRatio: storyboard.targetVideoAspectRatio,
+      },
+    };
+  },
+  getSystemPromptGuidance() {
+    return 'LTX 2.5 VIDEO PROMPTING: For image-to-video, describe motion, action, camera, dialogue, and sound not already obvious in the reference frame. Keep recurring character names and visual anchors stable across scenes. Use LTX 2.3 only for explicit rollback or its ID-LoRA/transition/10Eros-only paths.';
+  },
+};
+
 const PUBLIC_LTX23_ADAPTER: PublicStoryboardAdapter = {
   modelId: 'ltx23',
   name: 'LTX-2.3',
@@ -1549,6 +1573,7 @@ const PUBLIC_WAN_ADAPTER: PublicStoryboardAdapter = {
 const PUBLIC_STORYBOARD_ADAPTERS = [
   PUBLIC_SEEDANCE_ADAPTER,
   PUBLIC_GPT_IMAGE_2_ADAPTER,
+  PUBLIC_LTX25_ADAPTER,
   PUBLIC_LTX23_ADAPTER,
   PUBLIC_WAN_ADAPTER,
 ];
@@ -1609,7 +1634,9 @@ export const storyboardAdapterRegistry: StoryboardAdapterRegistryLike = {
     if (exact) return exact;
     if (trimmed.startsWith('seedance')) return PUBLIC_SEEDANCE_ADAPTER;
     if (trimmed.startsWith('gpt-image')) return PUBLIC_GPT_IMAGE_2_ADAPTER;
-    if (trimmed.startsWith('ltx')) return PUBLIC_LTX23_ADAPTER;
+    if (trimmed.startsWith('ltx25')) return PUBLIC_LTX25_ADAPTER;
+    if (trimmed.startsWith('ltx23') || trimmed.startsWith('ltx2-')) return PUBLIC_LTX23_ADAPTER;
+    if (trimmed.startsWith('ltx')) return PUBLIC_LTX25_ADAPTER;
     if (trimmed.startsWith('wan')) return PUBLIC_WAN_ADAPTER;
     return null;
   },
@@ -1729,6 +1756,31 @@ export const LTX23_DEV_WORKFLOW_MODELS = Object.freeze({
   ia2v: 'ltx23-22b-fp8_ia2v_dev',
   a2v: 'ltx23-22b-fp8_a2v_dev'
 } satisfies Record<Exclude<LtxWorkflow, 'v2v'>, string>);
+
+export const LTX25_WORKFLOW_MODELS = Object.freeze({
+  t2v: 'ltx25-22b-int8_t2v_distilled',
+  i2v: 'ltx25-22b-int8_i2v_distilled',
+  ia2v: 'ltx25-22b-int8_ia2v_distilled',
+  a2v: 'ltx25-22b-int8_a2v_distilled',
+  v2v: 'ltx25-22b-int8_v2v_distilled'
+} satisfies Record<Ltx25Workflow, string>);
+
+export const LTX25_DEV_WORKFLOW_MODELS = Object.freeze({
+  t2v: 'ltx25-22b-int8_t2v_dev',
+  i2v: 'ltx25-22b-int8_i2v_dev',
+  ia2v: 'ltx25-22b-int8_ia2v_dev',
+  a2v: 'ltx25-22b-int8_a2v_dev',
+  v2v: 'ltx25-22b-int8_v2v_dev'
+} satisfies Record<Ltx25Workflow, string>);
+
+export function resolveLtx25WorkflowModelForQuality(
+  workflow: Ltx25Workflow,
+  qualityTier: string | null | undefined,
+): string {
+  return qualityTier === 'pro'
+    ? LTX25_DEV_WORKFLOW_MODELS[workflow]
+    : LTX25_WORKFLOW_MODELS[workflow];
+}
 
 export function resolveLtx23WorkflowModelForQuality(
   workflow: LtxWorkflow,
@@ -2011,6 +2063,29 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
 
 export const EXPANDED_VIDEO_MODEL_REGISTRY = (() => {
   const registry: Record<string, SkillVideoModelConfig> = { ...VIDEO_MODEL_REGISTRY };
+  for (const workflow of ['t2v', 'i2v', 'ia2v', 'a2v', 'v2v'] as const) {
+    const base = registry[LTX23_WORKFLOW_MODELS[workflow]];
+    if (!base) continue;
+    const ltx25Base = {
+      ...base,
+      family: 'ltx25' as const,
+      maxDimension: 3840,
+      fps: 24,
+      sampler: 'euler_ancestral',
+      scheduler: 'manual_sigmas',
+      supportsNativeAudio: true
+    };
+    registry[LTX25_WORKFLOW_MODELS[workflow]] = {
+      ...ltx25Base,
+      steps: 8,
+      guidance: 1.0
+    };
+    registry[LTX25_DEV_WORKFLOW_MODELS[workflow]] = {
+      ...ltx25Base,
+      steps: 30,
+      guidance: 3.0
+    };
+  }
   for (const workflow of ['t2v', 'i2v', 'ia2v', 'a2v'] as const) {
     const base = registry[LTX23_WORKFLOW_MODELS[workflow]];
     if (!base) continue;
@@ -2043,17 +2118,23 @@ export const EXPANDED_VIDEO_MODEL_REGISTRY = (() => {
 })();
 
 export const VIDEO_WORKFLOW_DEFAULT_MODELS = Object.freeze({
-  t2v: LTX23_WORKFLOW_MODELS.t2v,
-  i2v: 'wan_v2.2-14b-fp8_i2v_lightx2v',
+  t2v: LTX25_WORKFLOW_MODELS.t2v,
+  i2v: LTX25_WORKFLOW_MODELS.i2v,
   s2v: 'wan_v2.2-14b-fp8_s2v_lightx2v',
-  ia2v: LTX23_WORKFLOW_MODELS.ia2v,
-  a2v: LTX23_WORKFLOW_MODELS.a2v,
+  ia2v: LTX25_WORKFLOW_MODELS.ia2v,
+  a2v: LTX25_WORKFLOW_MODELS.a2v,
   'animate-move': 'wan_v2.2-14b-fp8_animate-move_lightx2v',
   'animate-replace': 'wan_v2.2-14b-fp8_animate-replace_lightx2v',
-  v2v: LTX23_WORKFLOW_MODELS.v2v
+  v2v: LTX25_WORKFLOW_MODELS.v2v
 } satisfies Record<SkillVideoWorkflow, string>);
 
 export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  ltx25: LTX25_WORKFLOW_MODELS.t2v,
+  'ltx25-t2v': LTX25_WORKFLOW_MODELS.t2v,
+  'ltx25-i2v': LTX25_WORKFLOW_MODELS.i2v,
+  'ltx25-ia2v': LTX25_WORKFLOW_MODELS.ia2v,
+  'ltx25-a2v': LTX25_WORKFLOW_MODELS.a2v,
+  'ltx25-v2v': LTX25_WORKFLOW_MODELS.v2v,
   ltx23: LTX23_WORKFLOW_MODELS.t2v,
   'ltx23-t2v': LTX23_WORKFLOW_MODELS.t2v,
   'ltx23-i2v': LTX23_WORKFLOW_MODELS.i2v,
@@ -2147,7 +2228,7 @@ export const IMAGE_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
 });
 
 export function isLtx2Model(modelId: string | null | undefined): boolean {
-  return modelId?.startsWith('ltx2-') || modelId?.startsWith('ltx23-') || false;
+  return modelId?.startsWith('ltx2-') || modelId?.startsWith('ltx23-') || modelId?.startsWith('ltx25-') || false;
 }
 
 export function isWanModel(modelId: string | null | undefined): boolean {
@@ -2180,6 +2261,11 @@ export function resolveVideoModelAlias(
 ): string | null | undefined {
   if (!modelId) return modelId;
   const key = String(modelId).trim().toLowerCase();
+  if (key === 'ltx25') {
+    if (workflow && isLtxWorkflow(workflow)) {
+      return LTX25_WORKFLOW_MODELS[workflow];
+    }
+  }
   if (key === 'ltx23' && isLtxWorkflow(workflow)) {
     return LTX23_WORKFLOW_MODELS[workflow];
   }
@@ -2214,6 +2300,9 @@ export function getBuiltinVideoModelConfig(
   if (!workflow) return null;
   if (id.startsWith('ltx23-') && isLtxWorkflow(workflow)) {
     return EXPANDED_VIDEO_MODEL_REGISTRY[LTX23_WORKFLOW_MODELS[workflow]] || null;
+  }
+  if (id.startsWith('ltx25-') && isLtxWorkflow(workflow)) {
+    return EXPANDED_VIDEO_MODEL_REGISTRY[LTX25_WORKFLOW_MODELS[workflow]] || null;
   }
   if (id.startsWith('ltx2-')) {
     return {
@@ -2512,12 +2601,12 @@ export function selectDefaultVideoModel(
   if (!workflow) return null;
   const configured = config?.videoModels?.[workflow];
   if (configured) return resolveVideoModelAlias(configured, workflow) || null;
-  if (workflow === 'ia2v') return resolveLtx23WorkflowModelForQuality('ia2v', opts.quality);
-  if (workflow === 'a2v') return resolveLtx23WorkflowModelForQuality('a2v', opts.quality);
-  if (workflow === 'v2v') return LTX23_WORKFLOW_MODELS.v2v;
-  if (workflow === 't2v') return resolveLtx23WorkflowModelForQuality('t2v', opts.quality);
+  if (workflow === 'ia2v') return resolveLtx25WorkflowModelForQuality('ia2v', opts.quality);
+  if (workflow === 'a2v') return resolveLtx25WorkflowModelForQuality('a2v', opts.quality);
+  if (workflow === 'v2v') return resolveLtx25WorkflowModelForQuality('v2v', opts.quality);
+  if (workflow === 't2v') return resolveLtx25WorkflowModelForQuality('t2v', opts.quality);
   if (workflow === 'i2v' && (opts.referenceAudioIdentity || promptNeedsLtxNativeAudio(opts.prompt) || opts.quality === 'hq' || opts.quality === 'pro')) {
-    return resolveLtx23WorkflowModelForQuality('i2v', opts.quality);
+    return resolveLtx25WorkflowModelForQuality('i2v', opts.quality);
   }
   return VIDEO_WORKFLOW_DEFAULT_MODELS[workflow] || null;
 }

@@ -1,5 +1,5 @@
 /**
- * Video Generation Settings -- Dual Model Support (WAN 2.2 + LTX 2.3)
+ * Video Generation Settings
  */
 
 import { parseAspectRatio } from "./imageDimensions.js";
@@ -11,6 +11,8 @@ import { parseAspectRatio } from "./imageDimensions.js";
 export type VideoModelId =
   | "wan22"
   | "ltx23"
+  | "ltx25"
+  | Ltx25ConcreteModelId
   | "minimax-h3-t2v"
   | "minimax-h3-i2v"
   | "minimax-h3-flf2v"
@@ -27,6 +29,18 @@ export type VideoModelId =
   | "happyhorse-1.1-r2v";
 export type VideoQualityTier = "fast" | "hq" | "pro";
 export type Ltx23Workflow = "t2v" | "i2v" | "a2v" | "ia2v";
+export type Ltx25Workflow = "t2v" | "i2v" | "a2v" | "ia2v" | "v2v";
+export type Ltx25ConcreteModelId =
+  | "ltx25-22b-int8_t2v_distilled"
+  | "ltx25-22b-int8_i2v_distilled"
+  | "ltx25-22b-int8_a2v_distilled"
+  | "ltx25-22b-int8_ia2v_distilled"
+  | "ltx25-22b-int8_t2v_dev"
+  | "ltx25-22b-int8_i2v_dev"
+  | "ltx25-22b-int8_a2v_dev"
+  | "ltx25-22b-int8_ia2v_dev"
+  | "ltx25-22b-int8_v2v_distilled"
+  | "ltx25-22b-int8_v2v_dev";
 
 export interface VideoModelConfig {
   model: string;
@@ -106,6 +120,46 @@ export function getLtx23StepsForQuality(
   return qualityTier === "pro" ? 20 : 8;
 }
 
+export const LTX25_DISTILLED_WORKFLOW_MODELS: Record<Ltx25Workflow, Ltx25ConcreteModelId> = {
+  t2v: "ltx25-22b-int8_t2v_distilled",
+  i2v: "ltx25-22b-int8_i2v_distilled",
+  a2v: "ltx25-22b-int8_a2v_distilled",
+  ia2v: "ltx25-22b-int8_ia2v_distilled",
+  v2v: "ltx25-22b-int8_v2v_distilled",
+};
+
+export const LTX25_DEV_WORKFLOW_MODELS: Record<Ltx25Workflow, Ltx25ConcreteModelId> = {
+  t2v: "ltx25-22b-int8_t2v_dev",
+  i2v: "ltx25-22b-int8_i2v_dev",
+  a2v: "ltx25-22b-int8_a2v_dev",
+  ia2v: "ltx25-22b-int8_ia2v_dev",
+  v2v: "ltx25-22b-int8_v2v_dev",
+};
+
+export function getLtx25WorkflowModelIdForQuality(
+  workflow: Ltx25Workflow,
+  qualityTier: VideoQualityTier | undefined = "fast",
+): Ltx25ConcreteModelId {
+  return qualityTier === "pro"
+    ? LTX25_DEV_WORKFLOW_MODELS[workflow]
+    : LTX25_DISTILLED_WORKFLOW_MODELS[workflow];
+}
+
+export function getLtx25ModelNameForQuality(
+  workflowName: string,
+  qualityTier: VideoQualityTier | undefined = "fast",
+): string {
+  return qualityTier === "pro"
+    ? `LTX 2.5 22B ${workflowName} Dev + Speed LoRA`
+    : `LTX 2.5 22B ${workflowName} Distilled`;
+}
+
+export function getLtx25StepsForQuality(
+  qualityTier: VideoQualityTier | undefined = "fast",
+): number {
+  return qualityTier === "pro" ? 30 : 8;
+}
+
 export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
   wan22: {
     model: "wan_v2.2-14b-fp8_i2v_lightx2v",
@@ -133,6 +187,189 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     strength: 0.9,
     resolutionTiers: [1088, 768],
     resolutionThreshold: 720,
+  },
+  ltx25: {
+    model: LTX25_DISTILLED_WORKFLOW_MODELS.i2v,
+    fps: 24,
+    steps: getLtx25StepsForQuality("fast"),
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.7,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_t2v_distilled": {
+    model: LTX25_DISTILLED_WORKFLOW_MODELS.t2v,
+    fps: 24,
+    steps: 8,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_i2v_distilled": {
+    model: LTX25_DISTILLED_WORKFLOW_MODELS.i2v,
+    fps: 24,
+    steps: 8,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.7,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_a2v_distilled": {
+    model: LTX25_DISTILLED_WORKFLOW_MODELS.a2v,
+    fps: 24,
+    steps: 8,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_ia2v_distilled": {
+    model: LTX25_DISTILLED_WORKFLOW_MODELS.ia2v,
+    fps: 24,
+    steps: 8,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.7,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_t2v_dev": {
+    model: LTX25_DEV_WORKFLOW_MODELS.t2v,
+    fps: 24,
+    steps: 30,
+    guidance: 3.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_i2v_dev": {
+    model: LTX25_DEV_WORKFLOW_MODELS.i2v,
+    fps: 24,
+    steps: 30,
+    guidance: 3.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.7,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_a2v_dev": {
+    model: LTX25_DEV_WORKFLOW_MODELS.a2v,
+    fps: 24,
+    steps: 30,
+    guidance: 3.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_ia2v_dev": {
+    model: LTX25_DEV_WORKFLOW_MODELS.ia2v,
+    fps: 24,
+    steps: 30,
+    guidance: 3.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.7,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_v2v_distilled": {
+    model: LTX25_DISTILLED_WORKFLOW_MODELS.v2v,
+    fps: 24,
+    steps: 8,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.85,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
+  },
+  "ltx25-22b-int8_v2v_dev": {
+    model: LTX25_DEV_WORKFLOW_MODELS.v2v,
+    fps: 24,
+    steps: 30,
+    guidance: 3.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: "euler_ancestral",
+    scheduler: "manual_sigmas",
+    strength: 0.85,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: true,
   },
   "minimax-h3-t2v": {
     model: "minimax-h3-fl2va-fp8_t2v",
@@ -458,7 +695,7 @@ export function getHappyHorseModelSettings(
 }
 
 /** Switch this to change the default video model everywhere */
-export const DEFAULT_VIDEO_MODEL: VideoModelId = "ltx23";
+export const DEFAULT_VIDEO_MODEL: VideoModelId = "ltx25";
 
 // ============================================================================
 // Derived Convenience Exports (use default model)
@@ -469,6 +706,14 @@ export function getVideoModelConfig(
   qualityTier: VideoQualityTier | undefined = "fast",
 ): VideoModelConfig {
   const config = VIDEO_MODEL_CONFIGS[modelId];
+  if (modelId === "ltx25") {
+    return {
+      ...config,
+      model: getLtx25WorkflowModelIdForQuality("i2v", qualityTier),
+      steps: getLtx25StepsForQuality(qualityTier),
+      guidance: qualityTier === "pro" ? 3.0 : 1.0,
+    };
+  }
   if (modelId !== "ltx23") return config;
   return {
     ...config,

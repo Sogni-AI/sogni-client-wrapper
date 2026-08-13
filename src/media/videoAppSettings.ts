@@ -1,4 +1,6 @@
 import {
+  LTX25_DEV_WORKFLOW_MODELS,
+  LTX25_DISTILLED_WORKFLOW_MODELS,
   LTX23_DEV_MODEL_IDS,
   LTX23_DISTILLED_MODEL_IDS,
 } from './videoSettings.js';
@@ -26,16 +28,16 @@ export enum AnimateReplaceModel {
 }
 
 export const LTX2VideoModels = {
-  speedA2V: [LTX23_DISTILLED_MODEL_IDS.a2v, 'ltx2-19b-fp8_a2v_distilled'],
-  speedIA2V: [LTX23_DISTILLED_MODEL_IDS.ia2v, 'ltx2-19b-fp8_ia2v_distilled'],
-  speedI2V: [LTX23_DISTILLED_MODEL_IDS.i2v, 'ltx2-19b-fp8_i2v_distilled'],
-  speedT2V: [LTX23_DISTILLED_MODEL_IDS.t2v, 'ltx2-19b-fp8_t2v_distilled'],
-  speedV2V: ['ltx2-19b-fp8_v2v_distilled'],
-  qualityA2V: [LTX23_DEV_MODEL_IDS.a2v],
-  qualityIA2V: [LTX23_DEV_MODEL_IDS.ia2v],
-  qualityI2V: [LTX23_DEV_MODEL_IDS.i2v, 'ltx2-19b-fp8_i2v'],
-  qualityT2V: [LTX23_DEV_MODEL_IDS.t2v, 'ltx2-19b-fp8_t2v'],
-  qualityV2V: ['ltx2-19b-fp8_v2v'],
+  speedA2V: [LTX25_DISTILLED_WORKFLOW_MODELS.a2v, LTX23_DISTILLED_MODEL_IDS.a2v, 'ltx2-19b-fp8_a2v_distilled'],
+  speedIA2V: [LTX25_DISTILLED_WORKFLOW_MODELS.ia2v, LTX23_DISTILLED_MODEL_IDS.ia2v, 'ltx2-19b-fp8_ia2v_distilled'],
+  speedI2V: [LTX25_DISTILLED_WORKFLOW_MODELS.i2v, LTX23_DISTILLED_MODEL_IDS.i2v, 'ltx2-19b-fp8_i2v_distilled'],
+  speedT2V: [LTX25_DISTILLED_WORKFLOW_MODELS.t2v, LTX23_DISTILLED_MODEL_IDS.t2v, 'ltx2-19b-fp8_t2v_distilled'],
+  speedV2V: [LTX25_DISTILLED_WORKFLOW_MODELS.v2v, 'ltx23-22b-fp8_v2v_distilled', 'ltx2-19b-fp8_v2v_distilled'],
+  qualityA2V: [LTX25_DEV_WORKFLOW_MODELS.a2v, LTX23_DEV_MODEL_IDS.a2v],
+  qualityIA2V: [LTX25_DEV_WORKFLOW_MODELS.ia2v, LTX23_DEV_MODEL_IDS.ia2v],
+  qualityI2V: [LTX25_DEV_WORKFLOW_MODELS.i2v, LTX23_DEV_MODEL_IDS.i2v, 'ltx2-19b-fp8_i2v'],
+  qualityT2V: [LTX25_DEV_WORKFLOW_MODELS.t2v, LTX23_DEV_MODEL_IDS.t2v, 'ltx2-19b-fp8_t2v'],
+  qualityV2V: [LTX25_DEV_WORKFLOW_MODELS.v2v, 'ltx23-22b-fp8_v2v_dev', 'ltx2-19b-fp8_v2v'],
 } as const;
 
 export interface DurationRange {

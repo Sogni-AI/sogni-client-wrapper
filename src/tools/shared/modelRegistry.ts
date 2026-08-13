@@ -74,6 +74,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
   refine_result: QUALITY_TIER_MODELS,
   change_angle: QUALITY_ONLY_MODELS,
   generate_video: [
+    { key: 'ltx25', displayName: 'LTX 2.5 22B' },
     { key: 'ltx23', displayName: 'LTX 2.3 22B' },
     { key: 'wan22', displayName: 'WAN 2.2 14B' },
     { key: 'seedance2', displayName: 'Seedance 2.0' },
@@ -88,6 +89,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'happyhorse-1.1-r2v', displayName: 'HappyHorse 1.1 (Reference to Video)' },
   ],
   animate_photo: [
+    { key: 'ltx25', displayName: 'LTX 2.5 22B' },
     { key: 'ltx23', displayName: 'LTX 2.3 22B' },
     { key: 'wan22', displayName: 'WAN 2.2 14B' },
     { key: 'minimax-h3-i2v', displayName: 'MiniMax H3 (Image to Video)' },
@@ -101,8 +103,19 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini Image+Audio' },
     { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast Image+Audio' },
     { key: 'seedance2-5', displayName: 'Seedance 2.5 Image+Audio' },
+    { key: 'ltx25-ia2v', displayName: 'LTX 2.5 Image+Audio' },
+    { key: 'ltx25-a2v', displayName: 'LTX 2.5 Audio Only' },
     { key: 'ltx23-ia2v', displayName: 'LTX 2.3 Image+Audio' },
     { key: 'ltx23-a2v', displayName: 'LTX 2.3 Audio Only' },
+  ],
+  video_to_video: [
+    { key: 'ltx25-v2v', displayName: 'LTX 2.5 V2V Control' },
+    { key: 'ltx23-v2v', displayName: 'LTX 2.3 V2V Control' },
+    { key: 'wan22-animate', displayName: 'WAN 2.2 Animate' },
+    { key: 'seedance2', displayName: 'Seedance 2.0' },
+    { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
+    { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast' },
+    { key: 'seedance2-5', displayName: 'Seedance 2.5' },
   ],
   generate_music: [
     { key: 'turbo', displayName: 'ACE-Step 1.5 Turbo' },
@@ -118,7 +131,7 @@ const QUALITY_ARG_TOOLS = [
   'change_angle',
 ];
 
-const VIDEO_MODEL_ARG_TOOLS = ['generate_video', 'animate_photo', 'sound_to_video'];
+const VIDEO_MODEL_ARG_TOOLS = ['generate_video', 'animate_photo', 'sound_to_video', 'video_to_video'];
 
 /**
  * Get the model arg key name used by a given tool.

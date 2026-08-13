@@ -17,7 +17,7 @@ export const definition: ToolDefinition = {
     name: 'extend_video',
     description:
       'Extend a video by adding new time to the end. Works on BOTH videos previously rendered in this session AND user-uploaded videos — set videoIndex to a negative number (e.g. -1) to target an uploaded video when no prior render exists. The base video is auto-selected from the most recent video in this session unless videoIndex is set. ' +
-      'For LTX-2.3 base clips, the tool extracts the last frame and renders an image-to-video continuation. ' +
+      'For LTX 2.5/2.3 base clips, the tool extracts the last frame and renders an image-to-video continuation; new non-Seedance continuations default to LTX 2.5. ' +
       'For Seedance base clips, the tool extracts a trailing reference segment and renders a video-to-video continuation. ' +
       'Returns both the standalone new segment and a spliced composite (base + new segment).' +
       ' Use when the user asks to "make it longer", "extend the video", "add another N seconds", "continue the scene", "add an outro/bumper to the end", etc.' +
@@ -49,10 +49,9 @@ export const definition: ToolDefinition = {
         },
         videoModel: {
           type: 'string',
-          enum: ['auto', 'ltx23', 'seedance2', 'seedance2-mini', 'seedance2-fast', 'seedance2-5'],
+          enum: ['auto', 'ltx25', 'ltx23', 'seedance2', 'seedance2-mini', 'seedance2-fast', 'seedance2-5'],
           description:
-            'Which model to use for the new segment. Default: "auto" — detect from the base video\'s producer (Seedance base → Seedance, otherwise LTX-2.3). ' +
-            'Override only when the user explicitly requests a different model.',
+            'Which model to use for the new segment. Default: "auto" — preserve Seedance for a Seedance base and otherwise use LTX 2.5. Use ltx23 only for explicit rollback. Override only when the user explicitly requests a different model.',
         },
         keepOriginalAudio: {
           type: 'boolean',

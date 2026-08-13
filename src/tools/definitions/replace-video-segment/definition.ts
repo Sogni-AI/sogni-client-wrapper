@@ -12,7 +12,7 @@
  * to preserve the existing audio.
  *
  * Model dispatch:
- *   - LTX-2.3 / Wan 2.2 base → extract boundary frames, render animate_photo
+ *   - LTX 2.5/2.3 / Wan 2.2 base → extract boundary frames, render animate_photo
  *     with both as keyframes (frameRole="both"), trim handles when needed.
  *   - Seedance base → extract a reference clip around the requested window,
  *     render video_to_video (controlMode="seedance-v2v"), trim handles when
@@ -34,7 +34,7 @@ export const definition: ToolDefinition = {
       'PREFER this over re-running generate_video / animate_photo on the original prompt when the user only wants part of the video changed — re-rendering wastes credits, loses the unchanged sections, and breaks the original timing. ' +
       'If the user does not specify the exact start/end seconds (e.g. "replace the bumper at the end"), call analyze_video first to identify the correct window, OR derive it from the storyboard timing already in the conversation (e.g. last beat\'s time range). Do not guess wildly — pick a sensible bumper/end-card window such as the final 1-3 seconds when the storyboard says scene_07 is 14-15s. ' +
       'Returns both the standalone replacement clip and the spliced composite. ' +
-      'For LTX-2.3 and Wan 2.2 base videos the tool locks both ends with first/last-frame keyframes for seamless edges. ' +
+      'For LTX 2.5/2.3 and Wan 2.2 base videos the tool locks both ends with first/last-frame keyframes for seamless edges; new non-Seedance LTX segments default to 2.5. ' +
       'For Seedance base videos the tool uses the original window as a reference for video-to-video transformation. If a requested window is shorter than the selected model\'s native render minimum, the handler renders a slightly larger handled clip, trims the result back to the requested seconds, then splices exactly that requested range. ' +
       'By default the regenerated segment\'s audio replaces the original audio in the [startSeconds, endSeconds] window, so new motion stays in sync with new sound. Pass keepOriginalAudio=true only when the user explicitly asks to keep the existing audio — phrasings like "keep the audio", "leave the original audio", "preserve the music/score/dialogue", "don\'t change the audio". If the user uses an ambiguous phrasing such as "with the audio" (which could mean either "with the original audio kept" or "with new audio"), DO NOT call this tool yet — first ask the user whether to preserve or replace the original audio in the replaced window. When replacementVideoIndex is set, the existing replacement clip\'s own audio is used; pass keepOriginalAudio=true only when the user explicitly wants the base video audio to stay over the replacement window.',
     parameters: {
@@ -79,9 +79,9 @@ export const definition: ToolDefinition = {
         },
         videoModel: {
           type: 'string',
-          enum: ['auto', 'ltx23', 'wan22', 'seedance2', 'seedance2-mini', 'seedance2-fast', 'seedance2-5'],
+          enum: ['auto', 'ltx25', 'ltx23', 'wan22', 'seedance2', 'seedance2-mini', 'seedance2-fast', 'seedance2-5'],
           description:
-            'Which model to use for the new segment. Default: "auto" — detect from the base video\'s producer (Seedance base → Seedance, Wan base → Wan 2.2, otherwise LTX-2.3). Override only when the user explicitly requests a different model.',
+            'Which model to use for the new segment. Default: "auto" — preserve Seedance or WAN for matching base clips and otherwise use LTX 2.5. Use ltx23 only for explicit rollback. Override only when the user explicitly requests a different model.',
         },
         keepOriginalAudio: {
           type: 'boolean',

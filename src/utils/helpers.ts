@@ -54,7 +54,7 @@ export function isWanVideoModel(modelId: string): boolean {
 }
 
 export function isLtxVideoModel(modelId: string): boolean {
-  return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
+  return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-') || modelId.startsWith('ltx25-');
 }
 
 /**

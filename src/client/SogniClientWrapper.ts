@@ -1367,7 +1367,7 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   private isLtx2Model(modelId: string): boolean {
-    return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-');
+    return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-') || modelId.startsWith('ltx25-');
   }
 
   // Every Seedance generation shares the fixed-24fps / mp4 vendor envelope, so

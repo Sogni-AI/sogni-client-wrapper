@@ -211,7 +211,11 @@ export {
   buildInstrumentalMessages,
   parseToolCallResult,
 } from './musicComposition.js';
-export type { LyricsGenerationResult } from './musicComposition.js';
+export type {
+  LyricsGenerationResult,
+  MusicCompositionOptions,
+  MusicCompositionTarget,
+} from './musicComposition.js';
 // video prompt-engineering surface (system prompts, tool definition,
 // message builders, parser, supporting types) extracted from
 // `prompts/videoComposition.ts`. Depends only on the contracts-local

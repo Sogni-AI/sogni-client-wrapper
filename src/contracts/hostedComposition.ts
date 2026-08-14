@@ -36,12 +36,20 @@ export interface BuildLyricsCompositionToolArgsInput {
   language?: string;
   musicPrompt?: string;
   randomTheme?: string;
+  /** Target music model id (e.g. 'minimax_music3'); server routes to the matching prompt format. */
+  destinationModel?: string;
+  /** Requested song length in seconds so the composer sizes the lyric sheet. */
+  durationSeconds?: number;
 }
 
 export interface BuildInstrumentalCompositionToolArgsInput {
   prompt: string;
   musicPrompt?: string;
   randomTheme?: string;
+  /** Target music model id (e.g. 'minimax_music3'); server routes to the matching prompt format. */
+  destinationModel?: string;
+  /** Requested track length in seconds so the composer sizes the structure. */
+  durationSeconds?: number;
 }
 
 export interface BuildScriptCompositionToolArgsInput extends VideoFramePromptOptions {
@@ -123,6 +131,8 @@ export function buildLyricsCompositionToolArgs(
     prompt: input.prompt.trim() || `Come up with a unique, original song about: ${input.randomTheme || getRandomLyricsTheme()}. Be creative and surprising.`,
     language: input.language ?? 'unknown',
     ...(input.musicPrompt?.trim() ? { music_prompt: input.musicPrompt.trim() } : {}),
+    ...(input.destinationModel ? { destination_model: input.destinationModel } : {}),
+    ...(input.durationSeconds ? { duration_seconds: input.durationSeconds } : {}),
   };
 }
 
@@ -132,6 +142,8 @@ export function buildInstrumentalCompositionToolArgs(
   return {
     prompt: input.prompt.trim() || `Come up with a unique, original instrumental piece inspired by: ${input.randomTheme || getRandomLyricsTheme()}. Be creative and surprising.`,
     ...(input.musicPrompt?.trim() ? { music_prompt: input.musicPrompt.trim() } : {}),
+    ...(input.destinationModel ? { destination_model: input.destinationModel } : {}),
+    ...(input.durationSeconds ? { duration_seconds: input.durationSeconds } : {}),
   };
 }
 

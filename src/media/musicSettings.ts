@@ -1,8 +1,9 @@
-export type MusicRenderMode = 'speed' | 'quality';
+export type MusicRenderMode = 'speed' | 'quality' | 'best';
 
 export enum MusicModel {
   speed = 'ace_step_1.5_xl_turbo',
   quality = 'ace_step_1.5_xl_sft',
+  best = 'minimax_music3',
 }
 
 export const MUSIC_MODELS = {
@@ -19,6 +20,20 @@ export const MUSIC_MODELS = {
     guidance: { min: 1, max: 15, default: 5 },
     sampler: { allowed: ['euler', 'euler_ancestral', 'er_sde'], default: 'er_sde' },
     scheduler: { allowed: ['simple', 'linear_quadratic'], default: 'linear_quadratic' },
+  },
+  // MiniMax Music 3: autoregressive composer. duration is a per-model override of
+  // MUSIC_DURATION (300s cap) and is treated as a ceiling — the model may end the
+  // song early at a musical resolution. No BPM/key/timesig controls; describe
+  // tempo and key in the prompt caption instead.
+  best: {
+    steps: { min: 10, max: 100, default: 30 },
+    shift: null,
+    guidance: { min: 1, max: 5, default: 1.7 },
+    promptStrength: { min: 0, max: 10, default: 1.7 },
+    topK: { min: 1, max: 16384, default: 50 },
+    duration: { min: 10, max: 300, default: 60 },
+    sampler: { allowed: ['euler'], default: 'euler' },
+    scheduler: { allowed: ['simple'], default: 'simple' },
   },
 } as const;
 
@@ -238,5 +253,6 @@ export const IMAGINE_LABELS = {
 };
 
 export function getMusicModel(mode: MusicRenderMode): string {
+  if (mode === 'best') return MusicModel.best;
   return mode === 'speed' ? MusicModel.speed : MusicModel.quality;
 }

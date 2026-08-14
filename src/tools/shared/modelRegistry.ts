@@ -120,6 +120,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
   generate_music: [
     { key: 'turbo', displayName: 'ACE-Step 1.5 Turbo' },
     { key: 'sft', displayName: 'ACE-Step 1.5 SFT' },
+    { key: 'music3', displayName: 'MiniMax Music 3' },
   ],
 };
 

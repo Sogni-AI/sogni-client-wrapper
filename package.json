@@ -205,8 +205,8 @@
   },
   "homepage": "https://github.com/Sogni-AI/sogni-intelligence-client#readme",
   "dependencies": {
-    "@sogni-ai/sogni-client": "5.10.0",
-    "@sogni-ai/sogni-protocol": "1.0.0-alpha.19",
+    "@sogni-ai/sogni-client": "5.11.0",
+    "@sogni-ai/sogni-protocol": "1.0.0-alpha.20",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

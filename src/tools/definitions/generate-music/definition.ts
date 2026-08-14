@@ -64,7 +64,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: 'string',
           enum: ['turbo', 'sft', 'music3'],
           description:
-            'Music model. "turbo" (default): ACE-Step 1.5 Turbo — fast 4-16 step drafts at half cost. "sft": ACE-Step 1.5 SFT — experimental, strong lyric handling, 10-200 steps, full cost. "music3": MiniMax Music 3 — premium autoregressive composer with the best vocals, lyric adherence and song structure; 30 steps, up to 5 minutes, ~4x turbo cost, and it treats duration as a ceiling (may end the song early at a musical resolution). BPM/key/timesig args are ignored by music3 — fold tempo and key into the prompt instead. Use music3 when the user asks for the best quality, realistic vocals, or full songs; otherwise default to "turbo".',
+            'Music model. "turbo" (default): ACE-Step 1.5 Turbo — fast 4-16 step drafts at half cost. "sft": ACE-Step 1.5 SFT — experimental, strong lyric handling, 10-200 steps, full cost. "music3": MiniMax Music 3 — premium autoregressive composer with the best vocals, lyric adherence and song structure; 30 steps, up to 5 minutes, ~20x turbo cost, and it treats duration as a ceiling (may end the song early at a musical resolution). BPM/key/timesig args are ignored by music3 — fold tempo and key into the prompt instead. Use music3 when the user asks for the best quality, realistic vocals, or full songs; otherwise default to "turbo".',
         },
         timesig: {
           type: 'number',

@@ -84,6 +84,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'minimax-h3-t2v', displayName: 'MiniMax H3 (Text to Video)' },
     { key: 'minimax-h3-t2v-turbo', displayName: 'MiniMax H3 Turbo (Text to Video)' },
     { key: 'minimax-h3-r2v', displayName: 'MiniMax H3 (Reference to Video)' },
+    { key: 'minimax-h3-r2v-turbo', displayName: 'MiniMax H3 Turbo (Reference to Video)' },
     { key: 'happyhorse-1.1-t2v', displayName: 'HappyHorse 1.1 (Text to Video)' },
     { key: 'happyhorse-1.1-i2v', displayName: 'HappyHorse 1.1 (Image to Video)' },
     { key: 'happyhorse-1.1-r2v', displayName: 'HappyHorse 1.1 (Reference to Video)' },

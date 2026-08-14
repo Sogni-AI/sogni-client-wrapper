@@ -97,12 +97,12 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
   const generateVideoModelKeys = getModelOptions('generate_video').map(option => option.key);
   const animatePhotoModelKeys = getModelOptions('animate_photo').map(option => option.key);
   expect(
-    'model registry: generate_video includes only the H3 T2V Turbo selector',
+    'model registry: generate_video includes H3 T2V and R2V Turbo selectors',
     {
       t2vTurbo: generateVideoModelKeys.includes('minimax-h3-t2v-turbo'),
       r2vTurbo: generateVideoModelKeys.includes('minimax-h3-r2v-turbo'),
     },
-    { t2vTurbo: true, r2vTurbo: false },
+    { t2vTurbo: true, r2vTurbo: true },
   );
   expect(
     'model registry: animate_photo includes H3 I2V and FLF2V Turbo selectors',

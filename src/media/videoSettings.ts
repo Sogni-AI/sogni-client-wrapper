@@ -20,6 +20,7 @@ export type VideoModelId =
   | "minimax-h3-t2v-turbo"
   | "minimax-h3-i2v-turbo"
   | "minimax-h3-flf2v-turbo"
+  | "minimax-h3-r2v-turbo"
   | "seedance2"
   | "seedance2-mini"
   | "seedance2-fast"
@@ -451,9 +452,8 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     supportsAudioToggle: true,
     supportsNegativePrompt: false,
   },
-  // MiniMax H3 Turbo uses the same FL2VA checkpoint with the LightX2V v0.1
-  // four-step LoRA. The worker graph owns ER-SDE sampling, so callers send no
-  // sampler override; geometry, frame grid, and native-audio behavior match Base.
+  // MiniMax H3 Turbo uses LightX2V four-step LoRAs. The FL2VA worker graphs own
+  // ER-SDE sampling, while Ref2VA Turbo follows its upstream Euler recipe.
   "minimax-h3-t2v-turbo": {
     model: "minimax-h3-fl2va-fp8_t2v_turbo",
     fps: 24,
@@ -502,6 +502,26 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     maxDimension: 1344,
     scheduler: "simple",
     resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-r2v-turbo": {
+    model: "minimax-h3-ref2va-fp8_r2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "euler",
+    scheduler: "simple",
+    resolutionTiers: [544],
     frameBase: 124,
     frameStep: 17,
     minFrames: 124,

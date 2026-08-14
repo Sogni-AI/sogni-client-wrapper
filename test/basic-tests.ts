@@ -426,6 +426,7 @@ async function runTests() {
       'minimax-h3-t2v-turbo': 'minimax-h3-fl2va-fp8_t2v_turbo',
       'minimax-h3-i2v-turbo': 'minimax-h3-fl2va-fp8_i2v_turbo',
       'minimax-h3-flf2v-turbo': 'minimax-h3-fl2va-fp8_flf2v_turbo',
+      'minimax-h3-r2v-turbo': 'minimax-h3-ref2va-fp8_r2v_turbo',
     } as const;
     for (const [selector, model] of Object.entries(turboExpected)) {
       const config = getVideoModelConfig(selector as keyof typeof turboExpected);
@@ -433,8 +434,9 @@ async function runTests() {
       if (config.fps !== 24 || config.steps !== 4 || config.guidance !== 1) {
         throw new Error(`${selector} sampling defaults do not match the Turbo contract`);
       }
-      if (config.sampler !== undefined || config.scheduler !== 'simple') {
-        throw new Error(`${selector} must leave ER-SDE sampler selection to the worker graph`);
+      const expectedSampler = selector === 'minimax-h3-r2v-turbo' ? 'euler' : undefined;
+      if (config.sampler !== expectedSampler || config.scheduler !== 'simple') {
+        throw new Error(`${selector} sampler/scheduler defaults do not match the upstream recipe`);
       }
       if (
         config.nativeAudio !== true ||
@@ -446,7 +448,7 @@ async function runTests() {
     }
   })();
 
-  await test('Should expose only real MiniMax H3 Turbo tools and video-only Ref2VA guidance', () => {
+  await test('Should expose every real MiniMax H3 Turbo tool and video-only Ref2VA guidance', () => {
     const generateParams = generateVideoDefinition.function.parameters.properties;
     const generateModels = generateParams.videoModel.enum ?? [];
     const animateModels = animatePhotoDefinition.function.parameters.properties.videoModel.enum ?? [];
@@ -458,8 +460,8 @@ async function runTests() {
         throw new Error(`animate_photo is missing ${selector}`);
       }
     }
-    if (generateModels.includes('minimax-h3-r2v-turbo') || animateModels.includes('minimax-h3-r2v-turbo')) {
-      throw new Error('tool definitions expose nonexistent MiniMax H3 R2V Turbo');
+    if (!generateModels.includes('minimax-h3-r2v-turbo') || animateModels.includes('minimax-h3-r2v-turbo')) {
+      throw new Error('R2V Turbo must be exposed by generate_video only');
     }
     const h3Docs = [
       generateParams.videoModel.description,
@@ -1462,6 +1464,9 @@ async function runTests() {
     }
     if (formatModelRef('minimax-h3-r2v', 3, 'audio') !== '<Audio 3>') {
       throw new Error('MiniMax H3 r2v alias should resolve to <Audio N> refs');
+    }
+    if (formatModelRef('minimax-h3-ref2va-fp8_r2v_turbo', 1, 'image') !== '<Picture 1>') {
+      throw new Error('Full MiniMax H3 R2V Turbo backend id should resolve to <Picture N> refs');
     }
   })();
 

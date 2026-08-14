@@ -17,6 +17,7 @@ import {
   validateProjectConfig,
   validateClientConfig,
   getMaxContextImages,
+  getVideoDimensionRules,
   supportsContextImages,
   type ImageProjectConfig,
   type VideoProjectConfig,
@@ -565,6 +566,85 @@ async function runTests() {
     });
     if (!client) throw new Error('Client not created');
     if (!client.isConnected) throw new Error('isConnected method not available');
+  })();
+
+  await test('Should expose model-aware video dimension rules', () => {
+    const ltx = getVideoDimensionRules('ltx25-22b-int8_t2v_distilled');
+    if (ltx.maxDimension !== 3840 || ltx.minDimension !== 640 || ltx.dimensionMultiple !== 16) {
+      throw new Error(`Unexpected LTX-2.5 rules: ${JSON.stringify(ltx)}`);
+    }
+    const ltx23 = getVideoDimensionRules('ltx23-22b-fp8_i2v_distilled');
+    if (ltx23.maxDimension !== 3840) throw new Error('LTX-2.3 must allow up to 3840');
+    const wan = getVideoDimensionRules('wan_v2.2-14b-fp8_i2v_lightx2v');
+    if (wan.maxDimension !== 1536 || wan.minDimension !== 480 || wan.dimensionMultiple !== 16) {
+      throw new Error(`Unexpected WAN rules: ${JSON.stringify(wan)}`);
+    }
+    const hh = getVideoDimensionRules('happyhorse-1.1-t2v');
+    if (hh.maxDimension !== 1920 || hh.dimensionMultiple !== 1) {
+      throw new Error(`Unexpected HappyHorse rules: ${JSON.stringify(hh)}`);
+    }
+    const seedance = getVideoDimensionRules('seedance-2-0');
+    if (seedance.maxDimension < 3840 || seedance.dimensionMultiple !== 1) {
+      throw new Error(`Seedance rules must not shrink vendor requests: ${JSON.stringify(seedance)}`);
+    }
+    const fallback = getVideoDimensionRules(undefined);
+    if (fallback.maxDimension !== 1536) throw new Error('Unknown models must keep the legacy envelope');
+  })();
+
+  await test('Should not downscale LTX-2.5 1080p (and should preserve legacy WAN clamp)', () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+    const normalize = (
+      client as unknown as {
+        normalizeVideoDimensions: (
+          w: number,
+          h: number,
+          modelId?: string,
+        ) => { width: number; height: number; adjusted: boolean };
+      }
+    ).normalizeVideoDimensions.bind(client);
+
+    // The original bug: 1920x1088 silently became 1536x864 for every model.
+    const hd = normalize(1920, 1088, 'ltx25-22b-int8_t2v_distilled');
+    if (hd.width !== 1920 || hd.height !== 1088 || hd.adjusted) {
+      throw new Error(`LTX-2.5 1920x1088 must pass through untouched, got ${JSON.stringify(hd)}`);
+    }
+
+    // 4K preset stays inside the LTX tier envelope.
+    const uhd = normalize(3840, 2176, 'ltx25-22b-int8_i2v_distilled');
+    if (uhd.width !== 3840 || uhd.height !== 2176 || uhd.adjusted) {
+      throw new Error(`LTX-2.5 3840x2176 must pass through untouched, got ${JSON.stringify(uhd)}`);
+    }
+
+    // Oversized asks scale down to the family ceiling on the multiple grid.
+    const over = normalize(4200, 2100, 'ltx23-22b-fp8_t2v_distilled');
+    if (over.width > 3840 || over.height > 3840 || !over.adjusted) {
+      throw new Error(`Oversized LTX ask must clamp to <= 3840, got ${JSON.stringify(over)}`);
+    }
+    if (over.width % 16 !== 0 || over.height % 16 !== 0) {
+      throw new Error(`Clamped LTX dimensions must stay on the multiple-of-16 grid, got ${JSON.stringify(over)}`);
+    }
+
+    // WAN keeps its historical envelope.
+    const wan = normalize(1920, 1080, 'wan_v2.2-14b-fp8_i2v_lightx2v');
+    if (wan.width !== 1536 || wan.height !== 864 || !wan.adjusted) {
+      throw new Error(`WAN 1920x1080 must clamp to 1536x864, got ${JSON.stringify(wan)}`);
+    }
+
+    // HappyHorse's exact 1080p geometry survives (divisor 1, ceiling 1920).
+    const hh = normalize(1920, 1080, 'happyhorse-1.1-t2v');
+    if (hh.width !== 1920 || hh.height !== 1080 || hh.adjusted) {
+      throw new Error(`HappyHorse 1920x1080 must pass through untouched, got ${JSON.stringify(hh)}`);
+    }
+
+    // No model id: legacy behavior unchanged.
+    const legacy = normalize(1920, 1088);
+    if (legacy.width !== 1536 || legacy.height !== 864 || !legacy.adjusted) {
+      throw new Error(`Unknown-model 1920x1088 must keep the legacy clamp, got ${JSON.stringify(legacy)}`);
+    }
   })();
 
   // Test 4: Validation error for missing username

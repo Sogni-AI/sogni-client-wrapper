@@ -139,6 +139,7 @@ export {
   isLtxVideoModel,
   isSeedanceVideoModel,
   isHappyHorseVideoModel,
+  getVideoDimensionRules,
   isCookieAuth,
   sleep,
   retry,
@@ -147,6 +148,7 @@ export {
   getMaxContextImages,
   supportsContextImages,
 } from './utils/helpers.js';
+export type { VideoDimensionRules } from './utils/helpers.js';
 
 // SDK chat tool-calling helpers
 export {

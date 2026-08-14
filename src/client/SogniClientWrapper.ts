@@ -69,11 +69,9 @@ import {
   waitFor,
   retry,
   getMaxContextImages,
+  getVideoDimensionRules,
 } from '../utils/helpers.js';
 
-const MIN_VIDEO_DIMENSION = 480;
-const MAX_VIDEO_DIMENSION = 1536;
-const VIDEO_DIMENSION_MULTIPLE = 16;
 const LTX2_FRAME_STEP = 8;
 
 function freezeAttributionDefaults(
@@ -1012,10 +1010,10 @@ export class SogniClientWrapper extends EventEmitter {
     if (width && height) {
       const originalWidth = width;
       const originalHeight = height;
-      const normalizedDims = this.normalizeVideoDimensions(width, height);
+      const normalizedDims = this.normalizeVideoDimensions(width, height, config.modelId);
       if (normalizedDims.adjusted) {
         console.log(
-          `[SogniClientWrapper] Adjusted video dimensions from ${originalWidth}x${originalHeight} to ${normalizedDims.width}x${normalizedDims.height} to meet video requirements.`
+          `[SogniClientWrapper] Adjusted video dimensions from ${originalWidth}x${originalHeight} to ${normalizedDims.width}x${normalizedDims.height} to meet ${config.modelId} video requirements.`
         );
       }
       width = normalizedDims.width;
@@ -1062,60 +1060,70 @@ export class SogniClientWrapper extends EventEmitter {
     return normalized;
   }
 
-  private normalizeVideoDimensions(width: number, height: number): {
+  private normalizeVideoDimensions(width: number, height: number, modelId?: string): {
     width: number;
     height: number;
     adjusted: boolean;
   } {
+    // Model-family envelope (LTX-2.x runs 640–3840; the old blanket 1536 cap
+    // silently downscaled every LTX-2.5 1080p request). Unknown models keep
+    // the legacy 480–1536 envelope.
+    const rules = getVideoDimensionRules(modelId);
+    const minDimension = rules.minDimension;
+    const maxDimension = rules.maxDimension;
+    const dimensionMultiple = rules.dimensionMultiple;
+
     let targetWidth = width;
     let targetHeight = height;
     let adjusted = false;
 
-    if (targetWidth > MAX_VIDEO_DIMENSION || targetHeight > MAX_VIDEO_DIMENSION) {
+    if (targetWidth > maxDimension || targetHeight > maxDimension) {
       const scaleFactor = Math.min(
-        MAX_VIDEO_DIMENSION / targetWidth,
-        MAX_VIDEO_DIMENSION / targetHeight
+        maxDimension / targetWidth,
+        maxDimension / targetHeight
       );
       targetWidth = Math.floor(targetWidth * scaleFactor);
       targetHeight = Math.floor(targetHeight * scaleFactor);
       adjusted = true;
     }
 
-    if (targetWidth < MIN_VIDEO_DIMENSION || targetHeight < MIN_VIDEO_DIMENSION) {
+    if (targetWidth < minDimension || targetHeight < minDimension) {
       const scaleFactor = Math.max(
-        MIN_VIDEO_DIMENSION / targetWidth,
-        MIN_VIDEO_DIMENSION / targetHeight
+        minDimension / targetWidth,
+        minDimension / targetHeight
       );
       targetWidth = Math.floor(targetWidth * scaleFactor);
       targetHeight = Math.floor(targetHeight * scaleFactor);
       adjusted = true;
 
-      if (targetWidth > MAX_VIDEO_DIMENSION || targetHeight > MAX_VIDEO_DIMENSION) {
+      if (targetWidth > maxDimension || targetHeight > maxDimension) {
         const downscaleFactor = Math.min(
-          MAX_VIDEO_DIMENSION / targetWidth,
-          MAX_VIDEO_DIMENSION / targetHeight
+          maxDimension / targetWidth,
+          maxDimension / targetHeight
         );
         targetWidth = Math.floor(targetWidth * downscaleFactor);
         targetHeight = Math.floor(targetHeight * downscaleFactor);
       }
     }
 
-    const roundedWidth = Math.floor(targetWidth / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
-    const roundedHeight = Math.floor(targetHeight / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+    if (dimensionMultiple > 1) {
+      const roundedWidth = Math.floor(targetWidth / dimensionMultiple) * dimensionMultiple;
+      const roundedHeight = Math.floor(targetHeight / dimensionMultiple) * dimensionMultiple;
 
-    if (roundedWidth !== targetWidth || roundedHeight !== targetHeight) {
-      adjusted = true;
+      if (roundedWidth !== targetWidth || roundedHeight !== targetHeight) {
+        adjusted = true;
+      }
+
+      targetWidth = roundedWidth;
+      targetHeight = roundedHeight;
     }
 
-    targetWidth = roundedWidth;
-    targetHeight = roundedHeight;
-
-    if (targetWidth < MIN_VIDEO_DIMENSION) {
-      targetWidth = Math.ceil(MIN_VIDEO_DIMENSION / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+    if (targetWidth < minDimension) {
+      targetWidth = Math.ceil(minDimension / dimensionMultiple) * dimensionMultiple;
       adjusted = true;
     }
-    if (targetHeight < MIN_VIDEO_DIMENSION) {
-      targetHeight = Math.ceil(MIN_VIDEO_DIMENSION / VIDEO_DIMENSION_MULTIPLE) * VIDEO_DIMENSION_MULTIPLE;
+    if (targetHeight < minDimension) {
+      targetHeight = Math.ceil(minDimension / dimensionMultiple) * dimensionMultiple;
       adjusted = true;
     }
 

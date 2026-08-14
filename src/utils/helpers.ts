@@ -78,6 +78,49 @@ export function isHappyHorseVideoModel(modelId: string): boolean {
 }
 
 /**
+ * Last-resort video dimension envelope used by the wrapper when it normalizes
+ * a project's requested width/height and resizes reference media to match.
+ */
+export interface VideoDimensionRules {
+  minDimension: number;
+  maxDimension: number;
+  dimensionMultiple: number;
+}
+
+/**
+ * Per-family video dimension rules for the wrapper's final normalization pass.
+ *
+ * These mirror the Supernet model tiers (the socket remains authoritative)
+ * instead of one legacy ceiling: the historical blanket 480–1536 clamp
+ * silently downscaled every LTX-2.5 1920x1088 request to 1536x864 before the
+ * job ever left the client. Finer per-model defaults (aspect presets, exact
+ * divisors) belong to callers — the hosted-tool registry and CLI model cards —
+ * this layer only keeps the request inside the family's valid envelope.
+ */
+export function getVideoDimensionRules(modelId?: string): VideoDimensionRules {
+  if (modelId) {
+    if (isLtxVideoModel(modelId)) {
+      // LTX-2.x tiers accept 640–3840 (step 8 server-side); multiples of 16
+      // keep every emitted size on the tier grid, 1920x1088 included.
+      return { minDimension: 640, maxDimension: 3840, dimensionMultiple: 16 };
+    }
+    if (isHappyHorseVideoModel(modelId)) {
+      // HappyHorse registers exact 720P/1080P geometries (1920 ceiling, no
+      // divisor) — rounding to multiples of 16 would corrupt 1080.
+      return { minDimension: 480, maxDimension: 1920, dimensionMultiple: 1 };
+    }
+    if (isSeedanceVideoModel(modelId)) {
+      // The Seedance vendor path validates its own named resolutions (up to
+      // native 4K on 2.0); never shrink the request on its behalf.
+      return { minDimension: 1, maxDimension: 8192, dimensionMultiple: 1 };
+    }
+  }
+  // Legacy envelope for WAN and unrecognized models — matches the 1536-class
+  // WAN tiers this clamp was originally written for.
+  return { minDimension: 480, maxDimension: 1536, dimensionMultiple: 16 };
+}
+
+/**
  * Get the maximum number of context images supported by a model
  */
 export function getMaxContextImages(modelId: string): number {

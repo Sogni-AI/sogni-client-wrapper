@@ -2446,8 +2446,11 @@ async function runTests() {
     }
 
     const all = SogniTools.all;
-    if (!Array.isArray(all) || all.length !== 24) {
-      throw new Error(`SogniTools.all expected 24 tools, got ${all.length}`);
+    if (!Array.isArray(all) || all.length !== 25) {
+      throw new Error(`SogniTools.all expected 25 tools, got ${all.length}`);
+    }
+    if (!all.some((tool) => tool.function.name === 'upscale_image')) {
+      throw new Error('SogniTools.all must include the upscale_image contract');
     }
 
     const animateParams = animatePhotoDefinition.function.parameters.properties;

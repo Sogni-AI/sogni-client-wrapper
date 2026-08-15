@@ -82,6 +82,13 @@ export const TOOL_COST_METADATA: ReadonlyArray<ToolCostMetadata> = [
     description: 'AI photo restoration. Repairs scratches, color, exposure.',
   },
   {
+    tool: 'upscale_image',
+    costClass: 'image.standard',
+    riskLevel: 'paid',
+    userVisibleCost: 'Pixel-based image upscaling',
+    description: 'Deterministic RTX VSR enlargement without generative changes.',
+  },
+  {
     tool: 'apply_style',
     costClass: 'image.standard',
     riskLevel: 'paid',

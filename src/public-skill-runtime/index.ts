@@ -1074,12 +1074,13 @@ export const IMAGE_EDITING_SKILL: SkillManifest = {
   id: 'image_editing',
   name: 'Image editing',
   description:
-    'Edit, restore, restyle, refine, or change the camera angle of an existing image. Includes persona-conditioned edits and Krea 2 Identity Edit models — persona images should use edit_image and reference photos rather than text-to-image.',
-  toolNames: ['edit_image', 'restore_photo', 'apply_style', 'change_angle', 'refine_result'],
+    'Edit, restore, restyle, refine, upscale, or change the camera angle of an existing image. Includes deterministic RTX VSR upscaling plus persona-conditioned edits and Krea 2 Identity Edit models — persona images should use edit_image and reference photos rather than text-to-image.',
+  toolNames: ['edit_image', 'restore_photo', 'upscale_image', 'apply_style', 'change_angle', 'refine_result'],
   constraints: [
     'For persona image output, use edit_image with a reference photo rather than generate_image.',
     'Krea 2 Identity Edit and Dark Beast Krea 2 Identity Edit use edit_image with 1-2 context images, context_image_N refs, 512-2048 px output, default steps=10, guidance=1, sampler=euler, and scheduler=simple.',
     'refine_result acts on a prior generation in the session; do not call it before any image has been produced or uploaded.',
+    'Use upscale_image for promptless, deterministic enlargement that must preserve the exact image. Do not substitute restore_photo, refine_result, or edit_image when the user only wants more pixels.',
   ],
 };
 

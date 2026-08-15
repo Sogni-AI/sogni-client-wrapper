@@ -55,6 +55,7 @@ import type { ToolGatingPolicy } from '../toolGatingPolicy.js';
 export const IMAGE_CONTEXT_TOOL_NAMES: ReadonlyArray<string> = [
   'edit_image',
   'restore_photo',
+  'upscale_image',
   'apply_style',
   'refine_result',
   'change_angle',

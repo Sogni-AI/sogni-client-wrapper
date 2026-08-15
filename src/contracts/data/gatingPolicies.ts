@@ -40,6 +40,7 @@ export const MEDIA_TOOL_NAMES: ReadonlyArray<string> = [
   'generate_image',
   'edit_image',
   'restore_photo',
+  'upscale_image',
   'apply_style',
   'refine_result',
   'animate_photo',

@@ -71,6 +71,7 @@ export {
   refineResultDefinition,
   replaceVideoSegmentDefinition,
   restorePhotoDefinition,
+  upscaleImageDefinition,
   soundToVideoDefinition,
   stitchVideoDefinition,
   videoToVideoDefinition,

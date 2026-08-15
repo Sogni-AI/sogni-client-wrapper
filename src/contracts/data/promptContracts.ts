@@ -897,12 +897,44 @@ const RESTORE_PHOTO_CONTRACT: PromptContract = {
     '',
     'Use Dynamic Prompt syntax only when the user explicitly asks to compare multiple restoration',
     'approaches. Default restoration batches should keep the same prompt and vary only by seed.',
+    'If the user only wants a larger, higher-resolution copy without restoration or other creative',
+    'changes, use upscale_image instead. restore_photo is a generative edit and is not a substitute',
+    'for deterministic upscaling.',
   ].join('\n'),
   parameterDocs: {
     prompt: 'Natural-language edit/restoration prompt. Start with identity preservation for people, then requested restoration/edit, then preserve unmentioned details.',
     numberOfVariations: 'Use 1 unless the user explicitly asks for multiple outputs or comparison options.',
     scale: 'Set only when the user asks to upscale, enlarge, or increase resolution.',
     quality: 'Omit unless the user explicitly asks for fast or high quality.',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// upscale_image
+// ---------------------------------------------------------------------------
+const UPSCALE_IMAGE_CONTRACT: PromptContract = {
+  contractId: 'upscale_image_v1',
+  version: '1.0.0',
+  toolName: 'upscale_image',
+  baseDescription: [
+    'upscale_image performs promptless, deterministic NVIDIA RTX VSR enlargement of exactly one',
+    'uploaded or generated image. Use it when the user asks for a larger copy, higher resolution,',
+    '2x/3x/4x enlargement, 4K/8K output, or more pixels while preserving the source composition.',
+    '',
+    'Do not invent a prompt and do not route a pure upscale through restore_photo, refine_result,',
+    'edit_image, or apply_style. Those tools are generative and can change image content.',
+    '',
+    'Omit sourceImageIndex to use the latest generated image, falling back to the first upload.',
+    'Use zero-based non-negative indices for generated results; -1 selects the first upload and',
+    '-2 the second upload. Set either scale (2, 3, or 4) or targetLongestEdge (512-8192).',
+    'targetLongestEdge takes precedence. Never request a target at or below the source size.',
+    'Both 8px-aligned output edges must remain between 512 and 8192px. If a wide or tall source',
+    'needs a larger target to preserve its aspect ratio, use the minimum target returned by the tool.',
+  ].join('\n'),
+  parameterDocs: {
+    sourceImageIndex: 'Omit for the latest generated image, then first upload. Generated results are zero-based; -1/-2 select uploaded images.',
+    scale: 'Integer enlargement factor 2, 3, or 4. Defaults to 2 and is ignored when targetLongestEdge is set. A too-small result is rejected rather than stretched to the 512px edge minimum.',
+    targetLongestEdge: 'Explicit output longest edge in pixels, 512-8192. Must be larger than the source, and large enough that the other 8px-aligned edge remains at least 512px; aspect ratio is preserved.',
   },
 };
 
@@ -1564,6 +1596,7 @@ const COMPOSE_WORKFLOW_TEMPLATE_CONTRACT: PromptContract = {
  */
 export const PROMPT_CONTRACTS: ReadonlyArray<PromptContract> = [
   RESTORE_PHOTO_CONTRACT,
+  UPSCALE_IMAGE_CONTRACT,
   APPLY_STYLE_CONTRACT,
   REFINE_RESULT_CONTRACT,
   ORBIT_VIDEO_CONTRACT,

@@ -4,6 +4,7 @@ import { definition as generateMusicDefinition } from './generate-music/definiti
 import { definition as editImageDefinition } from './edit-image/definition.js';
 import { definition as applyStyleDefinition } from './apply-style/definition.js';
 import { definition as restorePhotoDefinition } from './restore-photo/definition.js';
+import { definition as upscaleImageDefinition } from './upscale-image/definition.js';
 import { definition as refineResultDefinition } from './refine-result/definition.js';
 import { definition as animatePhotoDefinition } from './animate-photo/definition.js';
 import { definition as changeAngleDefinition } from './change-angle/definition.js';
@@ -43,6 +44,7 @@ export {
   refineResultDefinition,
   replaceVideoSegmentDefinition,
   restorePhotoDefinition,
+  upscaleImageDefinition,
   soundToVideoDefinition,
   stitchVideoDefinition,
   videoToVideoDefinition,
@@ -58,6 +60,7 @@ export const generationToolDefinitions = [
   editImageDefinition,
   applyStyleDefinition,
   restorePhotoDefinition,
+  upscaleImageDefinition,
   refineResultDefinition,
   animatePhotoDefinition,
   changeAngleDefinition,

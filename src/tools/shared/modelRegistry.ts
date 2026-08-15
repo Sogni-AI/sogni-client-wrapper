@@ -70,6 +70,9 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'dark-beast-krea2-identity-edit', displayName: 'Dark Beast Krea 2 Identity Edit' },
   ],
   restore_photo: QUALITY_TIER_MODELS,
+  upscale_image: [
+    { key: 'rtx-vsr', displayName: 'NVIDIA RTX Video Super Resolution' },
+  ],
   apply_style: QUALITY_TIER_MODELS,
   refine_result: QUALITY_TIER_MODELS,
   change_angle: QUALITY_ONLY_MODELS,

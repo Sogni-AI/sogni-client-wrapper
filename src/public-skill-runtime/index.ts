@@ -1775,11 +1775,11 @@ export const LTX25_DEV_WORKFLOW_MODELS = Object.freeze({
 
 export function resolveLtx25WorkflowModelForQuality(
   workflow: Ltx25Workflow,
-  qualityTier: string | null | undefined,
+  _qualityTier: string | null | undefined,
 ): string {
-  return qualityTier === 'pro'
-    ? LTX25_DEV_WORKFLOW_MODELS[workflow]
-    : LTX25_WORKFLOW_MODELS[workflow];
+  // Dev stays addressable by its exact internal model ID, but public quality
+  // tiers must use the upstream-supported and release-validated Distilled path.
+  return LTX25_WORKFLOW_MODELS[workflow];
 }
 
 export function resolveLtx23WorkflowModelForQuality(
@@ -2177,8 +2177,8 @@ export const QUALITY_TIERS = Object.freeze({
     video: { steps: 8, shortSide: 1088 }
   },
   pro: {
-    model: 'flux2_dev_fp8',
-    steps: 40,
+    model: 'qwen_image_2512_fp8',
+    steps: 20,
     shortSide: 1024,
     video: { steps: 20, shortSide: 1920 }
   }

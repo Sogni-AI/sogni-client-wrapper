@@ -138,18 +138,18 @@ async function runTests() {
       if (getLtx25WorkflowModelIdForQuality(workflow, 'hq') !== LTX25_DISTILLED_WORKFLOW_MODELS[workflow]) {
         throw new Error(`HQ ${workflow} did not resolve to the LTX 2.5 distilled model`);
       }
-      if (getLtx25WorkflowModelIdForQuality(workflow, 'pro') !== LTX25_DEV_WORKFLOW_MODELS[workflow]) {
-        throw new Error(`Pro ${workflow} did not resolve to the LTX 2.5 Dev model`);
+      if (getLtx25WorkflowModelIdForQuality(workflow, 'pro') !== LTX25_DISTILLED_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`Pro ${workflow} did not remain on the validated LTX 2.5 Distilled model`);
       }
     }
-    if (getLtx25StepsForQuality('fast') !== 8 || getLtx25StepsForQuality('pro') !== 30) {
+    if (getLtx25StepsForQuality('fast') !== 8 || getLtx25StepsForQuality('pro') !== 8) {
       throw new Error('LTX 2.5 quality step defaults are incorrect');
     }
-    if (!getLtx25ModelNameForQuality('I2V', 'pro').includes('Speed LoRA')) {
-      throw new Error('LTX 2.5 Pro name must describe the required Speed LoRA path');
+    if (!getLtx25ModelNameForQuality('I2V', 'pro').includes('Distilled')) {
+      throw new Error('LTX 2.5 Pro name must describe the validated Distilled path');
     }
-    if (getVideoModelConfig('ltx25', 'pro').model !== LTX25_DEV_WORKFLOW_MODELS.i2v) {
-      throw new Error('LTX 2.5 Pro selector did not resolve to Dev I2V');
+    if (getVideoModelConfig('ltx25', 'pro').model !== LTX25_DISTILLED_WORKFLOW_MODELS.i2v) {
+      throw new Error('LTX 2.5 Pro selector did not remain on Distilled I2V');
     }
     for (const modelId of [
       'ltx25',
@@ -222,11 +222,11 @@ async function runTests() {
     if (!LTX2VideoModels.speedT2V.some(modelId => modelId.startsWith('ltx23-'))) {
       throw new Error('LTX 2.3 speed rollback model is missing');
     }
-    if (LTX2VideoModels.qualityI2V[0] !== LTX25_DEV_WORKFLOW_MODELS.i2v) {
-      throw new Error('LTX 2.5 Dev I2V is not first in the quality model list');
+    if (LTX2VideoModels.qualityI2V[0] !== LTX25_DISTILLED_WORKFLOW_MODELS.i2v) {
+      throw new Error('LTX 2.5 Distilled I2V is not first in the quality model list');
     }
     if (LTX2VideoModels.speedV2V[0] !== LTX25_DISTILLED_WORKFLOW_MODELS.v2v ||
-        LTX2VideoModels.qualityV2V[0] !== LTX25_DEV_WORKFLOW_MODELS.v2v) {
+        LTX2VideoModels.qualityV2V[0] !== LTX25_DISTILLED_WORKFLOW_MODELS.v2v) {
       throw new Error('LTX 2.5 V2V models are not first in the speed/quality arrays');
     }
     if (!LTX2VideoModels.speedV2V.some(modelId => modelId.startsWith('ltx23-'))) {
@@ -239,8 +239,8 @@ async function runTests() {
       if (resolveVideoModelAlias('ltx25', workflow) !== RUNTIME_LTX25_WORKFLOW_MODELS[workflow]) {
         throw new Error(`Runtime ltx25 alias failed for ${workflow}`);
       }
-      if (selectDefaultVideoModel(workflow, { quality: 'pro' }) !== RUNTIME_LTX25_DEV_WORKFLOW_MODELS[workflow]) {
-        throw new Error(`Runtime LTX 2.5 Pro default failed for ${workflow}`);
+      if (selectDefaultVideoModel(workflow, { quality: 'pro' }) !== RUNTIME_LTX25_WORKFLOW_MODELS[workflow]) {
+        throw new Error(`Runtime LTX 2.5 Pro default did not remain on Distilled for ${workflow}`);
       }
       const fastDefaults = getModelDefaults(RUNTIME_LTX25_WORKFLOW_MODELS[workflow]);
       const proDefaults = getModelDefaults(RUNTIME_LTX25_DEV_WORKFLOW_MODELS[workflow]);

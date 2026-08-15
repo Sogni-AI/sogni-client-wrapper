@@ -139,26 +139,25 @@ export const LTX25_DEV_WORKFLOW_MODELS: Record<Ltx25Workflow, Ltx25ConcreteModel
 
 export function getLtx25WorkflowModelIdForQuality(
   workflow: Ltx25Workflow,
-  qualityTier: VideoQualityTier | undefined = "fast",
+  _qualityTier: VideoQualityTier | undefined = "fast",
 ): Ltx25ConcreteModelId {
-  return qualityTier === "pro"
-    ? LTX25_DEV_WORKFLOW_MODELS[workflow]
-    : LTX25_DISTILLED_WORKFLOW_MODELS[workflow];
+  // LTX 2.5 Dev checkpoints remain registered for internal validation, but
+  // upstream has not published a supported ComfyUI Dev recipe. Keep every
+  // public quality selector on the release-validated Distilled workflow.
+  return LTX25_DISTILLED_WORKFLOW_MODELS[workflow];
 }
 
 export function getLtx25ModelNameForQuality(
   workflowName: string,
-  qualityTier: VideoQualityTier | undefined = "fast",
+  _qualityTier: VideoQualityTier | undefined = "fast",
 ): string {
-  return qualityTier === "pro"
-    ? `LTX 2.5 22B ${workflowName} Dev + Speed LoRA`
-    : `LTX 2.5 22B ${workflowName} Distilled`;
+  return `LTX 2.5 22B ${workflowName} Distilled`;
 }
 
 export function getLtx25StepsForQuality(
-  qualityTier: VideoQualityTier | undefined = "fast",
+  _qualityTier: VideoQualityTier | undefined = "fast",
 ): number {
-  return qualityTier === "pro" ? 30 : 8;
+  return 8;
 }
 
 export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
@@ -731,7 +730,7 @@ export function getVideoModelConfig(
       ...config,
       model: getLtx25WorkflowModelIdForQuality("i2v", qualityTier),
       steps: getLtx25StepsForQuality(qualityTier),
-      guidance: qualityTier === "pro" ? 3.0 : 1.0,
+      guidance: 1.0,
     };
   }
   if (modelId !== "ltx23") return config;

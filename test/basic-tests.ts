@@ -64,6 +64,7 @@ import {
   generateVideoDefinition,
   replaceVideoSegmentDefinition,
   soundToVideoDefinition,
+  upscaleImageDefinition,
   videoToVideoDefinition,
   collapseSingleSourceFanOutToDynamicPromptVariations,
   seedanceTerminalGenerationFailurePayloadFromError,
@@ -2451,6 +2452,20 @@ async function runTests() {
     }
     if (!all.some((tool) => tool.function.name === 'upscale_image')) {
       throw new Error('SogniTools.all must include the upscale_image contract');
+    }
+    const upscaleTarget = upscaleImageDefinition.function.parameters.properties.targetLongestEdge;
+    if (upscaleTarget.maximum !== 15360) {
+      throw new Error(`upscale_image targetLongestEdge maximum must be 15360, got ${upscaleTarget.maximum}`);
+    }
+    if (!upscaleImageDefinition.function.description?.includes('8K/16K')) {
+      throw new Error('upscale_image must advertise both 8K and 16K output');
+    }
+    const upscaleContract = PROMPT_CONTRACTS.find((contract) => contract.toolName === 'upscale_image');
+    if (!upscaleContract?.baseDescription.includes('4K/8K/16K output')) {
+      throw new Error('upscale_image prompt contract must advertise 16K output');
+    }
+    if (!upscaleContract.parameterDocs.targetLongestEdge?.includes('512-15360')) {
+      throw new Error('upscale_image prompt contract must expose the 15360px maximum');
     }
 
     const animateParams = animatePhotoDefinition.function.parameters.properties;

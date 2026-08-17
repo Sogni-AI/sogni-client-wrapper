@@ -1190,9 +1190,9 @@ export class SogniClientWrapper extends EventEmitter {
     };
   }
 
-  private async loadSharp(): Promise<typeof import('sharp')> {
+  private async loadSharp(): Promise<import('sharp').SharpConstructor> {
     const sharpModule = await import('sharp');
-    return ((sharpModule as unknown as { default?: typeof import('sharp') }).default || sharpModule) as typeof import('sharp');
+    return ((sharpModule as unknown as { default?: unknown }).default || sharpModule) as import('sharp').SharpConstructor;
   }
 
   /**

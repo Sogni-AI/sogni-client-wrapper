@@ -4,6 +4,12 @@
  */
 
 import type { ToolDefinition } from '../types.js';
+import {
+  KREA2_LORA_CATALOG_REFERENCE,
+  KREA2_LORA_MODEL_IDS_SENTENCE,
+  LORA_STACKING_GUIDANCE,
+  LORA_STRENGTHS_GUIDANCE,
+} from '../../shared/loraGuidance.js';
 import { LITERAL_PROMPT_OVERRIDE } from '../../../contracts/promptOverrideMarker.js';
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
 
@@ -106,7 +112,7 @@ VIDEO KEYFRAMES: When generating images intended as first+last frames for video 
           maxItems: 8,
           items: { type: 'string', minLength: 1 },
           description:
-            'Ordered LoRA IDs to apply to a compatible image model. Use only when the user explicitly requests LoRAs. Krea 2 Turbo has the broadest LoRA catalog. Order is significant: changing the order can change the image. Use at most 8 IDs and keep this array positionally aligned with loraStrengths. Workers download uncached LoRAs before generation, so the first render may take longer to start.',
+            `Ordered LoRA IDs to apply to a compatible image model. Use only when the user explicitly requests LoRAs or asks for an effect one of these names directly. ${LORA_STACKING_GUIDANCE}\n\n${KREA2_LORA_MODEL_IDS_SENTENCE}\n\n${KREA2_LORA_CATALOG_REFERENCE}`,
         },
         loraStrengths: {
           type: 'array',
@@ -114,7 +120,7 @@ VIDEO KEYFRAMES: When generating images intended as first+last frames for video 
           maxItems: 8,
           items: { type: 'number' },
           description:
-            'Strength for each LoRA in loras, in the same order. Omit to use 1.0 for every LoRA. Strengths are model/LoRA-specific and may be negative: many Krea 2 LoRAs are bipolar sliders where negative values apply the inverse effect and 0 disables the effect. Preserve explicit user values; the server clamps values to each LoRA contract.',
+            LORA_STRENGTHS_GUIDANCE,
         },
         gptImageQuality: {
           type: 'string',

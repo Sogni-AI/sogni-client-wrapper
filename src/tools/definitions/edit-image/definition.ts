@@ -4,6 +4,11 @@
  */
 
 import type { ToolDefinition } from '../types.js';
+import {
+  KREA2_LORA_CATALOG_REFERENCE,
+  LORA_STACKING_GUIDANCE,
+  LORA_STRENGTHS_GUIDANCE,
+} from '../../shared/loraGuidance.js';
 import { LITERAL_PROMPT_OVERRIDE } from '../../../contracts/promptOverrideMarker.js';
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
 
@@ -105,6 +110,22 @@ COMPOSITE GPT IMAGE 2 STORYBOARD SHEETS: When numberOfVariations=1 and the user 
           type: 'number',
           description:
             'Index of the primary image to use as the main reference. For follow-up edits when generated image results already exist, use the 0-based generated image result index; for example, editing the latest generated storyboard/image should use that generated result index so the model modifies the existing image instead of redrawing from uploads. When no generated image results exist, use sourceImageIndex=-1 to use the uploaded image references. The primary image and any additional uploaded images are passed as context images to guide generation.',
+        },
+        loras: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 8,
+          items: { type: 'string', minLength: 1 },
+          description: `Ordered LoRA IDs for the edit. ONLY valid with model="krea-identity-edit" or model="dark-beast-krea2-identity-edit" — Qwen, Flux.2 and GPT Image 2 accept no LoRAs and the IDs are dropped. Use when the user asks to shift a trait the identity edit itself does not change, such as age, build, skin, lighting or grain, while the identity LoRA holds the likeness. ${LORA_STACKING_GUIDANCE}
+
+${KREA2_LORA_CATALOG_REFERENCE}`,
+        },
+        loraStrengths: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 8,
+          items: { type: 'number' },
+          description: LORA_STRENGTHS_GUIDANCE,
         },
         numberOfVariations: {
           type: 'number',

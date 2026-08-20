@@ -64,3 +64,49 @@ export const KREA2_LORA_MODEL_IDS_SENTENCE =
   'Accepted only by the five Krea 2 based models: krea2_turbo_fp8_scaled (text-to-image), ' +
   'krea2_identity_edit_v1_2 and krea2_identity_edit_sogni_v0_3_alpha (identity edit), and the ' +
   'dark_beast_krea2_fp8 / dark_beast_krea2_identity_edit_v1_2 community variants.';
+
+/**
+ * The MiniMax H3 video LoRA catalog.
+ *
+ * Video LoRAs are a different shape from the Krea 2 sliders: positive-only, one
+ * file per family rather than one per effect, and gated on a trigger word that
+ * has to reach the prompt. State the trigger here because a request that omits
+ * it renders a normal H3 video and looks like the LoRA silently failed.
+ *
+ * Split across generate_video (t2v, r2v) and animate_photo (i2v, flf2v) because
+ * that is how the H3 modes are split across the two tools; each names only its
+ * own selectors so neither sends the other's.
+ */
+export const H3_VIDEO_LORA_CATALOG_REFERENCE =
+  'One LoRA is published for MiniMax H3 today: h3-realism-people (fal), a realism pass trained on '
+  + 'live-action footage of people. It restores skin texture and pores, stray hairs, fabric weave '
+  + 'and a fine sensor grain that the base model smooths away, and holds up in close-up. It needs '
+  + 'its trigger word: put r34l1sm near the FRONT of the prompt, or the render comes back as '
+  + 'ordinary H3 with no error. Exact ranges and any LoRA published since: '
+  + 'GET /v1/loras/comfy?modelId=<model>. Do not invent ids.';
+
+/** Shared video `loraStrengths` guidance: positive-only, and what pushing it costs. */
+export const H3_VIDEO_LORA_STRENGTHS_GUIDANCE =
+  'Strength for each LoRA in loras, in the same order. Omitting the array applies 1.0 to every '
+  + 'LoRA, which is NOT the catalog default and for h3-realism-people is already at the top of its '
+  + 'band, so send explicit values. Video LoRAs are positive-only — unlike the bipolar Krea 2 image '
+  + 'sliders, a negative value is not an inverse effect and 0 is off. h3-realism-people takes 0-2 '
+  + 'and its catalog default is 0.8; 0.6-1 is the '
+  + 'usable band. It also pulls the camera in as it climbs: at 1.5 and above the shot reliably '
+  + 'recomposes and the grade darkens, which on an image-conditioned mode can crop the subject out '
+  + 'of the frame the user supplied. Raise it above 1 only when the user asks for more, and prefer '
+  + 'the default when they supplied a first or last frame.';
+
+/**
+ * Which selectors accept the H3 LoRAs, in the vocabulary of one tool.
+ *
+ * Written per tool rather than as one shared list: an LLM reading animate_photo
+ * cannot set videoModel="minimax-h3-t2v" there, and naming it invites the try.
+ */
+export function h3LoraModelSentence(selectors: readonly string[]): string {
+  return (
+    `Accepted only when videoModel is one of ${selectors.map(selector => `"${selector}"`).join(', ')}. `
+    + 'Every other video model on this tool loads no LoRAs and silently ignores these arrays, so set '
+    + 'videoModel to an H3 mode in the same call when the user asks for one.'
+  );
+}

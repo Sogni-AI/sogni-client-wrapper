@@ -2,6 +2,9 @@
  * Unit tests for the public-safe tool-arg normalization helpers.
  */
 import {
+  animatePhotoDefinition,
+  editImageDefinition,
+  generateVideoDefinition,
   generateImageDefinition,
   extractDynamicPromptBranches,
   getModelOptions,
@@ -144,6 +147,80 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
     },
   );
   expect('generate_image accepts ordered bipolar LoRA strengths', bipolarLoras.ok, true);
+
+  // MiniMax H3 video LoRAs. The two tools split the H3 modes between them, so
+  // each must carry the arrays and name only its own selectors.
+  for (const [toolName, definition, expectedSelectors] of [
+    ['generate_video', generateVideoDefinition, ['minimax-h3-t2v', 'minimax-h3-t2v-turbo', 'minimax-h3-r2v', 'minimax-h3-r2v-turbo']],
+    ['animate_photo', animatePhotoDefinition, ['minimax-h3-i2v', 'minimax-h3-i2v-turbo', 'minimax-h3-flf2v', 'minimax-h3-flf2v-turbo']],
+  ] as const) {
+    const properties = definition.function.parameters.properties ?? {};
+    expect(
+      `${toolName} exposes ordered LoRA arrays`,
+      { loras: properties.loras?.maxItems, loraStrengths: properties.loraStrengths?.maxItems },
+      { loras: 8, loraStrengths: 8 },
+    );
+    // Every selector the description tells the LLM to set must be a real enum
+    // member, or the model follows the advice into a validation error.
+    const videoModelEnum = (properties.videoModel?.enum ?? []) as string[];
+    expect(
+      `${toolName} LoRA selectors are all videoModel enum members`,
+      expectedSelectors.filter(selector => !videoModelEnum.includes(selector)),
+      [],
+    );
+    expect(
+      `${toolName} names its own H3 LoRA selectors and not the other tool's`,
+      expectedSelectors.every(selector => properties.loras?.description?.includes(`"${selector}"`)),
+      true,
+    );
+    expect(
+      `${toolName} names the LoRA and its trigger word`,
+      Boolean(properties.loras?.description?.includes('h3-realism-people') && properties.loras?.description?.includes('r34l1sm')),
+      true,
+    );
+  }
+  expect(
+    'generate_video rejects mismatched LoRA arrays',
+    validateAndNormalizeHostedToolArguments([generateVideoDefinition], 'generate_video', {
+      prompt: 'r34l1sm, a fisherman mending nets',
+      videoModel: 'minimax-h3-t2v',
+      loras: ['h3-realism-people'],
+      loraStrengths: [0.8, 0.8],
+    }).ok,
+    false,
+  );
+  expect(
+    'generate_video accepts an H3 LoRA request',
+    validateAndNormalizeHostedToolArguments([generateVideoDefinition], 'generate_video', {
+      prompt: 'r34l1sm, a fisherman mending nets',
+      videoModel: 'minimax-h3-t2v',
+      loras: ['h3-realism-people'],
+      loraStrengths: [0.8],
+    }).ok,
+    true,
+  );
+  expect(
+    'animate_photo rejects loraStrengths without loras',
+    validateAndNormalizeHostedToolArguments([animatePhotoDefinition], 'animate_photo', {
+      prompt: 'r34l1sm, she turns to the window',
+      videoModel: 'minimax-h3-i2v',
+      loraStrengths: [0.8],
+    }).ok,
+    false,
+  );
+  // edit_image gained LoRAs after the parity check was written against
+  // generate_image by name, so it went unchecked until the check moved onto the
+  // schema. Guard the regression rather than the one tool.
+  expect(
+    'edit_image rejects mismatched LoRA arrays',
+    validateAndNormalizeHostedToolArguments([editImageDefinition], 'edit_image', {
+      prompt: 'make her older',
+      model: 'krea-identity-edit',
+      loras: ['krea2-age'],
+      loraStrengths: [2, 1],
+    }).ok,
+    false,
+  );
 
   const openNestedPayload = {
     id: 'wf_existing',

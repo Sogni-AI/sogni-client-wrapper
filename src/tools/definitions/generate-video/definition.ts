@@ -5,6 +5,12 @@
 
 import type { ToolDefinition } from '../types.js';
 import {
+  H3_VIDEO_LORA_CATALOG_REFERENCE,
+  H3_VIDEO_LORA_STRENGTHS_GUIDANCE,
+  LORA_STACKING_GUIDANCE,
+  h3LoraModelSentence,
+} from '../../shared/loraGuidance.js';
+import {
   GENERATE_VIDEO_SKIP_PROMPT_PROCESSING_DESCRIPTION,
   LITERAL_VIDEO_PROMPT_OVERRIDE,
   SEEDANCE_EXPAND_PROMPT_DESCRIPTION,
@@ -12,6 +18,21 @@ import {
   HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION,
 } from '../../../contracts/toolPromptMarkers.js';
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
+
+/**
+ * The videoModel selectors on THIS tool that load LoRAs.
+ *
+ * H3's image-conditioned modes (i2v, flf2v) live on animate_photo, so they are
+ * deliberately absent here. `tools-shared-tests` asserts every id below is a
+ * member of the videoModel enum, which is what keeps the two in step without
+ * reordering the enum itself.
+ */
+const H3_LORA_SELECTORS = [
+  "minimax-h3-t2v",
+  "minimax-h3-t2v-turbo",
+  "minimax-h3-r2v",
+  "minimax-h3-r2v-turbo",
+] as const;
 
 export const definition: ToolDefinition = {
   type: "function",
@@ -154,6 +175,21 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
           type: "string",
           description:
             'ONLY when the user explicitly requests a registered/reference persona voice clip. Name of the persona whose voice clip to use as referenceAudioIdentity. Set this when the narrator/speaker is a different persona than the one described in the video (e.g. "David" narrates a scene featuring Aleyna), or to explicitly select a requested voice when multiple personas with voice clips are resolved. Do NOT set this for ordinary character dialogue, inferred voices, or personas without a voice clip — LTX 2.3 generates voice natively from the text prompt instead. Requires ltx23 because LTX 2.5 has no compatible ID-LoRA.',
+        },
+        loras: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          items: { type: "string", minLength: 1 },
+          description:
+            `Ordered LoRA IDs to apply to a MiniMax H3 render. Use only when the user explicitly asks for a LoRA or for an effect one of these names describes. ${LORA_STACKING_GUIDANCE}\n\n${h3LoraModelSentence(H3_LORA_SELECTORS)}\n\n${H3_VIDEO_LORA_CATALOG_REFERENCE}`,
+        },
+        loraStrengths: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          items: { type: "number" },
+          description: H3_VIDEO_LORA_STRENGTHS_GUIDANCE,
         },
       },
       required: ["prompt"],

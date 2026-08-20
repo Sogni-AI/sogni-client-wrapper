@@ -430,7 +430,12 @@ export function validateAndNormalizeHostedToolArguments(
   const cleaned = validateValueAgainstSchema('', args, normalizedSchema, context).value;
   const cleanedRecord = isRecord(cleaned) ? cleaned : args;
 
-  if (toolName === 'generate_image') {
+  // Positional arrays: loraStrengths[i] belongs to loras[i], so a length
+  // mismatch silently shifts every strength onto the wrong LoRA. Keyed off the
+  // schema rather than a tool name — generate_image was the only tool that
+  // accepted LoRAs when this landed, and edit_image, generate_video and
+  // animate_photo each gained them later without gaining the check.
+  if (isRecord(normalizedSchema.properties) && 'loras' in normalizedSchema.properties) {
     const loras = cleanedRecord.loras;
     const strengths = cleanedRecord.loraStrengths;
     if (Array.isArray(strengths) && !Array.isArray(loras)) {

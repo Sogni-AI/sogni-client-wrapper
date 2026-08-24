@@ -1,28 +1,3 @@
-# [3.18.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.17.1...v3.18.0) (2026-08-24)
-
-
-### Bug Fixes
-
-* **deps:** align client pin with 5.15.3 ([0ca279c](https://github.com/Sogni-AI/sogni-intelligence-client/commit/0ca279c142b1c9a7de229524b048c6f904039b25))
-* **deps:** align client pin with 5.15.4 ([abcc07f](https://github.com/Sogni-AI/sogni-intelligence-client/commit/abcc07f3dc0a2f3c63f73c3b7976fc331c73a4f5))
-* **deps:** align sogni client release ([6f53abe](https://github.com/Sogni-AI/sogni-intelligence-client/commit/6f53abe4b1fac997bd869718803d93e28498c502))
-* **deps:** bump sogni client to 5.15.5 ([8d41453](https://github.com/Sogni-AI/sogni-intelligence-client/commit/8d4145313c8721fcd0eca04e4eb0468a2209894a))
-* **deps:** bump sogni client to 5.16.0 ([1dd281d](https://github.com/Sogni-AI/sogni-intelligence-client/commit/1dd281d9a71f66b6af56246060174a5ef1809b60))
-* **deps:** bump sogni protocol to 1.0.0-alpha.22 ([aae700b](https://github.com/Sogni-AI/sogni-intelligence-client/commit/aae700b5d75f81343043b4717fe3242f21791609))
-* **deps:** bump sogni-client to 5.15.1 ([897b2c3](https://github.com/Sogni-AI/sogni-intelligence-client/commit/897b2c348f3462e6856162c237876c011d148a3c))
-* **deps:** bump sogni-client to 5.15.2 ([351c3d6](https://github.com/Sogni-AI/sogni-intelligence-client/commit/351c3d6fe513a5a37e9dd74d394ba44b2fd9863f))
-* **deps:** bump sogni-client to 5.17.0 for the LoRA catalog ([91d2b57](https://github.com/Sogni-AI/sogni-intelligence-client/commit/91d2b57db9ea3600b464e526840b83ae930cd808))
-* **deps:** upgrade sharp past libvips advisories ([85a0d9f](https://github.com/Sogni-AI/sogni-intelligence-client/commit/85a0d9ffaf6c3b649de32bf5935c7ffee4452133))
-
-
-### Features
-
-* **music:** make MiniMax Music 3 the default generate_music model ([3f8a550](https://github.com/Sogni-AI/sogni-intelligence-client/commit/3f8a550fea8d89176f1e84fbecb2ba152d0c8fed))
-* **tools:** support RTX VSR upscaling through 16K ([6fb871d](https://github.com/Sogni-AI/sogni-intelligence-client/commit/6fb871df1c23cc10c0144abe4617e80f962ff03d))
-* **tools:** teach the image tools how to use Krea 2 LoRAs ([eab538e](https://github.com/Sogni-AI/sogni-intelligence-client/commit/eab538e6d74d6b69e4067930e254ce30c6ce62df))
-* **tools:** teach the video tools how to use the MiniMax H3 LoRA ([5e9df9b](https://github.com/Sogni-AI/sogni-intelligence-client/commit/5e9df9b9216775a655a9ce48d24f365d46a5f69c))
-* **video:** retire Seedance 2.0 Fast in favor of Seedance 2.0 Mini ([8dcd999](https://github.com/Sogni-AI/sogni-intelligence-client/commit/8dcd99949eddff053fbc20591c1c6879110f55f4))
-
 ## [3.12.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.12.5...v3.12.6) (2026-08-04)
 
 

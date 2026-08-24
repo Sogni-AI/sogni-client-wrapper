@@ -437,7 +437,7 @@ export function validateProjectConfig(config: ProjectConfig): void {
       }
 
       // Seedance 2.5 renders 4-30s and accepts 30 images / 10 videos / 10 audios
-      // (30 total); the 2.0 family renders 4-15s and accepts 9 / 3 / 3 (12 total).
+      // (50 total); the 2.0 family renders 4-15s and accepts 9 / 3 / 3 (12 total).
       // Caps are read from the protocol catalog rather than re-hard-coded here.
       const isSeedance25 = isSeedance25VideoModel(config.modelId);
       const maxSeedanceDuration = isSeedance25 ? 30 : 15;

@@ -193,11 +193,18 @@ export {
   IMAGE_PROMPT_MAX_TOKENS,
   IMAGE_PROMPT_TOOL,
   buildImagePromptMessages,
+  buildImagePromptAuthoringMessages,
+  resolveImagePromptAuthoringProfile,
+  assertImagePromptAuthoringOutput,
   parseToolCallPrompt,
 } from './imagePrompt.js';
 export type {
   ImagePromptingType,
   BuildImagePromptMessagesInput,
+  ImagePromptAuthoringOperation,
+  ImagePromptAuthoringOutputFormat,
+  ImagePromptAuthoringProfile,
+  BuildImagePromptAuthoringMessagesInput,
 } from './imagePrompt.js';
 // instrumental composition surface (system prompts, tool definitions,
 // message builders, result parser) extracted from

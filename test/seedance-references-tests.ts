@@ -158,9 +158,9 @@ export function runSeedanceReferencesTests(): { passed: number; failed: number }
     { images: 9, videos: 3, audios: 3, assets: 12 },
   );
   expect(
-    'per-model: seedance-2-5 is 30/10/10/30',
+    'per-model: seedance-2-5 is 30/10/10/50',
     getSeedanceReferenceLimits('seedance-2-5'),
-    { images: 30, videos: 10, audios: 10, assets: 30 },
+    { images: 30, videos: 10, audios: 10, assets: 50 },
   );
   expectThrows(
     'per-model: unknown model throws instead of defaulting',
@@ -181,6 +181,14 @@ export function runSeedanceReferencesTests(): { passed: number; failed: number }
     'validate: at-cap 30/0/0 ok on seedance-2-5',
     (() => {
       validateSeedanceReferenceCounts({ images: 30, videos: 0, audios: 0 }, 'seedance-2-5');
+      return 'ok';
+    })(),
+    'ok',
+  );
+  expect(
+    'validate: all per-modality caps totaling 50 are valid on seedance-2-5',
+    (() => {
+      validateSeedanceReferenceCounts({ images: 30, videos: 10, audios: 10 }, 'seedance-2-5');
       return 'ok';
     })(),
     'ok',

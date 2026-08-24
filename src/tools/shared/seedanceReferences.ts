@@ -38,7 +38,7 @@ export const SEEDANCE_REFERENCE_LIMITS: SeedanceReferenceLimits = Object.freeze(
 /**
  * Per-model caps, keyed by canonical Seedance model id. Sourced from the same
  * protocol catalog. Seedance 2.5 accepts 30 images / 10 videos / 10 audios with
- * 30 reference files total; the 2.0 family accepts 9 / 3 / 3 with 12 total.
+ * 50 reference files total; the 2.0 family accepts 9 / 3 / 3 with 12 total.
  */
 export const SEEDANCE_REFERENCE_LIMITS_BY_MODEL: Readonly<
   Record<string, SeedanceReferenceLimits>

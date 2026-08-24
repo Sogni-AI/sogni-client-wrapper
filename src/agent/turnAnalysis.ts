@@ -61,6 +61,18 @@ export type SignalProvenance =
   | 'artifact_graph'
   | 'user_explicit';
 
+/** A typed text deliverable that a runtime may author without media execution. */
+export interface TurnTextArtifact {
+  kind: 'model_prompt';
+  modality: 'image' | 'video';
+  /** A named target is required before model-native authoring may run. */
+  targetModel: string | null;
+  /** Media operation/workflow such as t2i, edit, t2v, i2v, flf2v, or r2v. */
+  workflow: string | null;
+  /** Video-only clip duration. Image artifacts keep this null. */
+  durationSeconds: number | null;
+}
+
 /**
  * Structured analysis of a single user turn. Produced by the L1 classifier
  * before any tool surface is composed.
@@ -88,6 +100,11 @@ export interface TurnAnalysis {
   needsClarification: boolean;
   /** Classifier confidence in this analysis, in [0, 1]. */
   confidence: number;
+  /**
+   * Optional model-native text deliverable. Null/absent remains valid for
+   * backward compatibility with classifiers that predate typed authoring.
+   */
+  textArtifact?: TurnTextArtifact | null;
   /** Where this analysis came from (classifier vs planner override, etc.). */
   provenance: SignalProvenance;
 }
@@ -149,6 +166,33 @@ export function isSignalProvenance(value: unknown): value is SignalProvenance {
   return typeof value === 'string' && SIGNAL_PROVENANCES.has(value as SignalProvenance);
 }
 
+export function isTurnTextArtifact(value: unknown): value is TurnTextArtifact {
+  return isRecord(value)
+    && value.kind === 'model_prompt'
+    && (value.modality === 'image' || value.modality === 'video')
+    && isNullableBoundedString(value.targetModel, 160)
+    && isNullableBoundedString(value.workflow, 80)
+    && (value.modality === 'video' || value.durationSeconds === null)
+    && (
+      value.durationSeconds === null
+      || (
+        typeof value.durationSeconds === 'number'
+        && Number.isFinite(value.durationSeconds)
+        && value.durationSeconds > 0
+        && value.durationSeconds <= 3600
+      )
+    );
+}
+
+function isNullableBoundedString(value: unknown, maxLength: number): boolean {
+  return value === null
+    || (
+      typeof value === 'string'
+      && value.trim().length > 0
+      && value.length <= maxLength
+    );
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
@@ -171,6 +215,11 @@ export function isTurnAnalysis(value: unknown): value is TurnAnalysis {
   if (!isStringArray(value.requiredCapabilities)) return false;
   if (typeof value.needsClarification !== 'boolean') return false;
   if (typeof value.confidence !== 'number' || !Number.isFinite(value.confidence)) return false;
+  if (
+    value.textArtifact !== undefined
+    && value.textArtifact !== null
+    && !isTurnTextArtifact(value.textArtifact)
+  ) return false;
   if (!isSignalProvenance(value.provenance)) return false;
   return true;
 }
@@ -249,6 +298,18 @@ export function validateTurnAnalysis(value: unknown): TurnAnalysisValidationResu
   const conf = (value as { confidence?: unknown }).confidence;
   if (typeof conf !== 'number' || !Number.isFinite(conf)) {
     pushError(errors, '/confidence', 'must be a finite number');
+  }
+  const textArtifact = (value as { textArtifact?: unknown }).textArtifact;
+  if (
+    textArtifact !== undefined
+    && textArtifact !== null
+    && !isTurnTextArtifact(textArtifact)
+  ) {
+    pushError(
+      errors,
+      '/textArtifact',
+      'must be null or a valid TurnTextArtifact',
+    );
   }
   if (!isSignalProvenance((value as { provenance?: unknown }).provenance)) {
     pushError(errors, '/provenance', 'must be a valid SignalProvenance');

@@ -71,14 +71,18 @@ import {
   seedanceTerminalPolicyPayloadFromError,
   SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE,
   SEEDANCE_STYLIZE_RECOVERY_OPTIONS,
+  MODELS_BY_TOOL,
 } from '../src/tools/index.js';
 import { GENERATION_TOOLS_MANIFEST } from '../src/openai-tools/index.js';
 import {
   PROMPT_CONTRACTS,
   IMAGE_PROMPT_TOOL,
+  assertImagePromptAuthoringOutput,
+  buildImagePromptAuthoringMessages,
   buildImagePromptMessages,
   buildLtxScriptMessages,
   buildWanScriptMessages,
+  resolveImagePromptAuthoringProfile,
 } from '../src/contracts/index.js';
 import {
   buildImageEditExecutionControls,
@@ -101,6 +105,12 @@ import { runSeedanceReferencesTests } from './seedance-references-tests';
 import { runHappyHorseReferencesTests } from './happyhorse-references-tests';
 import { runWorkflowExecutorTests } from './workflow-executor-tests';
 import { runCostApprovalTests } from './cost-approval-tests';
+import {
+  isTurnAnalysis,
+  isTurnTextArtifact,
+  validateTurnAnalysis,
+  type TurnAnalysis,
+} from '../src/agent/index.js';
 
 console.log('🧪 Starting sogni-client-wrapper tests...\n');
 
@@ -128,6 +138,151 @@ async function runTests() {
     if (!SogniError) throw new Error('SogniError not imported');
     if (!ClientEvent) throw new Error('ClientEvent not imported');
     if (!generateAppId) throw new Error('generateAppId not imported');
+  })();
+
+  await test('Should validate typed model-prompt text artifacts on TurnAnalysis', () => {
+    const analysis: TurnAnalysis = {
+      domain: 'chat',
+      intent: 'generate',
+      executionMode: 'none',
+      userWantsExecution: false,
+      isCapabilityQuestion: false,
+      isFutureInstruction: false,
+      isReferenceOnly: false,
+      needsPriorContext: false,
+      referencedArtifacts: [],
+      requiredCapabilities: [],
+      needsClarification: false,
+      confidence: 0.98,
+      textArtifact: {
+        kind: 'model_prompt',
+        modality: 'video',
+        targetModel: 'future-video-model-v7',
+        workflow: 'depth-guided-video',
+        durationSeconds: 12.5,
+      },
+      provenance: 'classifier',
+    };
+    if (!isTurnTextArtifact(analysis.textArtifact)) {
+      throw new Error('MiniMax H3 T2V text artifact was not recognized');
+    }
+    if (!isTurnAnalysis(analysis) || !validateTurnAnalysis(analysis).valid) {
+      throw new Error('TurnAnalysis rejected a valid model-prompt text artifact');
+    }
+
+    const invalid = {
+      ...analysis,
+      textArtifact: {
+        kind: 'model_prompt',
+        modality: 'video',
+        targetModel: '',
+        workflow: 't2v',
+        durationSeconds: null,
+      },
+    };
+    if (isTurnAnalysis(invalid)) {
+      throw new Error('TurnAnalysis accepted an unknown model-prompt target');
+    }
+    if (!validateTurnAnalysis(invalid).errors.some((error) => error.path === '/textArtifact')) {
+      throw new Error('TurnAnalysis validation did not identify the invalid text artifact');
+    }
+
+    const invalidImageDuration = {
+      ...analysis,
+      textArtifact: {
+        kind: 'model_prompt',
+        modality: 'image',
+        targetModel: 'krea-2-turbo',
+        workflow: 'generate',
+        durationSeconds: 8,
+      },
+    };
+    if (isTurnAnalysis(invalidImageDuration)) {
+      throw new Error('TurnAnalysis accepted video duration metadata on an image prompt artifact');
+    }
+  })();
+
+  await test('Should resolve every exposed image selector to a model-and-operation prompt contract', () => {
+    for (const model of MODELS_BY_TOOL.generate_image ?? []) {
+      const profile = resolveImagePromptAuthoringProfile(model.key, 'generate');
+      if (!profile || profile.operation !== 'generate') {
+        throw new Error(`Missing generation prompt contract for ${model.key}`);
+      }
+    }
+    for (const model of MODELS_BY_TOOL.edit_image ?? []) {
+      const profile = resolveImagePromptAuthoringProfile(model.key, 'edit');
+      if (!profile || profile.operation !== 'edit') {
+        throw new Error(`Missing edit prompt contract for ${model.key}`);
+      }
+    }
+  })();
+
+  await test('Should keep SD, FLUX, Krea, Qwen, Z-Image, and edit prompt grammars distinct', () => {
+    const sdxl = resolveImagePromptAuthoringProfile('Stable Diffusion XL', 't2i');
+    const flux = resolveImagePromptAuthoringProfile('Flux.2 Dev', 'generate');
+    const krea = resolveImagePromptAuthoringProfile('Krea 2 Turbo', 'generation');
+    const qwen = resolveImagePromptAuthoringProfile('Qwen Image 2512', 'text-to-image');
+    const zTurbo = resolveImagePromptAuthoringProfile('Z-Image Turbo', 'generate');
+    const qwenEdit = resolveImagePromptAuthoringProfile('qwen', 'image-edit');
+    if (!sdxl || sdxl.promptingType !== 'sdxl' || sdxl.outputFormat !== 'positive_negative') {
+      throw new Error('SDXL did not resolve to its positive/negative hybrid contract');
+    }
+    if (!flux || flux.promptingType !== 'flux' || flux.outputFormat !== 'prompt') {
+      throw new Error('FLUX did not resolve to its natural-language prompt-only contract');
+    }
+    if (!krea || krea.promptingType !== 'krea2' || krea.outputFormat !== 'prompt') {
+      throw new Error('Krea 2 did not resolve to its dense-caption prompt-only contract');
+    }
+    if (!qwen || qwen.promptingType !== 'qwen' || qwen.outputFormat !== 'positive_negative') {
+      throw new Error('Qwen Image did not resolve to its detailed positive/negative contract');
+    }
+    if (!zTurbo || zTurbo.promptingType !== 'z-image' || zTurbo.outputFormat !== 'prompt') {
+      throw new Error('Z-Image Turbo did not keep its distilled prompt-only contract');
+    }
+    if (!qwenEdit || qwenEdit.promptingType !== 'qwen-edit' || qwenEdit.operation !== 'edit') {
+      throw new Error('Qwen Image Edit did not resolve to a delta-instruction edit contract');
+    }
+
+    const sdxlSystem = buildImagePromptAuthoringMessages({
+      prompt: 'a car commercial still',
+      profile: sdxl,
+    })[0]?.content ?? '';
+    const fluxSystem = buildImagePromptAuthoringMessages({
+      prompt: 'a car commercial still',
+      profile: flux,
+    })[0]?.content ?? '';
+    const kreaSystem = buildImagePromptAuthoringMessages({
+      prompt: 'a car commercial still',
+      profile: krea,
+    })[0]?.content ?? '';
+    if (!sdxlSystem.includes('comma-separated quality/style keywords')) {
+      throw new Error('SDXL authoring lost its hybrid keyword guidance');
+    }
+    if (!fluxSystem.includes('not keyword lists') || !fluxSystem.includes('prompt text')) {
+      throw new Error('FLUX authoring lost its natural-language prompt-only guidance');
+    }
+    if (!kreaSystem.includes('rich captions') || !kreaSystem.includes('dense but fluent')) {
+      throw new Error('Krea 2 authoring lost its caption-conditioned guidance');
+    }
+
+    assertImagePromptAuthoringOutput(
+      sdxl,
+      'positive_prompt: a polished crimson coupe, studio lighting\nnegative_prompt: distorted wheels, illegible text',
+    );
+    assertImagePromptAuthoringOutput(flux, 'A polished crimson coupe in a controlled studio composition.');
+
+    if (resolveImagePromptAuthoringProfile('Krea 2 Turbo', 'edit') !== null) {
+      throw new Error('Generation-only Krea 2 selector incorrectly accepted an edit operation');
+    }
+    if (resolveImagePromptAuthoringProfile('Flux.1 Krea', 'edit') !== null) {
+      throw new Error('Generation-only FLUX selector incorrectly accepted an edit operation');
+    }
+    if (resolveImagePromptAuthoringProfile('Unknown Diffusion X9', 'generate') !== null) {
+      throw new Error('Unknown image model incorrectly received a fallback prompt contract');
+    }
+    if (resolveImagePromptAuthoringProfile('SDXL', 'depth-conditioned') !== null) {
+      throw new Error('Unknown image operation incorrectly defaulted to generation');
+    }
   })();
 
   await test('Should expose the canonical LTX 2.5 quality and workflow contract', () => {

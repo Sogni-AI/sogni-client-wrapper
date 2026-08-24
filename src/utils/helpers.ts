@@ -77,6 +77,10 @@ export function isHappyHorseVideoModel(modelId: string): boolean {
   return modelId.startsWith('happyhorse-1.1');
 }
 
+export function isMiniMaxH3VideoModel(modelId: string): boolean {
+  return modelId.startsWith('minimax-h3');
+}
+
 /**
  * Last-resort video dimension envelope used by the wrapper when it normalizes
  * a project's requested width/height and resizes reference media to match.
@@ -85,6 +89,7 @@ export interface VideoDimensionRules {
   minDimension: number;
   maxDimension: number;
   dimensionMultiple: number;
+  maxPixels?: number;
 }
 
 /**
@@ -99,6 +104,17 @@ export interface VideoDimensionRules {
  */
 export function getVideoDimensionRules(modelId?: string): VideoDimensionRules {
   if (modelId) {
+    if (isMiniMaxH3VideoModel(modelId)) {
+      // H3 validates both axes on a 32px grid and caps the whole canvas at
+      // 1344x768 pixels. The pixel cap matters independently of the per-axis
+      // ceiling: 1344x1344 is on-grid but is still not a valid H3 canvas.
+      return {
+        minDimension: 32,
+        maxDimension: 1344,
+        dimensionMultiple: 32,
+        maxPixels: 1_032_192,
+      };
+    }
     if (isLtxVideoModel(modelId)) {
       // LTX-2.x tiers accept 640–3840 (step 8 server-side); multiples of 16
       // keep every emitted size on the tier grid, 1920x1088 included.

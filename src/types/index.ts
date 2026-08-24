@@ -387,6 +387,12 @@ export interface VideoCostEstimateParams {
   /** Number of videos to generate */
   numberOfMedia?: number;
 
+  /**
+   * Number of image references the estimated video job will submit.
+   * Models whose pricing does not use this metadata ignore it.
+   */
+  referenceImageCount?: number;
+
   /** Token type for estimate */
   tokenType?: TokenType;
 }

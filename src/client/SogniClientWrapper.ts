@@ -635,6 +635,12 @@ export class SogniClientWrapper extends EventEmitter {
     if (params.steps !== undefined && (typeof params.steps !== 'number' || params.steps <= 0)) {
       throw new SogniValidationError('Steps must be a positive number');
     }
+    if (
+      params.referenceImageCount !== undefined &&
+      (!Number.isInteger(params.referenceImageCount) || params.referenceImageCount < 0)
+    ) {
+      throw new SogniValidationError('Reference image count must be a non-negative integer');
+    }
 
     const tokenType = params.tokenType || 'spark';
     const numberOfMedia = params.numberOfMedia || 1;
@@ -672,6 +678,9 @@ export class SogniClientWrapper extends EventEmitter {
       fps,
       steps: params.steps,
       numberOfMedia,
+      ...(params.referenceImageCount !== undefined
+        ? { referenceImageCount: params.referenceImageCount }
+        : {}),
     });
   }
 
@@ -1023,7 +1032,17 @@ export class SogniClientWrapper extends EventEmitter {
     if (baseBuffer && width && height) {
       const baseFit: 'inside' | 'cover' =
         baseKey === 'referenceImageEnd' && !!config.referenceImage ? 'cover' : 'inside';
-      const resizedBase = await this.resizeImageBuffer(baseBuffer, width, height, baseFit);
+      const fittedBase = await this.resizeImageBuffer(baseBuffer, width, height, baseFit);
+      // `fit: inside` preserves the source aspect ratio, so Sharp may emit an
+      // actual size that no longer follows the model's grid. For example,
+      // fitting 1472x1024 inside H3's 1344x768 box yields 1104x768; 1104 is not
+      // divisible by H3's required 32px step. Re-normalize the *actual* fitted
+      // size and, only when needed, make a tiny center crop from the original
+      // so the final reference and project dimensions are guaranteed valid.
+      const fittedDims = this.normalizeVideoDimensions(fittedBase.width, fittedBase.height, config.modelId);
+      const resizedBase = fittedDims.adjusted
+        ? await this.resizeImageBuffer(baseBuffer, fittedDims.width, fittedDims.height, 'cover')
+        : fittedBase;
       if (resizedBase.wasResized) {
         console.log(
           `[SogniClientWrapper] Resized ${baseKey} from ${resizedBase.originalWidth}x${resizedBase.originalHeight} to ${resizedBase.width}x${resizedBase.height} to meet video requirements.`
@@ -1072,6 +1091,7 @@ export class SogniClientWrapper extends EventEmitter {
     const minDimension = rules.minDimension;
     const maxDimension = rules.maxDimension;
     const dimensionMultiple = rules.dimensionMultiple;
+    const maxPixels = rules.maxPixels;
 
     let targetWidth = width;
     let targetHeight = height;
@@ -1104,6 +1124,13 @@ export class SogniClientWrapper extends EventEmitter {
         targetWidth = Math.floor(targetWidth * downscaleFactor);
         targetHeight = Math.floor(targetHeight * downscaleFactor);
       }
+    }
+
+    if (maxPixels && targetWidth * targetHeight > maxPixels) {
+      const scaleFactor = Math.sqrt(maxPixels / (targetWidth * targetHeight));
+      targetWidth = Math.floor(targetWidth * scaleFactor);
+      targetHeight = Math.floor(targetHeight * scaleFactor);
+      adjusted = true;
     }
 
     if (dimensionMultiple > 1) {

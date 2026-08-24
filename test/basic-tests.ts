@@ -590,6 +590,15 @@ async function runTests() {
     if (seedance.maxDimension < 3840 || seedance.dimensionMultiple !== 1) {
       throw new Error(`Seedance rules must not shrink vendor requests: ${JSON.stringify(seedance)}`);
     }
+    const h3 = getVideoDimensionRules('minimax-h3-fl2va-fp8_i2v');
+    if (
+      h3.minDimension !== 32 ||
+      h3.maxDimension !== 1344 ||
+      h3.dimensionMultiple !== 32 ||
+      h3.maxPixels !== 1_032_192
+    ) {
+      throw new Error(`Unexpected MiniMax H3 rules: ${JSON.stringify(h3)}`);
+    }
     const fallback = getVideoDimensionRules(undefined);
     if (fallback.maxDimension !== 1536) throw new Error('Unknown models must keep the legacy envelope');
   })();
@@ -643,10 +652,65 @@ async function runTests() {
       throw new Error(`HappyHorse 1920x1080 must pass through untouched, got ${JSON.stringify(hh)}`);
     }
 
+    const h3Square = normalize(1344, 1344, 'minimax-h3-fl2va-fp8_i2v');
+    if (
+      h3Square.width % 32 !== 0 ||
+      h3Square.height % 32 !== 0 ||
+      h3Square.width * h3Square.height > 1_032_192 ||
+      !h3Square.adjusted
+    ) {
+      throw new Error(`H3 square request must snap to its grid and pixel budget, got ${JSON.stringify(h3Square)}`);
+    }
+
     // No model id: legacy behavior unchanged.
     const legacy = normalize(1920, 1088);
     if (legacy.width !== 1536 || legacy.height !== 864 || !legacy.adjusted) {
       throw new Error(`Unknown-model 1920x1088 must keep the legacy clamp, got ${JSON.stringify(legacy)}`);
+    }
+  })();
+
+  await test('Should keep aspect-fit MiniMax H3 references on-grid after resizing', async () => {
+    const { default: sharp } = await import('sharp');
+    const source = await sharp({
+      create: {
+        width: 1472,
+        height: 1024,
+        channels: 3,
+        background: { r: 16, g: 32, b: 48 },
+      },
+    }).png().toBuffer();
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+    const prepare = (
+      client as unknown as {
+        prepareProjectConfig: (config: VideoProjectConfig) => Promise<VideoProjectConfig>;
+      }
+    ).prepareProjectConfig.bind(client);
+    const prepared = await prepare({
+      type: 'video',
+      modelId: 'minimax-h3-fl2va-fp8_i2v',
+      positivePrompt: 'A detailed dialogue-ready test scene.',
+      width: 1344,
+      height: 768,
+      referenceImage: source,
+      numberOfMedia: 1,
+    } as VideoProjectConfig);
+    const metadata = await sharp(prepared.referenceImage as Buffer).metadata();
+
+    if (prepared.width !== 1088 || prepared.height !== 768) {
+      throw new Error(`Expected H3 reference to snap to 1088x768, got ${prepared.width}x${prepared.height}`);
+    }
+    if (metadata.width !== prepared.width || metadata.height !== prepared.height) {
+      throw new Error(`Prepared H3 buffer does not match project dimensions: ${metadata.width}x${metadata.height}`);
+    }
+    if (prepared.width % 32 !== 0 || prepared.height % 32 !== 0) {
+      throw new Error(`Prepared H3 reference is off-grid: ${prepared.width}x${prepared.height}`);
+    }
+    if (prepared.width * prepared.height > 1_032_192) {
+      throw new Error(`Prepared H3 reference exceeds maxPixels: ${prepared.width}x${prepared.height}`);
     }
   })();
 
@@ -1798,6 +1862,61 @@ async function runTests() {
     }
     if (capturedEstimateParams.frames !== 81) {
       throw new Error(`Expected WAN frames=81, got ${capturedEstimateParams.frames}`);
+    }
+    if ('referenceImageCount' in capturedEstimateParams) {
+      throw new Error('Omitted referenceImageCount must preserve the legacy wrapper request');
+    }
+  })();
+
+  await test('Should forward valid video reference image counts and reject invalid counts', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    let capturedEstimateParams: any = null;
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams = params;
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    await client.estimateVideoCost({
+      modelId: 'minimax-h3-ref2va-fp8_r2v',
+      width: 1344,
+      height: 768,
+      duration: 6,
+      fps: 24,
+      steps: 20,
+      numberOfMedia: 1,
+      referenceImageCount: 6,
+    });
+    if (capturedEstimateParams?.referenceImageCount !== 6) {
+      throw new Error(`Expected referenceImageCount=6, got ${capturedEstimateParams?.referenceImageCount}`);
+    }
+
+    for (const referenceImageCount of [-1, 1.5, Number.NaN]) {
+      try {
+        await client.estimateVideoCost({
+          modelId: 'minimax-h3-ref2va-fp8_r2v',
+          width: 1344,
+          height: 768,
+          duration: 6,
+          fps: 24,
+          referenceImageCount,
+        });
+        throw new Error(`Expected referenceImageCount=${referenceImageCount} to fail validation`);
+      } catch (error) {
+        if (!(error instanceof SogniValidationError)) throw error;
+      }
     }
   })();
 

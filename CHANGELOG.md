@@ -1,3 +1,10 @@
+## [3.21.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.21.0...v3.21.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **video:** normalize H3 references and estimates ([8a1f2a0](https://github.com/Sogni-AI/sogni-intelligence-client/commit/8a1f2a004be25f9803d657a916d98c1b0e7fa259))
+
 # [3.21.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.20.0...v3.21.0) (2026-08-24)
 
 

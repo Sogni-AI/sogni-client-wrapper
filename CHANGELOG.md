@@ -1,3 +1,15 @@
+# [3.22.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.21.1...v3.22.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** align prompt authoring package dependencies ([d08283a](https://github.com/Sogni-AI/sogni-intelligence-client/commit/d08283a9f4570a4f12ce0e9ae3878c42d55b75b9))
+
+
+### Features
+
+* **prompts:** add model-native authoring contracts ([1fe6e80](https://github.com/Sogni-AI/sogni-intelligence-client/commit/1fe6e8067ed49262f9c8a52368848c0ca6676227))
+
 ## [3.21.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.21.0...v3.21.1) (2026-08-24)
 
 

@@ -1,3 +1,16 @@
+# [3.21.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.20.0...v3.21.0) (2026-08-24)
+
+
+### Features
+
+* **music:** make MiniMax Music 3 the default generate_music model ([3f8a550](https://github.com/Sogni-AI/sogni-intelligence-client/commit/3f8a550fea8d89176f1e84fbecb2ba152d0c8fed))
+* **video:** retire Seedance 2.0 Fast in favor of Seedance 2.0 Mini ([8dcd999](https://github.com/Sogni-AI/sogni-intelligence-client/commit/8dcd99949eddff053fbc20591c1c6879110f55f4))
+
+
+### Reverts
+
+* undo the 3.18.0 release commit that downgraded the version ([0363212](https://github.com/Sogni-AI/sogni-intelligence-client/commit/0363212fb775170679a629cd32eea1887b9f40c2))
+
 ## [3.12.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.12.5...v3.12.6) (2026-08-04)
 
 

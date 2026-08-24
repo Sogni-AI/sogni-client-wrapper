@@ -36,20 +36,21 @@ jobs:
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
         run: npm audit signatures
       - name: Release
-        # Auto-publish to npm via semantic-release is gated behind a manual
-        # workflow_dispatch trigger AND currently has no NPM_TOKEN configured.
-        # npm 2FA is enabled on the package, so the prior publish-type token
-        # always failed with EOTP and was removed from repo secrets to avoid
-        # confusion. Maintainers publish manually (npm version + npm publish
-        # --otp=...) for now.
+        # Auto-publishes to npm via semantic-release on every push to main, the
+        # same way sogni-client releases. Restored 2026-08-24: the previous
+        # publish-type token failed with EOTP because npm 2FA is enabled on the
+        # package, so it had been removed from repo secrets and maintainers
+        # published by hand. The NPM_TOKEN secret now holds a granular token
+        # with "Bypass two-factor authentication (2FA)" enabled — npm's
+        # replacement for the retired Classic/Automation type — which is the
+        # token type CI requires.
         #
-        # To re-enable CI publishing: generate an npm Automation token (npm
-        # web UI → Access Tokens → Generate New → Classic → Automation), add
-        # it to repo secrets as NPM_TOKEN, re-add the `NPM_TOKEN: ${{
-        # secrets.NPM_TOKEN }}` env entry below, and drop the
-        # `workflow_dispatch`-only guard if you want per-push publishes back.
-        if: github.event_name == 'workflow_dispatch'
+        # If this starts failing with E401/EINVALIDNPMTOKEN, the token expired
+        # (npm caps write tokens at 90 days); mint a new one the same way rather
+        # than routing around CI. npm is deprecating 2FA-bypass tokens, so the
+        # durable fix is migrating this step to Trusted Publishing (OIDC).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
         run: npx semantic-release

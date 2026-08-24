@@ -82,7 +82,6 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'wan22', displayName: 'WAN 2.2 14B' },
     { key: 'seedance2', displayName: 'Seedance 2.0' },
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
-    { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast' },
     { key: 'seedance2-5', displayName: 'Seedance 2.5' },
     { key: 'minimax-h3-t2v', displayName: 'MiniMax H3 (Text to Video)' },
     { key: 'minimax-h3-t2v-turbo', displayName: 'MiniMax H3 Turbo (Text to Video)' },
@@ -105,7 +104,6 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'wan-s2v', displayName: 'WAN 2.2 S2V' },
     { key: 'seedance2', displayName: 'Seedance 2.0 Image+Audio' },
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini Image+Audio' },
-    { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast Image+Audio' },
     { key: 'seedance2-5', displayName: 'Seedance 2.5 Image+Audio' },
     { key: 'ltx25-ia2v', displayName: 'LTX 2.5 Image+Audio' },
     { key: 'ltx25-a2v', displayName: 'LTX 2.5 Audio Only' },
@@ -118,7 +116,6 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'wan22-animate', displayName: 'WAN 2.2 Animate' },
     { key: 'seedance2', displayName: 'Seedance 2.0' },
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
-    { key: 'seedance2-fast', displayName: 'Seedance 2.0 Fast' },
     { key: 'seedance2-5', displayName: 'Seedance 2.5' },
   ],
   generate_music: [

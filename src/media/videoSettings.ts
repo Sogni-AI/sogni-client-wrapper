@@ -23,7 +23,6 @@ export type VideoModelId =
   | "minimax-h3-r2v-turbo"
   | "seedance2"
   | "seedance2-mini"
-  | "seedance2-fast"
   | "seedance2-5"
   | "happyhorse-1.1-t2v"
   | "happyhorse-1.1-i2v"
@@ -549,13 +548,6 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     minDimension: 1,
     maxDimension: 1280,
   },
-  "seedance2-fast": {
-    model: "seedance-2-0-fast",
-    fps: 24,
-    dimensionDivisor: 1,
-    minDimension: 1,
-    maxDimension: 1280,
-  },
   // Seedance 2.5 is 480p/720p only (maxDimension 1280) but renders up to 30s
   // per call, so its frame ceiling is double the 2.0 family's.
   "seedance2-5": {
@@ -570,7 +562,7 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
   // Alibaba HappyHorse 1.1 routes through Sogni Socket's vendor-job path to
   // Alibaba DashScope (Singapore). The socket re-derives ratio from
   // width/height and duration from frames/fps for vendor models, so we use
-  // permissive constraints here. Unlike Seedance there are no mini/fast tiers —
+  // permissive constraints here. Unlike Seedance there is no mini tier —
   // each mode (t2v/i2v/r2v) is its own canonical model id. 1080P is the upper
   // bound, so maxDimension is capped at 1920.
   "happyhorse-1.1-t2v": {
@@ -716,6 +708,11 @@ export function getHappyHorseModelSettings(
 /** Switch this to change the default video model everywhere */
 export const DEFAULT_VIDEO_MODEL: VideoModelId = "ltx25";
 
+// legacy alias: Seedance 2.0 Fast was retired 2026-08; Mini replaced it
+function resolveLegacyVideoModelId(modelId: string): VideoModelId {
+  return modelId === "seedance2-fast" ? "seedance2-mini" : (modelId as VideoModelId);
+}
+
 // ============================================================================
 // Derived Convenience Exports (use default model)
 // ============================================================================
@@ -724,7 +721,7 @@ export function getVideoModelConfig(
   modelId: VideoModelId = DEFAULT_VIDEO_MODEL,
   qualityTier: VideoQualityTier | undefined = "fast",
 ): VideoModelConfig {
-  const config = VIDEO_MODEL_CONFIGS[modelId];
+  const config = VIDEO_MODEL_CONFIGS[resolveLegacyVideoModelId(modelId)];
   if (modelId === "ltx25") {
     return {
       ...config,
@@ -789,7 +786,7 @@ export function calculateVideoDimensions(
   modelId: VideoModelId = DEFAULT_VIDEO_MODEL,
   aspectRatio?: string,
 ): { width: number; height: number } {
-  const config = VIDEO_MODEL_CONFIGS[modelId];
+  const config = VIDEO_MODEL_CONFIGS[resolveLegacyVideoModelId(modelId)];
   const divisor = config.dimensionDivisor;
   const minDim = config.minDimension;
   const maxDim = config.maxDimension;

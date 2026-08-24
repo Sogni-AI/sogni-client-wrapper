@@ -1035,7 +1035,7 @@ const VIDEO_TO_VIDEO_CONTRACT: PromptContract = {
     '',
     'Choose controlMode by intent. Use detailer for quality-only enhancement without restyling.',
     'Use seedance-v2v only when the user asks to transform/enhance/remaster an uploaded video',
-    'with Seedance, including Seedance-fast uploaded-video upscale/remaster requests. For detailer,',
+    'with Seedance, including uploaded-video upscale/remaster requests. For detailer,',
     'describe the original scene plus quality terms, not new content.',
     'Use outpaint to extend/expand the frame or change aspect ratio (positional, mask-free); set',
     'outpaintPosition and optionally outpaintAspectRatio. Use inpaint to regenerate a region',

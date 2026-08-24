@@ -1459,7 +1459,7 @@ const PUBLIC_SEEDANCE_ADAPTER: PublicStoryboardAdapter = {
     throw new StoryboardAdapterUnsupportedStageError('seedance', input.stage);
   },
   getSystemPromptGuidance() {
-    return `SEEDANCE STORYBOARD REFERENCES: If exactly one uploaded image is an ordered storyboard/sequence sheet and the user asks for a Seedance video with only a sparse/casual prompt, use generate_video with referenceImageIndices=[-1], prompt="${SEEDANCE_STORYBOARD_REFERENCE_PROMPT}", videoModel="seedance2", skipPromptProcessing=true, and expandPrompt=false. Also use videoModel="seedance2" when a generated storyboard image becomes the Seedance reference, regardless of requested resolution, unless the user explicitly asks for a draft, Mini, or the Seedance fast model/version. Do not use this fallback when the user provides a literal prompt, their own script, shot list, timecoded beats, VO/SFX notes, or other substantive video instructions.`;
+    return `SEEDANCE STORYBOARD REFERENCES: If exactly one uploaded image is an ordered storyboard/sequence sheet and the user asks for a Seedance video with only a sparse/casual prompt, use generate_video with referenceImageIndices=[-1], prompt="${SEEDANCE_STORYBOARD_REFERENCE_PROMPT}", videoModel="seedance2", skipPromptProcessing=true, and expandPrompt=false. Also use videoModel="seedance2" when a generated storyboard image becomes the Seedance reference, regardless of requested resolution, unless the user explicitly asks for a draft or Mini. Do not use this fallback when the user provides a literal prompt, their own script, shot list, timecoded beats, VO/SFX notes, or other substantive video instructions.`;
   },
 };
 
@@ -1796,7 +1796,6 @@ export function resolveLtx23WorkflowModelForQuality(
 export const SEEDANCE_WORKFLOW_MODELS = Object.freeze({
   t2v: 'seedance-2-0',
   t2vMini: 'seedance-2-0-mini',
-  t2vFast: 'seedance-2-0-fast',
   ia2v: 'seedance-2-0',
   v2v: 'seedance-2-0',
   // Seedance 2.5 is a single canonical model id across every workflow it
@@ -1804,7 +1803,7 @@ export const SEEDANCE_WORKFLOW_MODELS = Object.freeze({
   t2v25: 'seedance-2-5'
 });
 
-// Alibaba HappyHorse 1.1 — three discrete vendor models (no mini/fast variants).
+// Alibaba HappyHorse 1.1 — three discrete vendor models (no mini variant).
 // Unlike Seedance, the per-mode model id IS the canonical socket/Alibaba id, so
 // the map values double as the values accepted by the generate_video tool.
 export const HAPPYHORSE_WORKFLOW_MODELS = Object.freeze({
@@ -2030,21 +2029,7 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
     maxFrames: 361,
     supportsNativeAudio: true
   },
-  [SEEDANCE_WORKFLOW_MODELS.t2vFast]: {
-    workflow: 't2v',
-    family: 'seedance2',
-    defaultWidth: 1280,
-    defaultHeight: 720,
-    minDimension: 1,
-    maxDimension: 1280,
-    dimensionMultiple: 1,
-    fps: 24,
-    frameStep: 1,
-    minFrames: 97,
-    maxFrames: 361,
-    supportsNativeAudio: true
-  },
-  // Seedance 2.5: 480p/720p only like Mini/Fast, but 4-30s instead of 4-15s,
+  // Seedance 2.5: 480p/720p only like Mini, but 4-30s instead of 4-15s,
   // so maxFrames is 30 * 24 + 1 rather than 15 * 24 + 1.
   [SEEDANCE_WORKFLOW_MODELS.t2v25]: {
     workflow: 't2v',
@@ -2154,8 +2139,10 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   'seedance2-t2v': SEEDANCE_WORKFLOW_MODELS.t2v,
   'seedance2-mini': SEEDANCE_WORKFLOW_MODELS.t2vMini,
   'seedance2-mini-t2v': SEEDANCE_WORKFLOW_MODELS.t2vMini,
-  'seedance2-fast': SEEDANCE_WORKFLOW_MODELS.t2vFast,
-  'seedance2-fast-t2v': SEEDANCE_WORKFLOW_MODELS.t2vFast,
+  // legacy alias: Seedance 2.0 Fast was retired 2026-08; Mini replaced it
+  'seedance2-fast': SEEDANCE_WORKFLOW_MODELS.t2vMini,
+  'seedance2-fast-t2v': SEEDANCE_WORKFLOW_MODELS.t2vMini,
+  'seedance-2-0-fast': SEEDANCE_WORKFLOW_MODELS.t2vMini,
   'seedance2-ia2v': SEEDANCE_WORKFLOW_MODELS.ia2v,
   'seedance2-v2v': SEEDANCE_WORKFLOW_MODELS.v2v,
   'seedance2-5': SEEDANCE_WORKFLOW_MODELS.t2v25,
@@ -2957,6 +2944,12 @@ export function textMentionsStoryboardReference(text: string): boolean {
   return contextualStoryboardReference && !rejectsStoryboardPanelOutput;
 }
 
+/**
+ * Detects explicit "Seedance Fast" phrasing. Seedance 2.0 Fast was retired in
+ * 2026-08 and Seedance 2.0 Mini replaced it, so callers route a positive result
+ * to seedance2-mini; the detector stays so that phrasing still lands on the
+ * cheaper 720p Seedance tier instead of the full model.
+ */
 export function textExplicitlyRequestsSeedanceFastModel(text: string): boolean {
   const mentionsSeedance = /\b(?:seedance|seeddance)(?:\s*2(?:\.0)?)?\b/i.test(text);
   return /\b(?:seedance|seeddance)(?:\s*2(?:\.0)?)?\s+fast\b/i.test(text)
@@ -3828,7 +3821,7 @@ export interface StoryboardVideoHostedWorkflowBuildOptions {
   imageOutputFormat?: 'png' | 'jpg' | 'jpeg' | 'webp';
   imageWidth?: number;
   imageHeight?: number;
-  videoModel?: 'seedance2' | 'seedance2-mini' | 'seedance2-fast' | 'seedance2-5' | string;
+  videoModel?: 'seedance2' | 'seedance2-mini' | 'seedance2-5' | string;
   videoDurationSec?: number;
   videoTargetResolution?: number;
   generateAudio?: boolean;

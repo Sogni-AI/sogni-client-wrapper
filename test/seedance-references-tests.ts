@@ -153,7 +153,7 @@ export function runSeedanceReferencesTests(): { passed: number; failed: number }
     { images: 9, videos: 3, audios: 3, assets: 12 },
   );
   expect(
-    'per-model: seedance-2-0-fast is 9/3/3/12',
+    'legacy alias: retired seedance-2-0-fast resolves to the Mini caps (9/3/3/12)',
     getSeedanceReferenceLimits('seedance-2-0-fast'),
     { images: 9, videos: 3, audios: 3, assets: 12 },
   );

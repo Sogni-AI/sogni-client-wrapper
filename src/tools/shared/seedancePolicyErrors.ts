@@ -13,7 +13,7 @@ export const SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE =
   'InputImageSensitiveContentDetected.PrivacyInformation';
 
 export const SEEDANCE_REAL_PERSON_PRIVACY_MESSAGE =
-  "No problem — Seedance just has a content rule that keeps it from animating photos of real people directly, but we've got a couple of great ways to bring this to life! I can give the people a fun, clearly non-photographic makeover — anime, cartoon, claymation, LEGO, or bobblehead, or simply hide the faces — and then run Seedance on that. Or, if you'd like to keep the original look, I can switch to LTX 2.3, which animates your photo directly (it just won't use Seedance-fast). Which sounds best — a stylized spin, or LTX 2.3?";
+  "No problem — Seedance just has a content rule that keeps it from animating photos of real people directly, but we've got a couple of great ways to bring this to life! I can give the people a fun, clearly non-photographic makeover — anime, cartoon, claymation, LEGO, or bobblehead, or simply hide the faces — and then run Seedance on that. Or, if you'd like to keep the original look, I can switch to LTX 2.3, which animates your photo directly (it just won't use Seedance). Which sounds best — a stylized spin, or LTX 2.3?";
 
 /**
  * Structured recovery for the real-person privacy rejection: stylize the source

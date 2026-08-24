@@ -79,7 +79,7 @@ export const definition: ToolDefinition = {
         },
         videoModel: {
           type: 'string',
-          enum: ['auto', 'ltx25', 'ltx23', 'wan22', 'seedance2', 'seedance2-mini', 'seedance2-fast', 'seedance2-5'],
+          enum: ['auto', 'ltx25', 'ltx23', 'wan22', 'seedance2', 'seedance2-mini', 'seedance2-5'],
           description:
             'Which model to use for the new segment. Default: "auto" — preserve Seedance or WAN for matching base clips and otherwise use LTX 2.5. Use ltx23 only for explicit rollback. Override only when the user explicitly requests a different model.',
         },

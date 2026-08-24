@@ -76,19 +76,19 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             '• "detailer" — LTX 2.5 (default) or 2.3 quality enhancement. Describe the original scene with quality qualifiers and do not request content changes.\n' +
             '• "outpaint" — distilled LTX 2.5 (default) or LTX 2.3 canvas extension. Set outpaintPosition and optionally outpaintAspectRatio; Pro/dev is not supported for this mode.\n' +
             '• "inpaint" — distilled LTX 2.5 (default) or LTX 2.3 masked region regeneration. Set maskImageIndex when supplied; Pro/dev is not supported for this mode.\n' +
-            `• "seedance-v2v" — BytePlus Dreamina Seedance 2.0 video-to-video. Use only when the user explicitly asks for Seedance on the uploaded source video, such as Seedance Fast upscale, enhance, remaster, restyle, or transform. High-fidelity quality, native audio, time-coded scene control. ${SEEDANCE_TOOL_V2V_REFERENCE_GUIDANCE} Distinct from canny/depth/pose which use control-net constraints — Seedance treats the reference video holistically.\n` +
+            `• "seedance-v2v" — BytePlus Dreamina Seedance 2.0 video-to-video. Use only when the user explicitly asks for Seedance on the uploaded source video, such as a Seedance upscale, enhance, remaster, restyle, or transform. High-fidelity quality, native audio, time-coded scene control. ${SEEDANCE_TOOL_V2V_REFERENCE_GUIDANCE} Distinct from canny/depth/pose which use control-net constraints — Seedance treats the reference video holistically.\n` +
             'Canny vs depth: canny preserves silhouettes and fine outlines — pick it for subject-led scenes and graphic restyles. Depth preserves 3D structure — pick it for scenes where the camera moves or spatial layout matters more than edge fidelity. Default: "animate-move".',
         },
         negativePrompt: {
           type: "string",
           description:
-            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set when controlMode is seedance-v2v or videoModel is seedance2/seedance2-mini/seedance2-fast/seedance2-5.",
+            "Advanced non-Seedance only. Use this field only when the user explicitly asks to set a separate negative prompt. For ordinary avoid/no/don't constraints on LTX 2.3 or WAN 2.2, translate them into affirmative production constraints inside prompt instead; do not move them here. Do not set when controlMode is seedance-v2v or videoModel is seedance2/seedance2-mini/seedance2-5.",
         },
         videoModel: {
           type: "string",
-          enum: ["ltx25-v2v", "ltx23-v2v", "wan22-animate", "seedance2", "seedance2-mini", "seedance2-fast", "seedance2-5"],
+          enum: ["ltx25-v2v", "ltx23-v2v", "wan22-animate", "seedance2", "seedance2-mini", "seedance2-5"],
           description:
-            'Model selector for this video-to-video request. Usually omit: non-Seedance controls default to "ltx25-v2v"; use "ltx23-v2v" only for rollback. LTX 2.5 Fast/HQ uses distilled; Pro uses dev plus the official Speed LoRA. Dev supports canny/pose/depth/detailer, while inpaint/outpaint require distilled. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts, "seedance2-fast" only for explicit Fast requests, and "seedance2" for full/non-fast Seedance or 1080p/4K. "seedance2-5" supports 480p/720p, 4-30s at 24 fps, native audio, and first/last-frame conditioning; keep "seedance2" for 1080p/4K.',
+            'Model selector for this video-to-video request. Usually omit: non-Seedance controls default to "ltx25-v2v"; use "ltx23-v2v" only for rollback. LTX 2.5 Fast/HQ uses distilled; Pro uses dev plus the official Speed LoRA. Dev supports canny/pose/depth/detailer, while inpaint/outpaint require distilled. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts, and "seedance2" for full-quality Seedance or 1080p/4K. "seedance2-5" supports 480p/720p, 4-30s at 24 fps, native audio, and first/last-frame conditioning; keep "seedance2" for 1080p/4K.',
         },
         generateAudio: {
           type: "boolean",
@@ -98,7 +98,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         targetResolution: {
           type: "number",
           description:
-            'Seedance V2V only. Short-side output resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact dimensions. Seedance V2V full supports 4K; Seedance V2V Mini, Fast, and Seedance 2.5 support 480p and 720p only, so never set 1080p or 4K for "seedance2-5". Preserve the source video shape instead of forcing landscape pixels.',
+            'Seedance V2V only. Short-side output resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact dimensions. Seedance V2V full supports 4K; Seedance V2V Mini and Seedance 2.5 support 480p and 720p only, so never set 1080p or 4K for "seedance2-5". Preserve the source video shape instead of forcing landscape pixels.',
         },
         sourceImageIndex: {
           type: "number",
@@ -125,7 +125,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         duration: {
           type: "number",
           description:
-            'Output video duration in seconds. Range: 2-20 for WAN/LTX modes, 4-15 for controlMode="seedance-v2v" on seedance2/seedance2-mini/seedance2-fast, and 4-30 for controlMode="seedance-v2v" on seedance2-5. If omitted, the tool matches the uploaded source video duration when available (capped to the selected model range); otherwise it falls back to 10s for WAN Animate Move/Replace and 5s for LTX-2.3/Seedance modes. For long stitched/bulk WAN Animate Move/Replace work with no explicit per-clip length, prefer about 10s clips rather than 5s chunks. Only pass this when the user explicitly requests a different length.',
+            'Output video duration in seconds. Range: 2-20 for WAN/LTX modes, 4-15 for controlMode="seedance-v2v" on seedance2/seedance2-mini, and 4-30 for controlMode="seedance-v2v" on seedance2-5. If omitted, the tool matches the uploaded source video duration when available (capped to the selected model range); otherwise it falls back to 10s for WAN Animate Move/Replace and 5s for LTX-2.3/Seedance modes. For long stitched/bulk WAN Animate Move/Replace work with no explicit per-clip length, prefer about 10s clips rather than 5s chunks. Only pass this when the user explicitly requests a different length.',
           minimum: 2,
           maximum: 30,
         },

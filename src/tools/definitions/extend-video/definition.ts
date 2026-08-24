@@ -37,7 +37,7 @@ export const definition: ToolDefinition = {
         duration: {
           type: 'number',
           description:
-            'Length in seconds of the new appended segment (NOT total final length). LTX 2-20, Seedance 2.0/Mini/Fast 4-15, Seedance 2.5 4-30. Default: 5.',
+            'Length in seconds of the new appended segment (NOT total final length). LTX 2-20, Seedance 2.0/Mini 4-15, Seedance 2.5 4-30. Default: 5.',
           minimum: 2,
           maximum: 30,
         },
@@ -49,7 +49,7 @@ export const definition: ToolDefinition = {
         },
         videoModel: {
           type: 'string',
-          enum: ['auto', 'ltx25', 'ltx23', 'seedance2', 'seedance2-mini', 'seedance2-fast', 'seedance2-5'],
+          enum: ['auto', 'ltx25', 'ltx23', 'seedance2', 'seedance2-mini', 'seedance2-5'],
           description:
             'Which model to use for the new segment. Default: "auto" — preserve Seedance for a Seedance base and otherwise use LTX 2.5. Use ltx23 only for explicit rollback. Override only when the user explicitly requests a different model.',
         },

@@ -1,3 +1,10 @@
+## [3.22.5](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.4...v3.22.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **storyboard:** preserve structured story intent on recompilation ([d91e0d3](https://github.com/Sogni-AI/sogni-intelligence-client/commit/d91e0d3f59df2ba8c1d7f4d5e05d23a179ac6e0e))
+
 ## [3.22.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.3...v3.22.4) (2026-08-25)
 
 

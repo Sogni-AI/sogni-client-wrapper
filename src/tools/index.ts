@@ -44,8 +44,11 @@ export type {
 } from './shared/happyhorseReferences.js';
 export {
   WAN3_LOOSE_REFERENCE_LIMITS,
+  WAN3_REFERENCE_DURATION_LIMITS,
+  Wan3ReferenceDurationError,
   Wan3ReferenceLimitError,
   validateWan3ReferenceCounts,
+  validateWan3ReferenceDurations,
 } from './shared/wan3References.js';
 export type {
   Wan3ReferenceLimits,

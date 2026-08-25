@@ -8,14 +8,22 @@ export interface Wan3ReferenceLimits {
   readonly images: number;
   readonly videos: number;
   readonly audios: number;
-  readonly assets: number;
+  readonly files: number;
+  readonly links: number;
 }
 
 export const WAN3_LOOSE_REFERENCE_LIMITS: Wan3ReferenceLimits = Object.freeze({
   images: 10,
   videos: 5,
   audios: 5,
-  assets: 20,
+  files: 1,
+  links: 1,
+});
+
+export const WAN3_REFERENCE_DURATION_LIMITS = Object.freeze({
+  minimum: 1,
+  maximum: 15,
+  totalMaximum: 15,
 });
 
 export type Wan3ReferenceLimitKind = keyof Wan3ReferenceLimits;
@@ -31,9 +39,7 @@ export class Wan3ReferenceLimitError extends Error {
     requestedCount: number,
     maxCount: number,
   ) {
-    const label = limitKind === 'assets'
-      ? 'total loose references'
-      : `${limitKind.slice(0, -1)} references`;
+    const label = `${limitKind.slice(0, -1)} references`;
     super(
       `Wan 3 can use up to ${maxCount} ${label} per video; this request included ${requestedCount}. ` +
       'No media was generated. Please choose fewer references or split the story into multiple clips.',
@@ -45,17 +51,32 @@ export class Wan3ReferenceLimitError extends Error {
   }
 }
 
+export class Wan3ReferenceDurationError extends Error {
+  readonly code = 'wan3_reference_duration_invalid' as const;
+  readonly modality: 'video' | 'audio';
+
+  constructor(modality: 'video' | 'audio', message: string) {
+    super(`Wan 3 reference ${modality} duration is invalid: ${message}`);
+    this.name = 'Wan3ReferenceDurationError';
+    this.modality = modality;
+  }
+}
+
 export interface Wan3ReferenceCounts {
   readonly images: number;
   readonly videos: number;
   readonly audios: number;
+  readonly files?: number;
+  readonly links?: number;
 }
 
-/** Validate per-modality limits before the combined loose-reference cap. */
+/** Validate each official per-modality limit plus file/link exclusivity. */
 export function validateWan3ReferenceCounts(counts: Wan3ReferenceCounts): void {
   const images = Math.max(0, Math.floor(counts.images));
   const videos = Math.max(0, Math.floor(counts.videos));
   const audios = Math.max(0, Math.floor(counts.audios));
+  const files = Math.max(0, Math.floor(counts.files ?? 0));
+  const links = Math.max(0, Math.floor(counts.links ?? 0));
 
   if (images > WAN3_LOOSE_REFERENCE_LIMITS.images) {
     throw new Wan3ReferenceLimitError('images', images, WAN3_LOOSE_REFERENCE_LIMITS.images);
@@ -67,8 +88,45 @@ export function validateWan3ReferenceCounts(counts: Wan3ReferenceCounts): void {
     throw new Wan3ReferenceLimitError('audios', audios, WAN3_LOOSE_REFERENCE_LIMITS.audios);
   }
 
-  const total = images + videos + audios;
-  if (total > WAN3_LOOSE_REFERENCE_LIMITS.assets) {
-    throw new Wan3ReferenceLimitError('assets', total, WAN3_LOOSE_REFERENCE_LIMITS.assets);
+  if (files > WAN3_LOOSE_REFERENCE_LIMITS.files) {
+    throw new Wan3ReferenceLimitError('files', files, WAN3_LOOSE_REFERENCE_LIMITS.files);
+  }
+  if (links > WAN3_LOOSE_REFERENCE_LIMITS.links) {
+    throw new Wan3ReferenceLimitError('links', links, WAN3_LOOSE_REFERENCE_LIMITS.links);
+  }
+  if (files > 0 && links > 0) {
+    throw new Error('Wan 3 accepts either one reference file or one reference link, not both.');
+  }
+}
+
+/**
+ * Validate every duration that is known before dispatch. URL-only references
+ * may not have local metadata, so Alibaba remains the final authority for
+ * those assets.
+ */
+export function validateWan3ReferenceDurations(
+  modality: 'video' | 'audio',
+  durations: ReadonlyArray<number | undefined>,
+): void {
+  const known = durations.filter(
+    (duration): duration is number => typeof duration === 'number' && Number.isFinite(duration),
+  );
+  for (const duration of known) {
+    if (
+      duration < WAN3_REFERENCE_DURATION_LIMITS.minimum ||
+      duration > WAN3_REFERENCE_DURATION_LIMITS.maximum
+    ) {
+      throw new Wan3ReferenceDurationError(
+        modality,
+        `each clip must be 1–15 seconds; received ${duration.toFixed(2)} seconds`,
+      );
+    }
+  }
+  const total = known.reduce((sum, duration) => sum + duration, 0);
+  if (total > WAN3_REFERENCE_DURATION_LIMITS.totalMaximum) {
+    throw new Wan3ReferenceDurationError(
+      modality,
+      `all clips together must be at most 15 seconds; received ${total.toFixed(2)} seconds`,
+    );
   }
 }

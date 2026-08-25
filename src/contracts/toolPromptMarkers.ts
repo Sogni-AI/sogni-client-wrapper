@@ -5,19 +5,19 @@
 import { LITERAL_PROMPT_OVERRIDE } from './promptOverrideMarker.js';
 
 export const LITERAL_VIDEO_PROMPT_OVERRIDE =
-  `${LITERAL_PROMPT_OVERRIDE} Set skipPromptProcessing=true; for Seedance also set expandPrompt=false.`;
+  `${LITERAL_PROMPT_OVERRIDE} Set skipPromptProcessing=true; for Seedance or Wan 3 also set expandPrompt=false.`;
 
 export const SEEDANCE_EXPAND_PROMPT_DESCRIPTION =
-  'Seedance only. Whether to run the shared Seedance prompt shaper before dispatch. Defaults to true; set false only when the user explicitly asks to submit the compact prompt directly or not modify the prompt.';
+  'Seedance and Wan 3 only. Whether to expand the prompt before dispatch. Defaults to true. For Wan 3, a successful Sogni expansion disables Alibaba prompt_extend to prevent a second rewrite; false disables both expansion layers so exact prompts remain exact.';
 
 export const GENERATE_VIDEO_SKIP_PROMPT_PROCESSING_DESCRIPTION =
-  'Bypass automatic prompt shaping/refinement and voice-identity prompt formatting so the prompt text is sent unchanged to the video model. Set true ONLY when the user explicitly says not to modify/rewrite/enhance/expand/change/improve the prompt, or to use/send it exactly, verbatim, or as-is, AND the provided prompt already satisfies the tool requirements. Continue to set non-prompt parameters such as model, duration, count, aspect ratio, and seed. For Seedance literal prompt requests, also set expandPrompt=false. Do not set for ordinary underspecified requests.';
+  'Bypass automatic prompt shaping/refinement and voice-identity prompt formatting so the prompt text is sent unchanged to the video model. Set true ONLY when the user explicitly says not to modify/rewrite/enhance/expand/change/improve the prompt, or to use/send it exactly, verbatim, or as-is, AND the provided prompt already satisfies the tool requirements. Continue to set non-prompt parameters such as model, duration, count, aspect ratio, and seed. For Seedance or Wan 3 literal prompt requests, also set expandPrompt=false. Do not set for ordinary underspecified requests.';
 
 export const ANIMATE_PHOTO_SKIP_PROMPT_PROCESSING_DESCRIPTION =
-  'Bypass automatic prompt shaping/refinement, image-description anchoring, transition-prompt rewriting, and voice-identity prompt formatting so the prompt text is sent unchanged to the video model. Set true ONLY when the user explicitly says not to modify/rewrite/enhance/expand/change/improve the prompt, or to use/send it exactly, verbatim, or as-is, AND the provided prompt already satisfies the tool requirements. Continue to set non-prompt parameters such as source indices, frameRole, model, duration, count, and aspect ratio. For Seedance literal prompt requests, also set expandPrompt=false. Do not set for ordinary underspecified requests.';
+  'Bypass automatic prompt shaping/refinement, image-description anchoring, transition-prompt rewriting, and voice-identity prompt formatting so the prompt text is sent unchanged to the video model. Set true ONLY when the user explicitly says not to modify/rewrite/enhance/expand/change/improve the prompt, or to use/send it exactly, verbatim, or as-is, AND the provided prompt already satisfies the tool requirements. Continue to set non-prompt parameters such as source indices, frameRole, model, duration, count, and aspect ratio. For Seedance or Wan 3 literal prompt requests, also set expandPrompt=false. Do not set for ordinary underspecified requests.';
 
 export const LITERAL_SEEDANCE_PROMPT_OVERRIDE =
-  `${LITERAL_PROMPT_OVERRIDE} For Seedance, set expandPrompt=false.`;
+  `${LITERAL_PROMPT_OVERRIDE} For Seedance or Wan 3, set expandPrompt=false.`;
 
 export const SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE = `Seedance supports multimodal loose reference assets: images (up to 9), videos (up to 3), and audios (up to 3), with no more than 12 asset files total. Use @Image1/@Video1/@Audio1 style references in creative briefs when assigning roles. Assign every useful reference asset a role and prefer positive preservation constraints. If an uploaded video is the source clip to transform, upscale, enhance, restyle, or remaster, use video_to_video with controlMode="seedance-v2v" instead of generate_video referenceVideoIndices.`;
 

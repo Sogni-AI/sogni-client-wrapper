@@ -81,6 +81,30 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           minimum: 2,
           maximum: 30,
         },
+        smartDuration: {
+          type: "boolean",
+          description:
+            "Wan 3 only. Let the model choose 2-30 seconds. Do not also set duration. Sogni reserves 30 seconds and settles down to the provider-reported duration.",
+        },
+        ratio: {
+          type: "string",
+          enum: ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          description: 'Wan 3 only. Output ratio; "adaptive" derives it from the input.',
+        },
+        watermark: {
+          type: "boolean",
+          description: "Wan 3 only. Add Alibaba's visible watermark. Defaults to false.",
+        },
+        referenceFileUrl: {
+          type: "string",
+          description:
+            "Wan 3 only. One public HTTPS document URL for additional audio-driven context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl.",
+        },
+        referenceLinkUrl: {
+          type: "string",
+          description:
+            "Wan 3 only. One public HTTPS webpage URL for additional audio-driven context. Mutually exclusive with referenceFileUrl.",
+        },
         videoModel: {
           type: "string",
           enum: ["wan-s2v", "seedance2", "seedance2-mini", "seedance2-5", "ltx25-ia2v", "ltx25-a2v", "ltx23-ia2v", "ltx23-a2v", "wan3.0-video"],

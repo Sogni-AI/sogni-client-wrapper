@@ -133,6 +133,36 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           minimum: 2,
           maximum: 30,
         },
+        smartDuration: {
+          type: "boolean",
+          description:
+            "Wan 3 only. Let Wan 3 choose 2-30 output seconds. Do not also set duration; input plus output must stay within the provider's 30-second limit. Sogni reserves 30 seconds and settles down to actual duration.",
+        },
+        wan3TaskType: {
+          type: "string",
+          enum: ["edit", "extend"],
+          description:
+            'Wan 3 only. Use "edit" to transform the source or "extend" to continue it. Extension automatically uses ratio="adaptive" and the prompt should explicitly describe continuation intent.',
+        },
+        ratio: {
+          type: "string",
+          enum: ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          description: 'Wan 3 only. Extension requires "adaptive"; edit defaults to adaptive.',
+        },
+        referenceFileUrl: {
+          type: "string",
+          description:
+            "Wan 3 only. One public HTTPS document URL for additional edit/extension context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl.",
+        },
+        referenceLinkUrl: {
+          type: "string",
+          description:
+            "Wan 3 only. One public HTTPS webpage URL for additional edit/extension context. Mutually exclusive with referenceFileUrl.",
+        },
+        watermark: {
+          type: "boolean",
+          description: "Wan 3 only. Add Alibaba's visible watermark. Defaults to false.",
+        },
         numberOfVariations: {
           type: "number",
           description:

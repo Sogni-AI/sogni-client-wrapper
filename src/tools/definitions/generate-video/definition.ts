@@ -92,6 +92,31 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
           minimum: 2,
           maximum: 30,
         },
+        smartDuration: {
+          type: "boolean",
+          description:
+            "Wan 3 only. Set true to let Wan 3 choose an output length from 2-30 seconds. Do not also set duration. Sogni reserves the 30-second maximum before generation and settles the completed job down to Alibaba's reported output duration.",
+        },
+        ratio: {
+          type: "string",
+          enum: ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          description:
+            'Wan 3 only. Output ratio. Use "adaptive" to inherit source/context shape; extension requires adaptive. Omit for automatic behavior.',
+        },
+        watermark: {
+          type: "boolean",
+          description: "Wan 3 only. Add Alibaba's visible watermark. Defaults to false.",
+        },
+        referenceFileUrl: {
+          type: "string",
+          description:
+            "Wan 3 only. One public HTTPS document URL for context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl and first/last-frame inputs.",
+        },
+        referenceLinkUrl: {
+          type: "string",
+          description:
+            "Wan 3 only. One public HTTPS webpage URL for context. Mutually exclusive with referenceFileUrl and first/last-frame inputs.",
+        },
         negativePrompt: {
           type: "string",
           description:
@@ -121,7 +146,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
             SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE +
             ' ' +
             HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION +
-            ' "wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text-to-video, first-frame and first+last-frame animation, loose multimodal references, audio-driven generation, and uploaded-video editing/extension. It renders 2-30s at fixed 30 fps with optional native audio, supports 480p/720p/1080p and 16:9/4:3/1:1/3:4/9:16, accepts up to 10 reference images, 5 reference videos, and 5 reference audios, and uses plain per-type prompt labels Image 1, Video 1, and Audio 1. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, sound_to_video when audio is the primary driver, and video_to_video with controlMode="seedance-v2v" for edits or extensions.',
+            ' "wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text, first/last frames, loose multimodal references, audio-driven generation, document/web context, editing, and extension. It renders 2-30s or smart duration at fixed 30 fps with optional native audio, prompt expansion control, optional watermark, 480p/720p/1080p, and adaptive/16:9/4:3/1:1/3:4/9:16 ratios. It accepts up to 10 images, 5 videos, 5 audios, one file, or one webpage. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, sound_to_video when audio drives timing, and video_to_video with controlMode="seedance-v2v" for edits or extensions.',
         },
         generateAudio: {
           type: "boolean",

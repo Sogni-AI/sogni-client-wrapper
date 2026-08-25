@@ -3597,6 +3597,83 @@ async function runTests() {
     }
   })();
 
+  await test('Should keep workflow controls out of storyboard creative constraints', () => {
+    const userIntent = [
+      'Create a 9:16 product teaser.',
+      'Run the whole workflow without asking for approval: create a three-beat storyboard, then render it.',
+      'Keep the finished video without visible subtitles.',
+    ].join(' ');
+    const assistantDraft = [
+      'SCENE_01 - DISCOVERY',
+      'Purpose: A courier discovers a glowing case in a dark workshop.',
+      'Visual/Action: The courier reaches toward the sealed case as its edges illuminate.',
+      '',
+      'SCENE_02 - REVEAL',
+      'Purpose: The case opens and reveals a polished wearable device.',
+      'Visual/Action: The device rises into a halo of clean product light.',
+      '',
+      'SCENE_03 - RESOLVE',
+      'Purpose: The courier wears the device and exits into the city at dawn.',
+      'Visual/Action: A tracking shot follows the courier through the opening doors.',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    if (project.creativeBrief.mustAvoid.some(value => /approval|between stages/i.test(value))) {
+      throw new Error(`Workflow control leaked into creative negatives: ${project.creativeBrief.mustAvoid.join(' | ')}`);
+    }
+    if (!project.creativeBrief.mustAvoid.some(value => /without visible subtitles/i.test(value))) {
+      throw new Error(`Creative negative was dropped: ${project.creativeBrief.mustAvoid.join(' | ')}`);
+    }
+    if (/workflow|approval|then render/i.test(project.creativeBrief.storySpine)) {
+      throw new Error(`Workflow control leaked into story spine: ${project.creativeBrief.storySpine}`);
+    }
+    if (!/courier discovers a glowing case/i.test(project.creativeBrief.storySpine)) {
+      throw new Error(`Structured scene progression did not ground story spine: ${project.creativeBrief.storySpine}`);
+    }
+
+    const prompt = compileVideoStoryboardImagePrompt({
+      prompt: assistantDraft,
+      userIntentText: userIntent,
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    if (/without asking for approval|approval between stages/i.test(prompt)) {
+      throw new Error(`Workflow control leaked into compiled storyboard prompt: ${prompt}`);
+    }
+    if (!/without visible subtitles/i.test(prompt)) {
+      throw new Error(`Compiled storyboard prompt dropped a real creative negative: ${prompt}`);
+    }
+  })();
+
+  await test('Should remove metadata labels only as complete prompt tokens', () => {
+    const project = buildStoryboardProject({
+      prompt: [
+        'SCENE_01 - ASCENT',
+        'Purpose: A climber reaches a bright mountain ridge.',
+        'Visual/Action: Vertical camera movement reveals the summit.',
+      ].join('\n'),
+      userIntentText: 'Create a one-scene vertical video.',
+      frameCount: 1,
+      promptAuthorship: 'assistant',
+    });
+    const seedancePrompt = compileSeedanceStoryboardPromptFromProject({
+      ...project,
+      metadataLabels: ['V'],
+      creativeBrief: {
+        ...project.creativeBrief,
+        storySpine: 'Vertical movement reveals the summit while the climber rises.',
+      },
+    });
+    if (!seedancePrompt.includes('Story spine: Vertical movement reveals the summit')) {
+      throw new Error(`Metadata label removal damaged a containing word: ${seedancePrompt}`);
+    }
+  })();
+
   await test('Should retime assistant storyboard tables that contain zero-duration end-card beats', () => {
     const assistantDraft = [
       '| Beat | Time | Purpose | Visual/Action | Camera/Motion | Dialogue/VO | Audio/SFX | Transition |',

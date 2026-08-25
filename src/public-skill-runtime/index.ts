@@ -1359,7 +1359,7 @@ function compileStoryboardImagePromptFromProject(project: StoryboardProject): st
     project.endCard.logoUsage ? `Logo usage: ${project.endCard.logoUsage}` : '',
     '',
     'NEGATIVE / AVOID:',
-    ...compileStoryboardAvoidSection(project.creativeBrief.concept).map(item => `- ${item}`),
+    ...compileStoryboardAvoidConstraints(project.creativeBrief.mustAvoid).map(item => `- ${item}`),
   ].join('\n');
 }
 
@@ -5150,11 +5150,32 @@ function compileStoryboardReferenceSection(project: StoryboardProject): string[]
 
 function extractStoryboardAvoidConstraints(text: string): string[] {
   const constraints: string[] = [];
-  for (const match of text.matchAll(/\b(?:avoid|do not include|don't include|without|less)\b[\s\S]{0,220}(?:\.|$)/gi)) {
+  for (const match of text.matchAll(/\b(?:avoid|do not include|don't include|without|less)\b(?:(?!\b(?:avoid|do not include|don't include|without|less)\b)[^.!?\n]){0,220}/gi)) {
     const value = normalizeStoryboardAvoidConstraint(match[0]);
-    if (value && !constraints.includes(value)) constraints.push(value);
+    if (
+      value
+      && !storyboardAvoidConstraintIsWorkflowControl(value)
+      && !constraints.includes(value)
+    ) {
+      constraints.push(value);
+    }
   }
   return constraints;
+}
+
+/**
+ * Approval, confirmation, and review timing govern the agent workflow. They
+ * are not visual/audio negatives for an image or video model. Keep this test
+ * semantic and narrow so real creative constraints such as "without visible
+ * subtitles" continue to reach the renderer.
+ */
+function storyboardAvoidConstraintIsWorkflowControl(value: string): boolean {
+  const interaction = /\b(?:approval|confirmation|review|feedback|permission|user\s+input|user\s+response)\b/i;
+  if (!interaction.test(value)) return false;
+
+  const processAction = /\b(?:ask(?:ing)?|await(?:ing)?|wait(?:ing)?|pause|pausing|stop(?:ping)?|hold(?:ing)?|seek(?:ing)?|request(?:ing)?|require|requiring|check(?:ing)?|confirm(?:ing)?|approve|approving)\b/i;
+  const workflowBoundary = /\b(?:workflow|stage|step|phase|round|generation|render|between|before|after|proceed|continu(?:e|ing))\b/i;
+  return processAction.test(value) || workflowBoundary.test(value);
 }
 
 function normalizeStoryboardAvoidConstraint(value: string): string {
@@ -7267,6 +7288,19 @@ function inferStoryboardStorySpine(text: string, fallbackBrief: string): string 
   return 'A coherent sequence where every scene follows from the previous beat and supports the requested final video outcome.';
 }
 
+function inferStoryboardStorySpineFromScenes(scenes: SceneSpec[]): string {
+  const beats = scenes
+    .map(scene => meaningfulStoryboardPromptField(
+      scene.purpose
+      || scene.visual
+      || scene.action
+      || scene.title,
+    ))
+    .filter(Boolean);
+  if (beats.length === 0) return '';
+  return truncateStoryboardText(uniqueStoryboardStrings(beats).join(' -> '), 260);
+}
+
 function inferStoryboardProductFeatureMap(text: string, scenes: SceneSpec[]): string[] {
   const explicitLines = text
     .split(/\r?\n/)
@@ -7532,11 +7566,20 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     ? scenesWithEndCardText
     : retimeStoryboardScenesForDialogue(scenesWithEndCardText, durationSec);
   const voiceLines = assignVoiceLinesToScenes(normalizedScenes, sourceText);
+  const structuredSceneStorySpine = inferStoryboardStorySpineFromScenes(normalizedScenes);
+  const assistantStorySpineSource = approvedScriptContext || sourceText;
   const storySpineFallback = approvedScriptContext
-    || (options.promptAuthorship === 'assistant' ? narrativeUserIntentText : cleanStoryboardNarrativeSourceText(primarySourceBrief))
+    || (options.promptAuthorship === 'assistant'
+      ? structuredSceneStorySpine || cleanStoryboardNarrativeSourceText(primarySourceBrief)
+      : cleanStoryboardNarrativeSourceText(primarySourceBrief))
     || prompt
     || narrativeUserIntentText;
-  const storySpine = inferStoryboardStorySpine(allText, storySpineFallback);
+  const storySpine = inferStoryboardStorySpine(
+    options.promptAuthorship === 'assistant' && assistantStorySpineSource
+      ? assistantStorySpineSource
+      : allText,
+    storySpineFallback,
+  );
   const productFeatureMap = inferStoryboardProductFeatureMap(allText, normalizedScenes);
 
   // Track how many beat/scene sections the AUTHOR wrote in the
@@ -7772,14 +7815,14 @@ function compileStoryboardCriticalRequirements(): string[] {
   ];
 }
 
-function compileStoryboardAvoidSection(userIntentText: string): string[] {
+function compileStoryboardAvoidConstraints(constraints: string[]): string[] {
   const avoidLines = [
     'Avoid malformed text, misspelled brand words, inconsistent reference identities, missing scene cells, wrong timings, and mismatched board/cell aspect ratios.',
     'Avoid scene numbers, timing badges, timecodes, production tables, Dialogue/VO labels, Audio/SFX labels, or other production notes overlaid inside the video frame artwork.',
     'Avoid in-frame comic-book SFX/action text such as Whoosh!, Impact!, Boom!, Thud!, Slash!, Crack!, or Pop!; keep those words in the production notes only.',
   ];
 
-  for (const constraint of extractStoryboardAvoidConstraints(userIntentText)) {
+  for (const constraint of constraints) {
     const normalized = constraint.replace(/[.]+$/g, '').trim();
     avoidLines.push(/^(?:avoid|without|less|do\s+not|don't)\b/i.test(normalized)
       ? `${normalized}.`
@@ -7787,6 +7830,10 @@ function compileStoryboardAvoidSection(userIntentText: string): string[] {
   }
 
   return avoidLines;
+}
+
+function compileStoryboardAvoidSection(userIntentText: string): string[] {
+  return compileStoryboardAvoidConstraints(extractStoryboardAvoidConstraints(userIntentText));
 }
 
 function formatStoryboardSeconds(value: number | null): string {
@@ -7834,7 +7881,10 @@ function removeStoryboardMetadataLabelsFromPromptText(value: string, metadataLab
     .filter(Boolean)
     .sort((a, b) => b.length - a.length);
   for (const label of aliases) {
-    cleaned = cleaned.replace(new RegExp(escapeStoryboardRegExp(label), 'gi'), '');
+    const escaped = escapeStoryboardRegExp(label);
+    const leadingBoundary = /^[\p{L}\p{N}_]/u.test(label) ? '(?<![\\p{L}\\p{N}_])' : '';
+    const trailingBoundary = /[\p{L}\p{N}_]$/u.test(label) ? '(?![\\p{L}\\p{N}_])' : '';
+    cleaned = cleaned.replace(new RegExp(`${leadingBoundary}${escaped}${trailingBoundary}`, 'giu'), '');
   }
   return compactStoryboardLine(cleaned)
     .replace(/\s+([,.;:])/g, '$1')

@@ -88,7 +88,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: "string",
           enum: ["ltx25-v2v", "ltx23-v2v", "wan22-animate", "seedance2", "seedance2-mini", "seedance2-5"],
           description:
-            'Model selector for this video-to-video request. Usually omit: non-Seedance controls default to "ltx25-v2v"; use "ltx23-v2v" only for rollback. LTX 2.5 Fast/HQ uses distilled; Pro uses dev plus the official Speed LoRA. Dev supports canny/pose/depth/detailer, while inpaint/outpaint require distilled. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts, and "seedance2" for full-quality Seedance or 1080p/4K. "seedance2-5" supports 480p/720p, 4-30s at 24 fps, native audio, and first/last-frame conditioning; keep "seedance2" for 1080p/4K.',
+            'Model selector for this video-to-video request. Usually omit: non-Seedance controls default to "ltx25-v2v"; use "ltx23-v2v" only for rollback. LTX 2.5 Fast, HQ, and Pro currently use the release-validated official Distilled workflow for canny, pose, depth, detailer, inpaint, and outpaint. Dev is not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe. For controlMode="seedance-v2v", Seedance quality is selected only by model: use "seedance2-mini" for faster/lower-cost drafts and use "seedance2" for full-quality Seedance or 1080p/4K. "seedance2-5" supports 480p/720p, 4-30s at 24 fps, native audio, and first/last-frame conditioning; keep "seedance2" for 1080p/4K.',
         },
         generateAudio: {
           type: "boolean",

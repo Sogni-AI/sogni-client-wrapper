@@ -1701,10 +1701,10 @@ async function runTests() {
 
     const explicit = resolveImageEditModelForProfile({
       imageEditProfile: 'identity_sensitive_portrait',
-      explicitModelPreference: 'flux2',
+      explicitModelPreference: 'gpt-image-2',
       fallbackModel: 'qwen',
     });
-    if (explicit !== 'flux2') {
+    if (explicit !== 'gpt-image-2') {
       throw new Error(`Expected explicit model to win, got ${String(explicit)}`);
     }
 
@@ -1795,6 +1795,24 @@ async function runTests() {
     }
     if (normalizedDescription.includes('default to 10 steps')) {
       throw new Error('edit_image prompt contract must not pin stale Krea defaults');
+    }
+  })();
+
+  await test('generate-image linked variants repeat batch-wide invariants per option', () => {
+    const contract = PROMPT_CONTRACTS.find(
+      candidate => candidate.toolName === 'generate_image',
+    );
+    if (!contract) throw new Error('Expected generate_image prompt contract');
+    const normalizedDescription = contract.baseDescription.replace(/\s+/g, ' ');
+    for (const phrase of [
+      'hard per-option invariant',
+      'literal visible names, labels, captions, flags, logos, or symbols',
+      'complete standalone option',
+      'original option equally concrete',
+    ]) {
+      if (!normalizedDescription.includes(phrase)) {
+        throw new Error(`generate_image linked-variant contract is missing: ${phrase}`);
+      }
     }
   })();
 

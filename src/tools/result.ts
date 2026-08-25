@@ -132,7 +132,7 @@ export interface ToolResultErr {
    * Hint to the harness/loop on what to do next. Examples:
    *   - 'ask_user_for_missing_field:duration_seconds'
    *   - 'retry_with_smaller_aspect_ratio'
-   *   - 'switch_to_alternate_model:flux-2'
+   *   - 'switch_to_alternate_model:qwen-image'
    */
   suggested_next_action?: string;
   /** Free-form provenance (failed worker_id, partial outputs, etc.). */

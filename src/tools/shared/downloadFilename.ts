@@ -8,7 +8,7 @@
 
 /** Optional metadata to enrich download filenames. */
 export interface DownloadMetadata {
-  /** Model key or display name (e.g. "ltx23", "Flux.2 Dev") */
+  /** Model key or display name (e.g. "ltx23", "Qwen Image 2512") */
   model?: string;
   /** Output width in pixels */
   width?: number;

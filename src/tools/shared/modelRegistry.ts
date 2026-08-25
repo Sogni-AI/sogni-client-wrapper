@@ -12,16 +12,14 @@ export interface ModelOption {
   displayName: string;
 }
 
-/** Model options for quality-tier image editing tools.
- *  These tools natively support fast/hq via a "quality" arg, plus Flux.2 Dev
- *  via a "model" arg override in the handler. */
+/** Model options for quality-tier image editing tools. */
 const QUALITY_TIER_MODELS: ModelOption[] = [
   { key: 'fast', displayName: 'Qwen Image Edit 2511 Lightning' },
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
-  { key: 'pro', displayName: 'Flux.2 Dev (Pro)' },
+  { key: 'pro', displayName: 'Qwen Image Edit 2511 (Pro)' },
 ];
 
-/** Quality-only models for tools where Flux.2 is not compatible (e.g. SV3D pipeline) */
+/** Quality-only models for tools such as the SV3D pipeline. */
 const QUALITY_ONLY_MODELS: ModelOption[] = [
   { key: 'fast', displayName: 'Qwen Image Edit 2511 Lightning' },
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
@@ -42,8 +40,6 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'chroma-v46-flash', displayName: 'Chroma v.46 Flash' },
     { key: 'chroma1-hd', displayName: 'Chroma 1 HD' },
     { key: 'chroma-detail', displayName: 'Chroma Detail' },
-    { key: 'flux1-krea', displayName: 'Flux.1 Krea' },
-    { key: 'flux2', displayName: 'Flux.2 Dev' },
     { key: 'pony-v7', displayName: 'CyberRealistic Pony v7' },
     { key: 'qwen-2512', displayName: 'Qwen Image 2512' },
     { key: 'qwen-2512-lightning', displayName: 'Qwen Image 2512 Lightning' },
@@ -65,7 +61,6 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'gpt-image-2', displayName: 'GPT Image 2' },
     { key: 'qwen-lightning', displayName: 'Qwen Image Edit Lightning' },
     { key: 'qwen', displayName: 'Qwen Image Edit 2511' },
-    { key: 'flux2', displayName: 'Flux.2 Dev' },
     { key: 'krea-identity-edit', displayName: 'Krea 2 Identity Edit LoRA v1.2' },
     { key: 'dark-beast-krea2-identity-edit', displayName: 'Dark Beast Krea 2 Identity Edit' },
   ],

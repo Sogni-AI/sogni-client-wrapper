@@ -18,7 +18,7 @@
  * - `free` (0): zero-cost utility tools.
  * - `compose.*` (1): planning / FFmpeg composition; near-free.
  * - `image.standard` (1) < `image.premium` (2) < `image.external` (3):
- *   internal flux2-class < internal premium < third-party API.
+ *   standard internal < internal premium < third-party API.
  * - `audio.standard` (3): music generation tier.
  * - `video.standard` (5) < `video.vendor.standard` (6) < `video.premium` (8)
  *   < `video.vendor.premium` (10). Note the deliberate interleave:

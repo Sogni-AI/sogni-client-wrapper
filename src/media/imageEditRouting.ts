@@ -18,7 +18,6 @@ export const IMAGE_EDIT_MODEL_PREFERENCES = [
   'gpt-image-2',
   'qwen-lightning',
   'qwen',
-  'flux2',
   'krea-identity-edit',
   'dark-beast-krea2-identity-edit',
 ] as const;

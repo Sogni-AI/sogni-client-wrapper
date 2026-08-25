@@ -96,7 +96,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             "minimax-h3-flf2v-turbo",
           ],
           description:
-            '"ltx25" (default): LTX 2.5 I2V or first/last-frame video with native audio; Fast/HQ use distilled INT8 and Pro uses dev INT8 with its required official Speed LoRA refinement. ' +
+            '"ltx25" (default): LTX 2.5 I2V or first/last-frame video with native audio; Fast, HQ, and Pro currently use the release-validated official Distilled INT8 workflow. The Dev checkpoints are not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe. ' +
             'Which video model to use. "ltx23": LTX 2.3 rollback with native audio. "wan22": quick simple motion without audio, up to 10s. "minimax-h3-i2v" and "minimax-h3-i2v-turbo": standard and 4-step Turbo MiniMax H3 from one first frame. "minimax-h3-flf2v" and "minimax-h3-flf2v-turbo": standard and 4-step Turbo MiniMax H3 between required first and last frames; use frameRole="both" and provide the end frame. H3 generates native audio at fixed 24fps for 5.17-15.08s and has no negative-prompt input. H3 Base and Turbo prompts use the exact three-field contract and the official mode-specific alignment line. Do not set Seedance here; use generate_video with Seedance references.',
         },
         negativePrompt: {

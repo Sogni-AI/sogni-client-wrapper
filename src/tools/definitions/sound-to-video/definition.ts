@@ -11,6 +11,9 @@ import {
 } from '../../../contracts/toolPromptMarkers.js';
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
 
+const WAN3_VIDEO_MODEL_GUIDANCE =
+  '"wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text-to-video, first-frame and first+last-frame animation, loose multimodal references, audio-driven generation, and uploaded-video editing/extension. It renders 2-30s at fixed 30 fps with optional native audio, supports 480p/720p/1080p and 16:9/4:3/1:1/3:4/9:16, accepts up to 10 reference images, 5 reference videos, and 5 reference audios, and uses plain per-type prompt labels Image 1, Video 1, and Audio 1. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, sound_to_video when audio is the primary driver, and video_to_video with controlMode="seedance-v2v" for edits or extensions.';
+
 export const definition: ToolDefinition = {
   type: "function",
   function: {
@@ -53,7 +56,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         negativePrompt: {
           type: "string",
           description:
-            "Advanced LTX 2.5/LTX 2.3/WAN only. The LTX A2V and IA2V workflows accept this separate negative prompt. Use it only when the user explicitly asks to set one. Do not set for Seedance.",
+            "Advanced LTX 2.5/LTX 2.3/WAN only. The LTX A2V and IA2V workflows accept this separate negative prompt. Use it only when the user explicitly asks to set one. Do not set for Seedance.\n\nWan 3 has no negativePrompt request field; do not set this for wan3.0-video.",
         },
         audioSourceIndex: {
           type: "number",
@@ -74,18 +77,19 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         duration: {
           type: "number",
           description:
-            "Video duration in seconds. Default: 5. Range: 2-30; the usable window is per-model and the host clamps to it: LTX 2.3 and WAN accept 2-20, Seedance 2.0/Mini accept 4-15, and Seedance 2.5 accepts 4-30 — only seedance2-5 can use the 16-30s part of this range. For music videos, use the MAXIMUM duration the selected model allows (20 for LTX/WAN, 30 for \"seedance2-5\") since the audio is always longer than the video limit. Use when the user explicitly requests a specific length.",
+            "Video duration in seconds. Default: 5. Per-model range: LTX/WAN 2.2 = 2-20s; Wan 3 = 2-30s; Seedance 2.0 and Mini = 4-15s; Seedance 2.5 = 4-30s. For music videos, use the maximum duration the selected model allows because the audio is usually longer than the video limit. Use when the user explicitly requests a specific length.",
           minimum: 2,
           maximum: 30,
         },
         videoModel: {
           type: "string",
-          enum: ["wan-s2v", "seedance2", "seedance2-mini", "seedance2-5", "ltx25-ia2v", "ltx25-a2v", "ltx23-ia2v", "ltx23-a2v"],
+          enum: ["wan-s2v", "seedance2", "seedance2-mini", "seedance2-5", "ltx25-ia2v", "ltx25-a2v", "ltx23-ia2v", "ltx23-a2v", "wan3.0-video"],
           description:
             '"ltx25-ia2v" (default with image) and "ltx25-a2v" (default without image): LTX 2.5 image+audio and audio-only modes; Fast, HQ, and Pro currently use the release-validated official Distilled INT8 workflows. The Dev checkpoints are not publicly routed until upstream publishes and Sogni validates official ComfyUI Dev recipes. ' +
             'Video model. "ltx23-ia2v" (rollback with image): LTX 2.3 image+audio to video, audio-reactive with a reference image; Fast/HQ use the distilled 8-step worker and Default Media Quality Pro uses the non-distilled dev worker. "ltx23-a2v" (rollback without image): LTX 2.3 audio-only to video, no image needed, creates video purely from text prompt + audio with the same quality-tier routing. "wan-s2v": WAN 2.2 sound-to-video, best for lip-sync with a face image, fast 4-step. "seedance2": full Seedance 2.0 audio-reference video, 4-15s. "seedance2-mini": Seedance 2.0 Mini, 720p cap, fastest/lower-cost Seedance option. Seedance quality is selected only by this model value: pick "seedance2-mini" for faster/lower-cost drafts or explicit Mini requests, and pick "seedance2" for full-quality Seedance or 1080p/4K. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro. "seedance2-5": Seedance 2.5, the newest Seedance generation — 480p and 720p ONLY (it cannot render 1080p or 4K), 4-30s per clip at a fixed 24 fps, native audio, first-and-last-frame conditioning, and a much larger reference budget than the 2.0 family: up to 30 images, 10 videos, and 10 audios, with up to 50 reference media files total, subject to those per-modality caps. Choose "seedance2-5" when the user asks for Seedance 2.5, wants a single continuous Seedance clip longer than 15s (2.5 renders up to 30s in one call instead of being split and stitched), or wants a first-and-last-frame Seedance transition. Keep "seedance2" for 1080p/4K requests, which Seedance 2.5 cannot satisfy. ' +
             SEEDANCE_TOOL_AUDIO_REFERENCE_GUIDANCE +
-            ' Omit to auto-select based on whether an image is present.',
+            ' Omit to auto-select based on whether an image is present. ' +
+            WAN3_VIDEO_MODEL_GUIDANCE,
         },
         generateAudio: {
           type: "boolean",
@@ -102,7 +106,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         targetResolution: {
           type: "number",
           description:
-            'Short-side video resolution target in pixels. Use ONLY when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact pixels or an output orientation. This preserves the source/reference aspect ratio. Do NOT set exact-pixel aspectRatio for bare named resolution requests. If the user says "720p portrait" or "720p landscape", use exact-pixel aspectRatio instead.',
+            'Short-side video resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", "1080p", "2160p", or "4K" without exact pixels or an output orientation. This preserves the source/reference aspect ratio. Do NOT set exact-pixel aspectRatio for bare named resolution requests. If the user says "720p portrait", "720p landscape", "4K portrait", or "4K landscape", use exact-pixel aspectRatio instead.',
         },
         aspectRatio: {
           type: "string",
@@ -113,3 +117,6 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
     },
   },
 };
+
+definition.function.description +=
+  ' Use videoModel="wan3.0-video" when the user explicitly requests Wan 3 audio-driven video.';

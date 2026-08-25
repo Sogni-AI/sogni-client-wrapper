@@ -89,6 +89,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'happyhorse-1.1-t2v', displayName: 'HappyHorse 1.1 (Text to Video)' },
     { key: 'happyhorse-1.1-i2v', displayName: 'HappyHorse 1.1 (Image to Video)' },
     { key: 'happyhorse-1.1-r2v', displayName: 'HappyHorse 1.1 (Reference to Video)' },
+    { key: 'wan3.0-video', displayName: 'Wan 3' },
   ],
   animate_photo: [
     { key: 'ltx25', displayName: 'LTX 2.5 22B' },
@@ -98,6 +99,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'minimax-h3-i2v-turbo', displayName: 'MiniMax H3 Turbo (Image to Video)' },
     { key: 'minimax-h3-flf2v', displayName: 'MiniMax H3 (First + Last Frame)' },
     { key: 'minimax-h3-flf2v-turbo', displayName: 'MiniMax H3 Turbo (First + Last Frame)' },
+    { key: 'wan3.0-video', displayName: 'Wan 3' },
   ],
   sound_to_video: [
     { key: 'wan-s2v', displayName: 'WAN 2.2 S2V' },
@@ -108,6 +110,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'ltx25-a2v', displayName: 'LTX 2.5 Audio Only' },
     { key: 'ltx23-ia2v', displayName: 'LTX 2.3 Image+Audio' },
     { key: 'ltx23-a2v', displayName: 'LTX 2.3 Audio Only' },
+    { key: 'wan3.0-video', displayName: 'Wan 3 Image/Audio' },
   ],
   video_to_video: [
     { key: 'ltx25-v2v', displayName: 'LTX 2.5 V2V Control' },
@@ -116,6 +119,7 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'seedance2', displayName: 'Seedance 2.0' },
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
     { key: 'seedance2-5', displayName: 'Seedance 2.5' },
+    { key: 'wan3.0-video', displayName: 'Wan 3 Edit/Extend' },
   ],
   generate_music: [
     { key: 'turbo', displayName: 'ACE-Step 1.5 Turbo' },

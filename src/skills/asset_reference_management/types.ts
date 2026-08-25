@@ -8,7 +8,8 @@
  *   user_label  — human-readable name the user / LLM use in conversation
  *   model_ref   — the literal token a given model expects in its prompt
  *                 (Seedance "@Image1", GPT-Image-2 "Image 1",
- *                  HappyHorse "[Image 1]", context-conditioned
+ *                  HappyHorse "[Image 1]", Wan 3 "Image 1",
+ *                  context-conditioned
  *                  "context_image_0", etc.)
  *
  * The portable contract lives here so chat (Path A), the hosted API
@@ -52,6 +53,7 @@ export interface AssetManifest {
 export type KnownAssetModelId =
   | 'seedance'
   | 'happyhorse'
+  | 'wan3'
   | 'ltx23'
   | 'ltx25'
   | 'gpt-image-2'

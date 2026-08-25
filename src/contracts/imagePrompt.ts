@@ -5,6 +5,7 @@ import { getRandomTheme } from "./randomThemes.js";
 export type ImagePromptingType =
   /** Legacy family key retained for direct callers; active Chroma profiles use `chroma`. */
   | "flux"
+  | "flux1-schnell"
   | "chroma"
   | "sdxl"
   | "sd15"
@@ -58,6 +59,15 @@ const CHROMA_GUIDE = `Chroma image models use detailed natural-language descript
 - If the user requests visible text, labels, typography, or signage, specify the exact words and wrap them in quotes.
 - If the user's prompt is already detailed, lightly polish and finalize it rather than heavily expanding or changing direction.
 - Keep low-guidance behavior in mind: prompts should be clear, direct, faithful, and parseable.`;
+
+const FLUX1_SCHNELL_GUIDE = `FLUX.1 Schnell uses clear natural-language image descriptions.
+- Start with the image type and main subject, then state the subject's primary action or visible state.
+- Add location, style or medium, composition and framing, lighting, palette, material detail, and one or two visual effects only when each detail materially improves the requested image.
+- Put the most important subject and framing information early. Describe spatial relationships explicitly when placement matters.
+- Prefer specific observable details over keyword piles, prompt weights, repeated emphasis, or stacks of generic quality claims.
+- Match length to the scene: concise prompts are appropriate for simple concepts; use more detail only for genuinely complex or tightly directed compositions.
+- If visible text is requested, preserve the exact wording in quotation marks and state where and how it appears.
+- Keep the prompt positive and self-contained; do not append a separate negative-prompt section or invent content the user did not request.`;
 
 const SDXL_GUIDE = `SDXL models work well with a hybrid approach: natural language descriptions combined with comma-separated quality/style keywords.
 Prompt structure (in this order):
@@ -161,6 +171,7 @@ const EDITING_GUIDE = `Image editing models accept reference images alongside te
 
 const PROMPTING_GUIDES: Record<ImagePromptingType, string> = {
   flux: CHROMA_GUIDE,
+  "flux1-schnell": FLUX1_SCHNELL_GUIDE,
   chroma: CHROMA_GUIDE,
   sdxl: SDXL_GUIDE,
   sd15: SD15_GUIDE,
@@ -341,6 +352,15 @@ const CHROMA_MODEL_NAMES = new Set([
   "chroma-v48-detail-svd-fp8",
 ]);
 
+// FLUX.1 Schnell remains an active generator. Keep these aliases exact so
+// sunset FLUX family ids remain excluded and continue to fail closed.
+const FLUX1_SCHNELL_MODEL_NAMES = new Set([
+  "flux-schnell",
+  "flux-1-schnell",
+  "flux1-schnell",
+  "flux1-schnell-fp8",
+]);
+
 const KREA2_MODEL_NAMES = new Set([
   "krea-2",
   "krea2",
@@ -502,6 +522,15 @@ export function resolveImagePromptAuthoringProfile(
       id: "chroma-generate",
       modelTitle: "Chroma",
       promptingType: "chroma",
+      operation: "generate",
+    });
+  }
+  if (FLUX1_SCHNELL_MODEL_NAMES.has(model)) {
+    if (operation !== "generate") return null;
+    return imageProfile({
+      id: "flux1-schnell-generate",
+      modelTitle: "FLUX.1 Schnell",
+      promptingType: "flux1-schnell",
       operation: "generate",
     });
   }

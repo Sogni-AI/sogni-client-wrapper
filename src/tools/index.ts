@@ -8,6 +8,7 @@ export type {
   ParsedToolResultError,
 } from './shared/errorClassification.js';
 export {
+  GENERATE_IMAGE_MODELS,
   MODELS_BY_TOOL,
   getAlternativeModels,
   getModelArgKey,

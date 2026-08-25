@@ -78,6 +78,7 @@ import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
   animatePhotoDefinition,
   extendVideoDefinition,
+  generateImageDefinition,
   generateVideoDefinition,
   replaceVideoSegmentDefinition,
   soundToVideoDefinition,
@@ -89,6 +90,7 @@ import {
   SEEDANCE_INPUT_IMAGE_PRIVACY_POLICY_CODE,
   SEEDANCE_STYLIZE_RECOVERY_OPTIONS,
   MODELS_BY_TOOL,
+  GENERATE_IMAGE_MODELS,
 } from '../src/tools/index.js';
 import { GENERATION_TOOLS_MANIFEST } from '../src/openai-tools/index.js';
 import {
@@ -229,6 +231,13 @@ async function runTests() {
   })();
 
   await test('Should resolve every exposed image selector to a model-and-operation prompt contract', () => {
+    const schemaModelKeys = (
+      generateImageDefinition.function.parameters.properties.model as { enum: string[] }
+    ).enum;
+    const catalogModelKeys = GENERATE_IMAGE_MODELS.map(model => model.key);
+    if (JSON.stringify(schemaModelKeys) !== JSON.stringify(catalogModelKeys)) {
+      throw new Error('generate_image schema and active model catalog drifted apart');
+    }
     for (const model of MODELS_BY_TOOL.generate_image ?? []) {
       const profile = resolveImagePromptAuthoringProfile(model.key, 'generate');
       if (!profile || profile.operation !== 'generate') {
@@ -246,6 +255,7 @@ async function runTests() {
   await test('Should keep SD, Chroma, Krea, Qwen, Z-Image, and edit prompt grammars distinct', () => {
     const sdxl = resolveImagePromptAuthoringProfile('Stable Diffusion XL', 't2i');
     const chroma = resolveImagePromptAuthoringProfile('chroma-v46-flash', 'generate');
+    const fluxSchnell = resolveImagePromptAuthoringProfile('FLUX.1 Schnell', 'generate');
     const krea = resolveImagePromptAuthoringProfile('Krea 2 Turbo', 'generation');
     const qwen = resolveImagePromptAuthoringProfile('Qwen Image 2512', 'text-to-image');
     const zTurbo = resolveImagePromptAuthoringProfile('Z-Image Turbo', 'generate');
@@ -255,6 +265,14 @@ async function runTests() {
     }
     if (!chroma || chroma.promptingType !== 'chroma' || chroma.outputFormat !== 'prompt') {
       throw new Error('Chroma did not resolve to its natural-language prompt contract');
+    }
+    if (
+      !fluxSchnell
+      || fluxSchnell.id !== 'flux1-schnell-generate'
+      || fluxSchnell.promptingType !== 'flux1-schnell'
+      || fluxSchnell.outputFormat !== 'prompt'
+    ) {
+      throw new Error('FLUX.1 Schnell did not resolve to its active caption-style prompt contract');
     }
     if (!krea || krea.promptingType !== 'krea2' || krea.outputFormat !== 'prompt') {
       throw new Error('Krea 2 did not resolve to its dense-caption prompt-only contract');
@@ -325,6 +343,7 @@ async function runTests() {
       ['chroma-v.46-flash_fp8', 'generate', 'chroma'],
       ['chroma-v48-detail-svd_fp8', 'generate', 'chroma'],
       ['chroma1-hd_fp8_scaled', 'generate', 'chroma'],
+      ['flux1-schnell-fp8', 'generate', 'flux1-schnell'],
       ['qwen_image_2512_fp8', 'generate', 'qwen'],
       ['qwen_image_2512_fp8_lightning', 'generate', 'qwen'],
       ['qwen_image_edit_2511_fp8', 'edit', 'qwen-edit'],
@@ -349,6 +368,7 @@ async function runTests() {
       'qwen_image_2513_fp8',
       'qwen_image_edit_2512_fp8',
       'flux1-dev-kontext_fp16_future',
+      'flux1-schnell-fp16-future',
       'dark_beast_krea3_fp8',
       'z_image_turbo_v2_bf16',
     ]) {

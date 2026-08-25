@@ -25,38 +25,42 @@ const QUALITY_ONLY_MODELS: ModelOption[] = [
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
 ];
 
+/** Exact active selectors that may be named on generate_image calls. */
+export const GENERATE_IMAGE_MODELS = [
+  { key: 'gpt-image-2', displayName: 'GPT Image 2' },
+  { key: 'z-turbo', displayName: 'Z-Image Turbo' },
+  { key: 'z-image', displayName: 'Z-Image' },
+  { key: 'krea-2-turbo', displayName: 'Krea 2 Turbo' },
+  { key: 'dark-beast-krea2', displayName: 'Dark Beast Krea 2' },
+  { key: 'dark-beast-z-turbo', displayName: 'Dark Beast Z-Image Turbo' },
+  { key: 'chroma-v46-flash', displayName: 'Chroma v.46 Flash' },
+  { key: 'chroma1-hd', displayName: 'Chroma 1 HD' },
+  { key: 'chroma-detail', displayName: 'Chroma Detail' },
+  { key: 'flux-schnell', displayName: 'FLUX.1 Schnell' },
+  { key: 'pony-v7', displayName: 'CyberRealistic Pony v7' },
+  { key: 'qwen-2512', displayName: 'Qwen Image 2512' },
+  { key: 'qwen-2512-lightning', displayName: 'Qwen Image 2512 Lightning' },
+  { key: 'albedo-xl', displayName: 'AlbedoBase XL v3.1-Large' },
+  { key: 'animagine-xl', displayName: 'Animagine XL 4.0' },
+  { key: 'one-obsession-v22', displayName: 'One Obsession v2.2' },
+  { key: 'anima-pencil-xl', displayName: 'Anima Pencil XL v5' },
+  { key: 'art-universe-xl', displayName: 'Art Universe XL v6' },
+  { key: 'hyphoria-real', displayName: 'Hyphoria Real [Illu] v0.5' },
+  { key: 'analog-madness-xl', displayName: 'Analog Madness SDXL v2' },
+  { key: 'cyberrealistic-xl', displayName: 'CyberRealistic XL v6' },
+  { key: 'real-dream-xl', displayName: 'Real Dream XL-Pony-11' },
+  { key: 'faetastic-xl', displayName: 'FaeTastic Details XL v24' },
+  { key: 'zavychroma-xl', displayName: 'ZavyChromaXL v8' },
+  { key: 'pony-faetality', displayName: 'Pony FaeTality v1.1' },
+  { key: 'dreamshaper-xl', displayName: 'DreamShaper XL' },
+] as const satisfies readonly ModelOption[];
+
 /**
  * Map of tool names to their available generation models. Tools not listed
  * here (or with only 1 model) won't show "Switch Model" in the menu.
  */
 export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
-  generate_image: [
-    { key: 'gpt-image-2', displayName: 'GPT Image 2' },
-    { key: 'z-turbo', displayName: 'Z-Image Turbo' },
-    { key: 'z-image', displayName: 'Z-Image' },
-    { key: 'krea-2-turbo', displayName: 'Krea 2 Turbo' },
-    { key: 'dark-beast-krea2', displayName: 'Dark Beast Krea 2' },
-    { key: 'dark-beast-z-turbo', displayName: 'Dark Beast Z-Image Turbo' },
-    { key: 'chroma-v46-flash', displayName: 'Chroma v.46 Flash' },
-    { key: 'chroma1-hd', displayName: 'Chroma 1 HD' },
-    { key: 'chroma-detail', displayName: 'Chroma Detail' },
-    { key: 'pony-v7', displayName: 'CyberRealistic Pony v7' },
-    { key: 'qwen-2512', displayName: 'Qwen Image 2512' },
-    { key: 'qwen-2512-lightning', displayName: 'Qwen Image 2512 Lightning' },
-    { key: 'albedo-xl', displayName: 'AlbedoBase XL v3.1-Large' },
-    { key: 'animagine-xl', displayName: 'Animagine XL 4.0' },
-    { key: 'one-obsession-v22', displayName: 'One Obsession v2.2' },
-    { key: 'anima-pencil-xl', displayName: 'Anima Pencil XL v5' },
-    { key: 'art-universe-xl', displayName: 'Art Universe XL v6' },
-    { key: 'hyphoria-real', displayName: 'Hyphoria Real [Illu] v0.5' },
-    { key: 'analog-madness-xl', displayName: 'Analog Madness SDXL v2' },
-    { key: 'cyberrealistic-xl', displayName: 'CyberRealistic XL v6' },
-    { key: 'real-dream-xl', displayName: 'Real Dream XL-Pony-11' },
-    { key: 'faetastic-xl', displayName: 'FaeTastic Details XL v24' },
-    { key: 'zavychroma-xl', displayName: 'ZavyChromaXL v8' },
-    { key: 'pony-faetality', displayName: 'Pony FaeTality v1.1' },
-    { key: 'dreamshaper-xl', displayName: 'DreamShaper XL' },
-  ],
+  generate_image: [...GENERATE_IMAGE_MODELS],
   edit_image: [
     { key: 'gpt-image-2', displayName: 'GPT Image 2' },
     { key: 'qwen-lightning', displayName: 'Qwen Image Edit Lightning' },

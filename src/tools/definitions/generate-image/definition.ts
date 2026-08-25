@@ -12,6 +12,7 @@ import {
 } from '../../shared/loraGuidance.js';
 import { LITERAL_PROMPT_OVERRIDE } from '../../../contracts/promptOverrideMarker.js';
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
+import { GENERATE_IMAGE_MODELS } from '../../shared/modelRegistry.js';
 
 export const definition: ToolDefinition = {
   type: 'function',
@@ -56,15 +57,7 @@ VIDEO KEYFRAMES: When generating images intended as first+last frames for video 
         },
         model: {
           type: 'string',
-          enum: [
-            'gpt-image-2',
-            'z-turbo', 'z-image', 'krea-2-turbo', 'dark-beast-krea2', 'dark-beast-z-turbo',
-            'chroma-v46-flash', 'chroma1-hd', 'chroma-detail', 'pony-v7',
-            'qwen-2512', 'qwen-2512-lightning',
-            'albedo-xl', 'animagine-xl', 'one-obsession-v22', 'anima-pencil-xl', 'art-universe-xl', 'hyphoria-real',
-            'analog-madness-xl', 'cyberrealistic-xl', 'real-dream-xl', 'faetastic-xl',
-            'zavychroma-xl', 'pony-faetality', 'dreamshaper-xl',
-          ],
+          enum: GENERATE_IMAGE_MODELS.map(model => model.key),
           description:
             'DO NOT SET THIS PARAMETER unless the user names a specific model, asks for a very complex image render, asks for a video storyboard/storyboard sheet/contact sheet/panel layout image, asks for anime without naming a model, requests permitted NSFW/nudity content, or explicitly asks for Z-image/Z-image Turbo/Krea 2 Turbo image-to-image. The app auto-selects based on quality settings. Set "gpt-image-2" when the user asks for a ChatGPT, OpenAI, GPT, GPT-2, GPT Image, or gpt-image-2 image/model, when they explicitly request very strong text rendering, or by default for complex single-image renders that need dense labels, crisp typography, multi-panel composition, timing notes, foley notes, professional storyboard-sheet layout, or a comprehensive character/mascot/model sheet with turnarounds, expressions, accessories, palette swatches, and brand notes. Set "one-obsession-v22" when the user asks for an anime or anime-style image and has not named a specific image model. Set "z-turbo" when the user asks for Z-image Turbo; set "z-image" when they ask for Z-image without Turbo. Set "krea-2-turbo" when the user asks for Krea 2 Turbo. If the user names another image model, honor that requested model instead. A model preference usually does not change which tool to use; the Z-image and Krea 2 Turbo image-to-image exception uses sourceImageIndex plus starting_image_strength on this tool. NSFW rule: "gpt-image-2" and Qwen image models CANNOT do nudity. For permitted NSFW/nudity content, prefer "dark-beast-krea2", then "dark-beast-z-turbo"; "chroma1-hd", "pony-v7", "chroma-detail", "chroma-v46-flash", and "z-turbo" are compatible fallbacks.',
         },

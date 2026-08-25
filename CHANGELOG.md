@@ -1,3 +1,10 @@
+## [3.23.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.0...v3.23.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **deps:** update sogni-client to 5.19.1 ([80dc409](https://github.com/Sogni-AI/sogni-intelligence-client/commit/80dc409081b2c09db5006a4e469b6f4848ee58d0))
+
 # [3.23.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.6...v3.23.0) (2026-08-25)
 
 

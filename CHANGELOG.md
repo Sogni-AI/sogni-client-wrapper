@@ -1,3 +1,10 @@
+## [3.22.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.3...v3.22.4) (2026-08-25)
+
+
+### Bug Fixes
+
+* **storyboard:** separate controls from creative prompts ([f17962b](https://github.com/Sogni-AI/sogni-intelligence-client/commit/f17962b7c345616340311c86c9fa4ab6eea2d7e6))
+
 ## [3.22.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.2...v3.22.3) (2026-08-25)
 
 

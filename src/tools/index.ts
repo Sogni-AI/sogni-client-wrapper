@@ -42,6 +42,19 @@ export type {
   HappyHorseReferenceLimitKind,
   HappyHorseReferenceCounts,
 } from './shared/happyhorseReferences.js';
+export {
+  WAN3_LOOSE_REFERENCE_LIMITS,
+  WAN3_REFERENCE_DURATION_LIMITS,
+  Wan3ReferenceDurationError,
+  Wan3ReferenceLimitError,
+  validateWan3ReferenceCounts,
+  validateWan3ReferenceDurations,
+} from './shared/wan3References.js';
+export type {
+  Wan3ReferenceLimits,
+  Wan3ReferenceLimitKind,
+  Wan3ReferenceCounts,
+} from './shared/wan3References.js';
 // HappyHorse 1.1 LLM tool guidance — re-exported from the `./tools` subpath so
 // consumers composing the generate_video manifest can pick it up alongside the
 // Seedance markers. Authored in contracts/toolPromptMarkers.ts.

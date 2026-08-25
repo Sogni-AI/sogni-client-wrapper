@@ -123,6 +123,7 @@ import { SogniClient } from '@sogni-ai/sogni-client';
 import { runToolsSharedTests } from './tools-shared-tests';
 import { runSeedanceReferencesTests } from './seedance-references-tests';
 import { runHappyHorseReferencesTests } from './happyhorse-references-tests';
+import { runWan3VideoTests } from './wan3-video-tests';
 import { runWorkflowExecutorTests } from './workflow-executor-tests';
 import { runCostApprovalTests } from './cost-approval-tests';
 import {
@@ -5183,6 +5184,11 @@ async function runTests() {
   const happyHorseRefResults = runHappyHorseReferencesTests();
   testsPassed += happyHorseRefResults.passed;
   testsFailed += happyHorseRefResults.failed;
+
+  // Wan 3 unified model routing, capability, and reference-format tests
+  const wan3Results = runWan3VideoTests();
+  testsPassed += wan3Results.passed;
+  testsFailed += wan3Results.failed;
 
   // Workflow executor — per-slot retry-callback primitive
   const executorResults = await runWorkflowExecutorTests();

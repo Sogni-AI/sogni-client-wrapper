@@ -26,7 +26,7 @@ type Ltx25Workflow = LtxWorkflow;
 
 export interface SkillVideoModelConfig {
   workflow: SkillVideoWorkflow;
-  family: 'ltx25' | 'ltx23' | 'ltx2' | 'wan22' | 'seedance2';
+  family: 'ltx25' | 'ltx23' | 'ltx2' | 'wan22' | 'wan3' | 'seedance2';
   defaultWidth: number;
   defaultHeight: number;
   minDimension: number;
@@ -49,7 +49,7 @@ export interface SkillVideoModelConfig {
 
 export interface SkillModelDefaults {
   workflow?: SkillVideoWorkflow;
-  family?: 'ltx25' | 'ltx23' | 'ltx2' | 'wan22' | 'seedance2' | 'krea2-identity-edit';
+  family?: 'ltx25' | 'ltx23' | 'ltx2' | 'wan22' | 'wan3' | 'seedance2' | 'krea2-identity-edit';
   defaultWidth?: number;
   defaultHeight?: number;
   minDimension?: number;
@@ -997,12 +997,33 @@ const HAPPYHORSE_MODEL_REF_FORMAT: ModelRefFormat = {
   scanRegex: /\[(?:Image|Video|Audio)\s+\d+\]/g,
 };
 
+/** Wan 3 uses Alibaba's plain, type-local English reference ordinals. */
+const WAN3_MODEL_REF_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `Video ${index}`;
+    if (type === 'audio') return `Audio ${index}`;
+    return `Image ${index}`;
+  },
+  parse(token) {
+    const m = /^(Image|Video|Audio)\s+(\d+)$/.exec(token.trim());
+    if (!m) return null;
+    const index = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(index) || index < 1) return null;
+    return {
+      index,
+      type: m[1] === 'Video' ? 'video' : m[1] === 'Audio' ? 'audio' : 'image',
+    };
+  },
+  scanRegex: /\b(?:Image|Video|Audio)\s+\d+\b/g,
+};
+
 export function getModelRefFormat(modelId: string): ModelRefFormat {
   const trimmed = modelId.trim().toLowerCase().replace(/[_.\s]+/g, '-').replace(/-+/g, '-');
   if (trimmed === 'seedance' || isSeedanceVideoModelId(trimmed)) return SEEDANCE_MODEL_REF_FORMAT;
   const videoFamily = resolveRegisteredVideoModelFamily(trimmed);
   if (videoFamily === 'minimax-h3') return MINIMAX_H3_MODEL_REF_FORMAT;
   if (videoFamily === 'happyhorse-1.1') return HAPPYHORSE_MODEL_REF_FORMAT;
+  if (videoFamily === 'wan3') return WAN3_MODEL_REF_FORMAT;
   if (videoFamily === 'ltx25' || videoFamily === 'ltx23' || videoFamily === 'ltx2' || videoFamily === 'wan22') {
     return CONTEXT_MODEL_REF_FORMAT;
   }
@@ -1816,6 +1837,9 @@ export const HAPPYHORSE_WORKFLOW_MODELS = Object.freeze({
   r2v: 'happyhorse-1.1-r2v'
 });
 
+// Wan 3 is one canonical Alibaba model whose media shape selects every mode.
+export const WAN3_WORKFLOW_MODEL = 'wan3.0-video';
+
 export const VIDEO_MODEL_REGISTRY = Object.freeze({
   [LTX23_WORKFLOW_MODELS.t2v]: {
     workflow: 't2v',
@@ -2048,6 +2072,20 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
     minFrames: 97,
     maxFrames: 721,
     supportsNativeAudio: true
+  },
+  [WAN3_WORKFLOW_MODEL]: {
+    workflow: 't2v',
+    family: 'wan3',
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    minDimension: 480,
+    maxDimension: 1920,
+    dimensionMultiple: 1,
+    fps: 30,
+    frameStep: 1,
+    minFrames: 61,
+    maxFrames: 901,
+    supportsNativeAudio: true
   }
 } satisfies Record<string, SkillVideoModelConfig>);
 
@@ -2160,7 +2198,11 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   'seedance2-5': SEEDANCE_WORKFLOW_MODELS.t2v25,
   'seedance2-5-t2v': SEEDANCE_WORKFLOW_MODELS.t2v25,
   'seedance2-5-ia2v': SEEDANCE_WORKFLOW_MODELS.t2v25,
-  'seedance2-5-v2v': SEEDANCE_WORKFLOW_MODELS.t2v25
+  'seedance2-5-v2v': SEEDANCE_WORKFLOW_MODELS.t2v25,
+  wan3: WAN3_WORKFLOW_MODEL,
+  'wan3.0': WAN3_WORKFLOW_MODEL,
+  'wan3-video': WAN3_WORKFLOW_MODEL,
+  'wan3.0-video': WAN3_WORKFLOW_MODEL
 } satisfies Record<string, string>);
 
 export const QUALITY_TIERS = Object.freeze({
@@ -2242,6 +2284,10 @@ export function isSeedanceModel(modelId: string | null | undefined): boolean {
 
 export function isHappyHorseModel(modelId: string | null | undefined): boolean {
   return resolveRegisteredVideoModelFamily(modelId) === 'happyhorse-1.1';
+}
+
+export function isWan3Model(modelId: string | null | undefined): boolean {
+  return resolveRegisteredVideoModelFamily(modelId) === 'wan3';
 }
 
 export function resolveVideoControlNetStrength(
@@ -3473,6 +3519,11 @@ export function isHappyHorseModelSelection(modelId: string | null | undefined): 
     isHappyHorseModel(resolveVideoModelAlias(modelId, 'i2v')) ||
     isHappyHorseModel(resolveVideoModelAlias(modelId, 'v2v'))
   );
+}
+
+export function isWan3ModelSelection(modelId: string | null | undefined): boolean {
+  if (!modelId) return false;
+  return isWan3Model(modelId) || isWan3Model(resolveVideoModelAlias(modelId));
 }
 
 export function planCliVideoBrain(input: SkillCliVideoBrainInput): SkillCliVideoBrainPlan {

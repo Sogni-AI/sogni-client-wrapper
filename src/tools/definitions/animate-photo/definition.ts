@@ -30,6 +30,9 @@ const H3_LORA_SELECTORS = [
   "minimax-h3-flf2v-turbo",
 ] as const;
 
+const WAN3_VIDEO_MODEL_GUIDANCE =
+  '"wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text-to-video, first-frame and first+last-frame animation, loose multimodal references, audio-driven generation, and uploaded-video editing/extension. It renders 2-30s at fixed 30 fps with optional native audio, supports 480p/720p/1080p and 16:9/4:3/1:1/3:4/9:16, accepts up to 10 reference images, 5 reference videos, and 5 reference audios, and uses plain per-type prompt labels Image 1, Video 1, and Audio 1. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, sound_to_video when audio is the primary driver, and video_to_video with controlMode="seedance-v2v" for edits or extensions.';
+
 export const definition: ToolDefinition = {
   type: "function",
   function: {
@@ -94,30 +97,46 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             "minimax-h3-i2v-turbo",
             "minimax-h3-flf2v",
             "minimax-h3-flf2v-turbo",
+            "wan3.0-video",
           ],
           description:
             '"ltx25" (default): LTX 2.5 I2V or first/last-frame video with native audio; Fast, HQ, and Pro currently use the release-validated official Distilled INT8 workflow. The Dev checkpoints are not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe. ' +
-            'Which video model to use. "ltx23": LTX 2.3 rollback with native audio. "wan22": quick simple motion without audio, up to 10s. "minimax-h3-i2v" and "minimax-h3-i2v-turbo": standard and 4-step Turbo MiniMax H3 from one first frame. "minimax-h3-flf2v" and "minimax-h3-flf2v-turbo": standard and 4-step Turbo MiniMax H3 between required first and last frames; use frameRole="both" and provide the end frame. H3 generates native audio at fixed 24fps for 5.17-15.08s and has no negative-prompt input. H3 Base and Turbo prompts use the exact three-field contract and the official mode-specific alignment line. Do not set Seedance here; use generate_video with Seedance references.',
+            'Which video model to use. "ltx23": LTX 2.3 rollback with native audio. "wan22": quick simple motion without audio, up to 10s. "minimax-h3-i2v" and "minimax-h3-i2v-turbo": standard and 4-step Turbo MiniMax H3 from one first frame. "minimax-h3-flf2v" and "minimax-h3-flf2v-turbo": standard and 4-step Turbo MiniMax H3 between required first and last frames; use frameRole="both" and provide the end frame. H3 generates native audio at fixed 24fps for 5.17-15.08s and has no negative-prompt input. H3 Base and Turbo prompts use the exact three-field contract and the official mode-specific alignment line. Do not set Seedance here; use generate_video with Seedance references. ' +
+            WAN3_VIDEO_MODEL_GUIDANCE,
         },
         negativePrompt: {
           type: "string",
           description:
-            "Advanced LTX/WAN only. Use this field only when the user explicitly asks to set a separate negative prompt. MiniMax H3 has no negative-prompt input; put requested exclusions in prompt.",
+            "Advanced LTX/WAN only. Use this field only when the user explicitly asks to set a separate negative prompt. MiniMax H3 has no negative-prompt input; put requested exclusions in prompt.\n\nWan 3 has no negativePrompt request field; do not set this for wan3.0-video.",
         },
         generateAudio: {
           type: "boolean",
           description:
-            "Whether the returned video should include generated/native audio. Omit to include audio by default; set false only when the user explicitly asks for silent output or no audio. Supported by LTX and MiniMax H3; ignored by audio-less WAN.",
+            "Whether the returned video should include generated/native audio. Omit to include audio by default; set false only when the user explicitly asks for silent output or no audio. Supported by LTX and MiniMax H3; ignored by audio-less WAN.\n\nWan 3 supports this toggle; omit it for audio-on by default or set false only for an explicitly silent result.",
         },
         duration: {
           type: "number",
           description:
-            'Video duration in seconds. Default: 5. Per-model range: ltx25 and ltx23 = 2-20s, wan22 = 2-10s, MiniMax H3 = 5.17-15.08s snapped to its valid frame grid. For longer totals, batch clips via sourceImageIndices.',
+            'Video duration in seconds. Default: 5. Use when the user explicitly requests a specific length (e.g., "make a 10 second video"). Per-model maximum: ltx25 and ltx23 = 20s, wan22 = 10s (clips longer than this are invalid), wan3.0-video = 30s with a 2s minimum, minimax-h3 = 15.08s with a 5.17s minimum because H3 renders 124-362 frames on a 17-frame grid at a fixed 24 fps. For totals beyond the per-model cap, batch multiple clips via sourceImageIndices instead of requesting a single oversized clip.',
+        },
+        smartDuration: {
+          type: "boolean",
+          description:
+            "Wan 3 only. Let the model choose 2-30 seconds. Do not also set duration. The 30-second maximum is reserved and the final charge settles down to reported duration.",
+        },
+        ratio: {
+          type: "string",
+          enum: ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
+          description: 'Wan 3 only. Use "adaptive" to preserve the source frame shape.',
+        },
+        watermark: {
+          type: "boolean",
+          description: "Wan 3 only. Add Alibaba's visible watermark. Defaults to false.",
         },
         targetResolution: {
           type: "number",
           description:
-            'Short-side video resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact pixels or an output orientation. This preserves the source image aspect ratio. Do NOT set width, height, or exact-pixel aspectRatio for bare named resolution requests. If the user says "720p portrait" or "720p landscape", use exact-pixel aspectRatio instead.',
+            'Short-side video resolution target in pixels. Use when the user asks for a bare named resolution such as "480p", "720p", or "1080p" without exact pixels or an output orientation. This preserves the source image aspect ratio. Wan 3 supports 480p, 720p, and 1080p; HappyHorse supports only 720p and 1080p. Never set 4K for either. MiniMax H3 renders inside a 1344x768 pixel budget on a 32px grid, so use 768 for H3 and never 1080p or 4K. Do NOT set width, height, or exact-pixel aspectRatio for bare named resolution requests. If the user says "720p portrait" or "720p landscape", use exact-pixel aspectRatio instead.',
         },
         sourceImageIndex: {
           type: "number",
@@ -195,3 +214,6 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
     },
   },
 };
+
+definition.function.description +=
+  ' Wan 3 first-frame and first+last-frame generation is supported with videoModel="wan3.0-video".';

@@ -80,6 +80,28 @@ const HAPPYHORSE_FORMAT: ModelRefFormat = {
   scanRegex: /\[(?:Image|Video|Audio)\s+\d+\]/g,
 };
 
+/**
+ * Wan 3 follows Alibaba's English multimodal reference identifiers: `Image 1`,
+ * `Video 1`, and `Audio 1`, numbered independently by media type.
+ */
+const WAN3_FORMAT: ModelRefFormat = {
+  format(index, type) {
+    if (type === 'video') return `Video ${index}`;
+    if (type === 'audio') return `Audio ${index}`;
+    return `Image ${index}`;
+  },
+  parse(token) {
+    const m = /^(Image|Video|Audio)\s+(\d+)$/.exec(token.trim());
+    if (!m) return null;
+    const kind = m[1]!;
+    const idx = Number.parseInt(m[2]!, 10);
+    if (!Number.isFinite(idx) || idx < 1) return null;
+    const t: AssetType = kind === 'Video' ? 'video' : kind === 'Audio' ? 'audio' : 'image';
+    return { index: idx, type: t };
+  },
+  scanRegex: /\b(?:Image|Video|Audio)\s+\d+\b/g,
+};
+
 const GPT_IMAGE_2_FORMAT: ModelRefFormat = {
   format(index, type) {
     if (type === 'video') return `Video ${index}`;
@@ -152,6 +174,7 @@ const MINIMAX_H3_FORMAT: ModelRefFormat = {
 const MODEL_REF_FORMATS: Record<KnownAssetModelId, ModelRefFormat> = {
   seedance: SEEDANCE_FORMAT,
   happyhorse: HAPPYHORSE_FORMAT,
+  wan3: WAN3_FORMAT,
   'gpt-image-2': GPT_IMAGE_2_FORMAT,
   ltx23: CONTEXT_FORMAT,
   ltx25: CONTEXT_FORMAT,
@@ -204,6 +227,9 @@ export function getModelRefFormatResolution(modelId: string): ModelRefFormatReso
   const videoFamily = resolveRegisteredVideoModelFamily(trimmed);
   if (videoFamily === 'happyhorse-1.1') {
     return { format: HAPPYHORSE_FORMAT, model_id: 'happyhorse', fell_back: false };
+  }
+  if (videoFamily === 'wan3') {
+    return { format: WAN3_FORMAT, model_id: 'wan3', fell_back: false };
   }
   if (videoFamily === 'minimax-h3') {
     return { format: MINIMAX_H3_FORMAT, model_id: 'minimax-h3', fell_back: false };

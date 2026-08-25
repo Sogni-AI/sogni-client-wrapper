@@ -10,7 +10,8 @@ export type RegisteredVideoModelFamily =
   | 'ltx2'
   | 'wan22'
   | 'minimax-h3'
-  | 'happyhorse-1.1';
+  | 'happyhorse-1.1'
+  | 'wan3';
 
 function normalizeVideoModelId(value: string): string {
   return value
@@ -100,6 +101,12 @@ const HAPPYHORSE_11_MODEL_IDS = normalizedSet([
   'happyhorse-1.1-i2v',
   'happyhorse-1.1-r2v',
 ]);
+const WAN3_MODEL_IDS = normalizedSet([
+  'wan3',
+  'wan3.0',
+  'wan3-video',
+  'wan3.0-video',
+]);
 
 export function resolveRegisteredVideoModelFamily(
   value: string | null | undefined,
@@ -113,6 +120,7 @@ export function resolveRegisteredVideoModelFamily(
   if (WAN22_MODEL_IDS.has(modelId)) return 'wan22';
   if (MINIMAX_H3_MODEL_IDS.has(modelId)) return 'minimax-h3';
   if (HAPPYHORSE_11_MODEL_IDS.has(modelId)) return 'happyhorse-1.1';
+  if (WAN3_MODEL_IDS.has(modelId)) return 'wan3';
   return null;
 }
 
@@ -131,6 +139,10 @@ export function isRegisteredMiniMaxH3VideoModelId(value: string | null | undefin
 
 export function isRegisteredHappyHorseVideoModelId(value: string | null | undefined): boolean {
   return resolveRegisteredVideoModelFamily(value) === 'happyhorse-1.1';
+}
+
+export function isRegisteredWan3VideoModelId(value: string | null | undefined): boolean {
+  return resolveRegisteredVideoModelFamily(value) === 'wan3';
 }
 
 export { isSeedanceVideoModelId };

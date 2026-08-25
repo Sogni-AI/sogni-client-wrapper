@@ -1,3 +1,10 @@
+## [3.23.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.5...v3.23.6) (2026-08-25)
+
+
+### Bug Fixes
+
+* **media:** remove retired Kontext enhancement route ([6c26338](https://github.com/Sogni-AI/sogni-intelligence-client/commit/6c26338552f4953ba56608ecd65937f672970931))
+
 ## [3.23.5](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.4...v3.23.5) (2026-08-25)
 
 

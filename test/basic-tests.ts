@@ -3,6 +3,8 @@
  * These tests validate structure, types, and error handling without requiring actual API credentials
  */
 
+import { createRequire } from 'node:module';
+
 import {
   SogniClientWrapper,
   SogniError,
@@ -18,6 +20,13 @@ import {
   validateClientConfig,
   getMaxContextImages,
   getVideoDimensionRules,
+  isHappyHorseVideoModel,
+  isLtxVideoModel,
+  isMiniMaxH3VideoModel,
+  isSeedance25VideoModel,
+  isSeedanceVideoModel,
+  isWanVideoModel,
+  resolveSeedanceVideoModelId,
   supportsContextImages,
   type ImageProjectConfig,
   type VideoProjectConfig,
@@ -49,14 +58,22 @@ import {
   containsQuotedDialogue,
   extractQuotedDialogueSegments,
   formatModelRef,
+  getModelRefFormat as getPublicModelRefFormat,
   getVideoPromptGuardrailPlan,
   getModelDefaults,
+  getBuiltinVideoModelConfig,
   inferStoryboardLayoutSpec,
   LTX25_DEV_WORKFLOW_MODELS as RUNTIME_LTX25_DEV_WORKFLOW_MODELS,
   LTX25_WORKFLOW_MODELS as RUNTIME_LTX25_WORKFLOW_MODELS,
   resolveVideoModelAlias,
   selectDefaultVideoModel,
+  isSeedanceModel,
+  isSeedanceModelSelection,
+  storyboardAdapterRegistry,
 } from '../src/public-skill-runtime/index.js';
+import {
+  getModelRefFormatResolution,
+} from '../src/skills/asset_reference_management/modelRefRegistry.js';
 import {
   SEEDANCE_VENDOR_TIMEOUT_MESSAGE,
   animatePhotoDefinition,
@@ -160,6 +177,7 @@ async function runTests() {
         targetModel: 'future-video-model-v7',
         workflow: 'depth-guided-video',
         durationSeconds: 12.5,
+        referenceCounts: { images: 2, videos: 1, audios: 0 },
       },
       provenance: 'classifier',
     };
@@ -168,6 +186,14 @@ async function runTests() {
     }
     if (!isTurnAnalysis(analysis) || !validateTurnAnalysis(analysis).valid) {
       throw new Error('TurnAnalysis rejected a valid model-prompt text artifact');
+    }
+
+    const invalidReferenceCounts = {
+      ...analysis.textArtifact,
+      referenceCounts: { images: -1, videos: 0, audios: 0 },
+    };
+    if (isTurnTextArtifact(invalidReferenceCounts)) {
+      throw new Error('TurnTextArtifact accepted an invalid reference count');
     }
 
     const invalid = {
@@ -217,9 +243,9 @@ async function runTests() {
     }
   })();
 
-  await test('Should keep SD, FLUX, Krea, Qwen, Z-Image, and edit prompt grammars distinct', () => {
+  await test('Should keep SD, Chroma, Krea, Qwen, Z-Image, and edit prompt grammars distinct', () => {
     const sdxl = resolveImagePromptAuthoringProfile('Stable Diffusion XL', 't2i');
-    const flux = resolveImagePromptAuthoringProfile('Flux.2 Dev', 'generate');
+    const chroma = resolveImagePromptAuthoringProfile('chroma-v46-flash', 'generate');
     const krea = resolveImagePromptAuthoringProfile('Krea 2 Turbo', 'generation');
     const qwen = resolveImagePromptAuthoringProfile('Qwen Image 2512', 'text-to-image');
     const zTurbo = resolveImagePromptAuthoringProfile('Z-Image Turbo', 'generate');
@@ -227,8 +253,8 @@ async function runTests() {
     if (!sdxl || sdxl.promptingType !== 'sdxl' || sdxl.outputFormat !== 'positive_negative') {
       throw new Error('SDXL did not resolve to its positive/negative hybrid contract');
     }
-    if (!flux || flux.promptingType !== 'flux' || flux.outputFormat !== 'prompt') {
-      throw new Error('FLUX did not resolve to its natural-language prompt-only contract');
+    if (!chroma || chroma.promptingType !== 'chroma' || chroma.outputFormat !== 'prompt') {
+      throw new Error('Chroma did not resolve to its natural-language prompt contract');
     }
     if (!krea || krea.promptingType !== 'krea2' || krea.outputFormat !== 'prompt') {
       throw new Error('Krea 2 did not resolve to its dense-caption prompt-only contract');
@@ -242,14 +268,22 @@ async function runTests() {
     if (!qwenEdit || qwenEdit.promptingType !== 'qwen-edit' || qwenEdit.operation !== 'edit') {
       throw new Error('Qwen Image Edit did not resolve to a delta-instruction edit contract');
     }
+    if (qwenEdit.maxReferenceImages !== 3) {
+      throw new Error('Qwen Image Edit lost its three-image prompt contract');
+    }
+    const kreaEdit = resolveImagePromptAuthoringProfile('krea-identity-edit', 'edit');
+    const gptEdit = resolveImagePromptAuthoringProfile('gpt-image-2', 'edit');
+    if (kreaEdit?.maxReferenceImages !== 2 || gptEdit?.maxReferenceImages !== 16) {
+      throw new Error('Image-edit prompt contracts lost their model-specific reference ceilings');
+    }
 
     const sdxlSystem = buildImagePromptAuthoringMessages({
       prompt: 'a car commercial still',
       profile: sdxl,
     })[0]?.content ?? '';
-    const fluxSystem = buildImagePromptAuthoringMessages({
+    const chromaSystem = buildImagePromptAuthoringMessages({
       prompt: 'a car commercial still',
-      profile: flux,
+      profile: chroma,
     })[0]?.content ?? '';
     const kreaSystem = buildImagePromptAuthoringMessages({
       prompt: 'a car commercial still',
@@ -258,10 +292,14 @@ async function runTests() {
     if (!sdxlSystem.includes('comma-separated quality/style keywords')) {
       throw new Error('SDXL authoring lost its hybrid keyword guidance');
     }
-    if (!fluxSystem.includes('not keyword lists') || !fluxSystem.includes('prompt text')) {
-      throw new Error('FLUX authoring lost its natural-language prompt-only guidance');
+    if (!chromaSystem.includes('not keyword lists') || !chromaSystem.includes('prompt text')) {
+      throw new Error('Chroma authoring lost its natural-language guidance');
     }
-    if (!kreaSystem.includes('rich captions') || !kreaSystem.includes('dense but fluent')) {
+    if (
+      !kreaSystem.includes('caption-conditioned') ||
+      !kreaSystem.includes('short or ambiguous idea') ||
+      !kreaSystem.includes('no mandatory word count')
+    ) {
       throw new Error('Krea 2 authoring lost its caption-conditioned guidance');
     }
 
@@ -269,19 +307,79 @@ async function runTests() {
       sdxl,
       'positive_prompt: a polished crimson coupe, studio lighting\nnegative_prompt: distorted wheels, illegible text',
     );
-    assertImagePromptAuthoringOutput(flux, 'A polished crimson coupe in a controlled studio composition.');
+    assertImagePromptAuthoringOutput(chroma, 'A polished crimson coupe in a controlled studio composition.');
 
     if (resolveImagePromptAuthoringProfile('Krea 2 Turbo', 'edit') !== null) {
       throw new Error('Generation-only Krea 2 selector incorrectly accepted an edit operation');
-    }
-    if (resolveImagePromptAuthoringProfile('Flux.1 Krea', 'edit') !== null) {
-      throw new Error('Generation-only FLUX selector incorrectly accepted an edit operation');
     }
     if (resolveImagePromptAuthoringProfile('Unknown Diffusion X9', 'generate') !== null) {
       throw new Error('Unknown image model incorrectly received a fallback prompt contract');
     }
     if (resolveImagePromptAuthoringProfile('SDXL', 'depth-conditioned') !== null) {
       throw new Error('Unknown image operation incorrectly defaulted to generation');
+    }
+  })();
+
+  await test('Should resolve registered image worker ids without family-prefix inheritance', () => {
+    const cases = [
+      ['chroma-v.46-flash_fp8', 'generate', 'chroma'],
+      ['chroma-v48-detail-svd_fp8', 'generate', 'chroma'],
+      ['chroma1-hd_fp8_scaled', 'generate', 'chroma'],
+      ['qwen_image_2512_fp8', 'generate', 'qwen'],
+      ['qwen_image_2512_fp8_lightning', 'generate', 'qwen'],
+      ['qwen_image_edit_2511_fp8', 'edit', 'qwen-edit'],
+      ['qwen_image_edit_2511_fp8_lightning', 'edit', 'qwen-edit'],
+      ['z_image_bf16', 'generate', 'z-image'],
+      ['z_image_turbo_bf16', 'generate', 'z-image'],
+      ['dark_beast_z_image_turbo_v9_bf16', 'generate', 'z-image'],
+      ['krea2_turbo_fp8_scaled', 'generate', 'krea2'],
+      ['dark_beast_krea2_fp8', 'generate', 'krea2'],
+      ['krea2_identity_edit_v1_2', 'edit', 'krea2-edit'],
+      ['dark_beast_krea2_identity_edit_v1_2', 'edit', 'krea2-edit'],
+      ['krea2_identity_edit_sogni_v0_3_alpha', 'edit', 'krea2-edit'],
+    ] as const;
+    for (const [modelId, operation, promptingType] of cases) {
+      const profile = resolveImagePromptAuthoringProfile(modelId, operation);
+      if (!profile || profile.promptingType !== promptingType) {
+        throw new Error(`Registered image worker ${modelId} did not resolve to ${promptingType}`);
+      }
+    }
+
+    for (const unknown of [
+      'qwen_image_2513_fp8',
+      'qwen_image_edit_2512_fp8',
+      'flux1-dev-kontext_fp16_future',
+      'dark_beast_krea3_fp8',
+      'z_image_turbo_v2_bf16',
+    ]) {
+      if (resolveImagePromptAuthoringProfile(unknown) !== null) {
+        throw new Error(`Unknown image worker inherited a prompt contract: ${unknown}`);
+      }
+    }
+
+    for (const sunsetModel of [
+      'flux1-dev-kontext_fp8_scaled',
+      'flux2_dev_fp8',
+      'flux2',
+      'flux-2-dev',
+      'flux1-krea',
+      'flux-1-krea',
+    ]) {
+      if (resolveImagePromptAuthoringProfile(sunsetModel) !== null) {
+        throw new Error(`Sunset model was exposed as an active prompt target: ${sunsetModel}`);
+      }
+    }
+
+    for (const modelWithoutReferenceGrammar of [
+      'chroma-v.46-flash_fp8',
+      'flux1-dev-kontext_fp8_scaled',
+      'flux2_dev_fp8',
+      'flux1-krea-dev_fp8_scaled',
+    ]) {
+      const resolution = getModelRefFormatResolution(modelWithoutReferenceGrammar);
+      if (!resolution.fell_back || resolution.model_id !== 'unknown') {
+        throw new Error(`Prompt/catalog identity leaked into reference syntax for ${modelWithoutReferenceGrammar}`);
+      }
     }
   })();
 
@@ -756,6 +854,121 @@ async function runTests() {
     }
     const fallback = getVideoDimensionRules(undefined);
     if (fallback.maxDimension !== 1536) throw new Error('Unknown models must keep the legacy envelope');
+  })();
+
+  await test('Should recognize only explicitly registered Seedance model contracts', () => {
+    for (const modelId of [
+      'seedance-2-0',
+      'seedance-2-0-mini',
+      'seedance-2-5',
+      'seedance2',
+      'seedance2-mini',
+      'seedance2-5',
+    ]) {
+      if (!isSeedanceVideoModel(modelId) || !isSeedanceModel(modelId)) {
+        throw new Error(`Registered Seedance model was not recognized: ${modelId}`);
+      }
+    }
+    if (!isSeedance25VideoModel('seedance-2-5')) {
+      throw new Error('Seedance 2.5 did not receive its explicit capability contract');
+    }
+    if (resolveSeedanceVideoModelId('seedance-2-0-fast') !== 'seedance-2-0-mini') {
+      throw new Error('The explicit retired Fast alias did not resolve to Mini');
+    }
+    for (const unknown of [
+      'seedance-2-5-ultra',
+      'seedance-2-0-future',
+      'seedance-3-0',
+      'seedance-2-0_t2v',
+    ]) {
+      if (
+        isSeedanceVideoModel(unknown) ||
+        isSeedance25VideoModel(unknown) ||
+        isSeedanceModel(unknown) ||
+        resolveSeedanceVideoModelId(unknown) !== null
+      ) {
+        throw new Error(`Unknown Seedance SKU inherited a registered contract: ${unknown}`);
+      }
+      if (storyboardAdapterRegistry.getAdapter(unknown) !== null) {
+        throw new Error(`Unknown Seedance SKU inherited the Seedance storyboard adapter: ${unknown}`);
+      }
+      if (getPublicModelRefFormat(unknown).format(1, 'image') === '@Image1') {
+        throw new Error(`Unknown Seedance SKU inherited the Seedance public model_ref format: ${unknown}`);
+      }
+      const internalResolution = getModelRefFormatResolution(unknown);
+      if (!internalResolution.fell_back || internalResolution.model_id !== 'unknown') {
+        throw new Error(`Unknown Seedance SKU inherited the internal model_ref format: ${unknown}`);
+      }
+    }
+    for (const selection of ['seedance2', 'seedance2-mini', 'seedance2-5']) {
+      if (!isSeedanceModelSelection(selection)) {
+        throw new Error(`Explicit Seedance CLI alias was not recognized: ${selection}`);
+      }
+    }
+    if (isSeedanceModelSelection('seedance2-5-ultra')) {
+      throw new Error('Unknown Seedance CLI alias inherited the Seedance selection contract');
+    }
+  })();
+
+  await test('Should fail closed for unregistered future video and image model families', () => {
+    const videoCases: Array<{
+      unknown: string;
+      recognized: (modelId: string) => boolean;
+    }> = [
+      { unknown: 'ltx26-22b-int8_t2v_distilled', recognized: isLtxVideoModel },
+      { unknown: 'wan_v3.0-14b-fp8_t2v_lightx2v', recognized: isWanVideoModel },
+      { unknown: 'minimax-h3-v4-t2v', recognized: isMiniMaxH3VideoModel },
+      { unknown: 'happyhorse-2.0-t2v', recognized: isHappyHorseVideoModel },
+      { unknown: 'ltx', recognized: isLtxVideoModel },
+    ];
+    for (const { unknown, recognized } of videoCases) {
+      if (recognized(unknown)) {
+        throw new Error(`Unknown video model inherited a family contract: ${unknown}`);
+      }
+      if (storyboardAdapterRegistry.getAdapter(unknown) !== null) {
+        throw new Error(`Unknown video model inherited a storyboard adapter: ${unknown}`);
+      }
+      if (getBuiltinVideoModelConfig(unknown) !== null) {
+        throw new Error(`Unknown video model inherited execution defaults: ${unknown}`);
+      }
+      const refResolution = getModelRefFormatResolution(unknown);
+      if (!refResolution.fell_back || refResolution.model_id !== 'unknown') {
+        throw new Error(`Unknown video model inherited a model_ref grammar: ${unknown}`);
+      }
+    }
+
+    for (const unknown of ['gpt-image-3', 'flux-3-ultra', 'qwen-image-9999', 'krea-3-identity-edit']) {
+      if (resolveImagePromptAuthoringProfile(unknown) !== null) {
+        throw new Error(`Unknown image model inherited a prompt contract: ${unknown}`);
+      }
+      const refResolution = getModelRefFormatResolution(unknown);
+      if (!refResolution.fell_back || refResolution.model_id !== 'unknown') {
+        throw new Error(`Unknown image model inherited a model_ref grammar: ${unknown}`);
+      }
+      if (storyboardAdapterRegistry.getAdapter(unknown) !== null) {
+        throw new Error(`Unknown image model inherited a storyboard adapter: ${unknown}`);
+      }
+    }
+
+    const unknownH3Bounds = getVideoDimensionRules('minimax-h3-v4-t2v');
+    if (unknownH3Bounds.minDimension !== 480 || unknownH3Bounds.maxDimension !== 1536) {
+      throw new Error(`Unknown H3 model inherited H3 dimensions: ${JSON.stringify(unknownH3Bounds)}`);
+    }
+  })();
+
+  await test('Should preserve every explicitly registered video family selector', () => {
+    if (!isLtxVideoModel('ltx25-22b-int8_t2v_distilled')) throw new Error('LTX 2.5 worker id was not recognized');
+    if (!isLtxVideoModel('ltx23-22b-fp8_i2v_dev')) throw new Error('LTX 2.3 worker id was not recognized');
+    if (!isLtxVideoModel('ltx2-19b-fp8_v2v_distilled')) throw new Error('LTX 2 worker id was not recognized');
+    if (!isWanVideoModel('wan_v2.2-14b-fp8_i2v_lightx2v')) throw new Error('WAN 2.2 worker id was not recognized');
+    if (!isMiniMaxH3VideoModel('minimax-h3-ref2va-fp8_r2v_turbo')) throw new Error('MiniMax H3 worker id was not recognized');
+    if (!isMiniMaxH3VideoModel('minimax-h3-turbo')) throw new Error('MiniMax H3 Turbo selector was not recognized');
+    if (!isHappyHorseVideoModel('happyhorse-1.1-r2v')) throw new Error('HappyHorse 1.1 worker id was not recognized');
+    if (!isHappyHorseVideoModel('happyhorse-1.1')) throw new Error('HappyHorse 1.1 selector was not recognized');
+    const wanQuality = getBuiltinVideoModelConfig('wan_v2.2-14b-fp8_i2v');
+    if (wanQuality?.family !== 'wan22' || wanQuality.steps !== 20) {
+      throw new Error(`Registered WAN quality model lost its exact defaults: ${JSON.stringify(wanQuality)}`);
+    }
   })();
 
   await test('Should not downscale LTX-2.5 1080p (and should preserve legacy WAN clamp)', () => {
@@ -1795,6 +2008,22 @@ async function runTests() {
     }
     if (normalizedDescription.includes('default to 10 steps')) {
       throw new Error('edit_image prompt contract must not pin stale Krea defaults');
+    }
+  })();
+
+  await test('shared prompt-authoring contracts match the installed protocol exactly', () => {
+    const requireFromHere = createRequire(import.meta.url);
+    for (const toolName of ['enhance_prompt', 'compose_script'] as const) {
+      const localContract = PROMPT_CONTRACTS.find(
+        candidate => candidate.toolName === toolName,
+      );
+      if (!localContract) throw new Error(`Expected ${toolName} prompt contract`);
+      const protocolContract = requireFromHere(
+        `@sogni-ai/sogni-protocol/prompts/tools/${toolName}.json`,
+      ) as typeof localContract;
+      if (JSON.stringify(localContract) !== JSON.stringify(protocolContract)) {
+        throw new Error(`${toolName} runtime contract drifted from @sogni-ai/sogni-protocol`);
+      }
     }
   })();
 
@@ -3896,7 +4125,7 @@ async function runTests() {
     };
 
     await client.estimateVideoCost({
-      modelId: 'seedance-2-0_t2v',
+      modelId: 'seedance-2-0',
       width: 1280,
       height: 720,
       duration: 5,

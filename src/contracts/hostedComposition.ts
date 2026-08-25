@@ -22,11 +22,14 @@ export const HOSTED_COMPOSITION_ROUTER_MAX_TOKENS = 512;
 
 export interface BuildEnhancePromptToolArgsInput {
   prompt: string;
-  destinationModel?: string;
+  /** Exact registered model selector whose native prompt contract must be used. */
+  destinationModel: string;
   destinationTool?: string;
   targetOutput?: string;
   stylePrompt?: string;
+  /** @deprecated Compatibility metadata only; destinationModel selects the contract. */
   promptingType?: ImagePromptingType;
+  /** @deprecated Compatibility label only; destinationModel selects the contract. */
   modelTitle?: string;
   randomTheme?: string;
 }
@@ -117,7 +120,7 @@ export function buildEnhancePromptToolArgs(
     prompt: input.prompt.trim() || `Come up with a unique, creative image inspired by: ${input.randomTheme || getRandomTheme()}. Be original and surprising.`,
     target_output: input.targetOutput ?? 'image_prompt',
     destination_tool: input.destinationTool ?? 'generate_image',
-    ...(input.destinationModel ? { destination_model: input.destinationModel } : {}),
+    destination_model: input.destinationModel,
     ...(input.promptingType ? { prompting_type: input.promptingType } : {}),
     ...(input.modelTitle ? { model_title: input.modelTitle } : {}),
     ...(input.stylePrompt?.trim() ? { style_prompt: input.stylePrompt.trim() } : {}),

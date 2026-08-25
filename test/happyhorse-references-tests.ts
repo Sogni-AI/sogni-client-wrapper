@@ -191,12 +191,12 @@ export function runHappyHorseReferencesTests(): { passed: number; failed: number
   console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')); };
   let happyHorseRef = '';
   let resolution: ReturnType<typeof getModelRefFormatResolution> | null = null;
-  let heuristicResolution: ReturnType<typeof getModelRefFormatResolution> | null = null;
+  let concreteResolution: ReturnType<typeof getModelRefFormatResolution> | null = null;
   try {
     happyHorseRef = formatModelRef('happyhorse', 1, 'image');
     resolution = getModelRefFormatResolution('happyhorse');
-    // Heuristic: a more specific id still resolves to happyhorse (no fallback).
-    heuristicResolution = getModelRefFormatResolution('happyhorse-1.1-r2v');
+    // The explicitly registered concrete id resolves without a family-prefix guess.
+    concreteResolution = getModelRefFormatResolution('happyhorse-1.1-r2v');
   } finally {
     console.warn = originalWarn;
   }
@@ -206,8 +206,8 @@ export function runHappyHorseReferencesTests(): { passed: number; failed: number
   expect('happyhorse audio ref is bracketed', formatModelRef('happyhorse', 2, 'audio'), '[Audio 2]');
   expect('happyhorse resolution did not fall back', resolution?.fell_back, false);
   expect('happyhorse resolved model_id', resolution?.model_id, 'happyhorse');
-  expect('happyhorse-1.1-r2v heuristic did not fall back', heuristicResolution?.fell_back, false);
-  expect('happyhorse-1.1-r2v heuristic model_id', heuristicResolution?.model_id, 'happyhorse');
+  expect('happyhorse-1.1-r2v concrete id did not fall back', concreteResolution?.fell_back, false);
+  expect('happyhorse-1.1-r2v concrete id model_id', concreteResolution?.model_id, 'happyhorse');
   expect('no fallback warning emitted for happyhorse', warnings.length, 0);
 
   // parse/scan round-trip `[Image 2]`.
@@ -230,6 +230,7 @@ export function runHappyHorseReferencesTests(): { passed: number; failed: number
   const kreaResolution = getModelRefFormatResolution('krea2_identity_edit_v1_2');
   const kreaAliasResolution = getModelRefFormatResolution('krea-2-identity-edit');
   const darkBeastResolution = getModelRefFormatResolution('dark-beast-krea2-identity-edit');
+  const darkBeastWorkerResolution = getModelRefFormatResolution('dark_beast_krea2_identity_edit_v1_2');
   expect(
     "formatModelRef('krea2_identity_edit_v1_2',1,'image') === 'context_image_0'",
     formatModelRef('krea2_identity_edit_v1_2', 1, 'image'),
@@ -241,6 +242,8 @@ export function runHappyHorseReferencesTests(): { passed: number; failed: number
   expect('Krea identity alias resolved model_id', kreaAliasResolution.model_id, 'krea-identity-edit');
   expect('Dark Beast Krea selector did not fall back', darkBeastResolution.fell_back, false);
   expect('Dark Beast Krea selector resolved model_id', darkBeastResolution.model_id, 'krea-identity-edit');
+  expect('Dark Beast Krea worker id did not fall back', darkBeastWorkerResolution.fell_back, false);
+  expect('Dark Beast Krea worker id resolved model_id', darkBeastWorkerResolution.model_id, 'krea-identity-edit');
 
   console.log(`\nhappyhorse references: ${testsPassed} passed, ${testsFailed} failed`);
   return { passed: testsPassed, failed: testsFailed };

@@ -62,6 +62,12 @@ export type SignalProvenance =
   | 'user_explicit';
 
 /** A typed text deliverable that a runtime may author without media execution. */
+export interface TurnTextArtifactReferenceCounts {
+  images: number;
+  videos: number;
+  audios: number;
+}
+
 export interface TurnTextArtifact {
   kind: 'model_prompt';
   modality: 'image' | 'video';
@@ -71,6 +77,8 @@ export interface TurnTextArtifact {
   workflow: string | null;
   /** Video-only clip duration. Image artifacts keep this null. */
   durationSeconds: number | null;
+  /** Explicit loose-reference counts for reference-native video prompt modes. */
+  referenceCounts?: TurnTextArtifactReferenceCounts | null;
 }
 
 /**
@@ -167,12 +175,26 @@ export function isSignalProvenance(value: unknown): value is SignalProvenance {
 }
 
 export function isTurnTextArtifact(value: unknown): value is TurnTextArtifact {
+  const referenceCounts = value && typeof value === 'object'
+    ? (value as { referenceCounts?: unknown }).referenceCounts
+    : undefined;
   return isRecord(value)
     && value.kind === 'model_prompt'
     && (value.modality === 'image' || value.modality === 'video')
     && isNullableBoundedString(value.targetModel, 160)
     && isNullableBoundedString(value.workflow, 80)
     && (value.modality === 'video' || value.durationSeconds === null)
+    && (value.modality === 'video' || referenceCounts === undefined || referenceCounts === null)
+    && (
+      referenceCounts === undefined
+      || referenceCounts === null
+      || (
+        isRecord(referenceCounts)
+        && isBoundedReferenceCount(referenceCounts.images)
+        && isBoundedReferenceCount(referenceCounts.videos)
+        && isBoundedReferenceCount(referenceCounts.audios)
+      )
+    )
     && (
       value.durationSeconds === null
       || (
@@ -182,6 +204,10 @@ export function isTurnTextArtifact(value: unknown): value is TurnTextArtifact {
         && value.durationSeconds <= 3600
       )
     );
+}
+
+function isBoundedReferenceCount(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100;
 }
 
 function isNullableBoundedString(value: unknown, maxLength: number): boolean {

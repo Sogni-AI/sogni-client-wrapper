@@ -3,7 +3,9 @@ import type { ToolDefinition } from "../tools/definitions/types.js";
 import { getRandomTheme } from "./randomThemes.js";
 
 export type ImagePromptingType =
+  /** Legacy family key retained for direct callers; active Chroma profiles use `chroma`. */
   | "flux"
+  | "chroma"
   | "sdxl"
   | "sd15"
   | "pony"
@@ -17,7 +19,6 @@ export type ImagePromptingType =
   | "qwen-edit"
   | "krea2-edit"
   | "gpt-image-edit"
-  | "flux-edit"
   | "video";
 
 export type ImagePromptAuthoringOperation = "generate" | "edit";
@@ -29,6 +30,8 @@ export interface ImagePromptAuthoringProfile {
   promptingType: ImagePromptingType;
   operation: ImagePromptAuthoringOperation;
   outputFormat: ImagePromptAuthoringOutputFormat;
+  /** Maximum ordered image references accepted by this prompt operation. */
+  maxReferenceImages?: number;
 }
 
 export interface BuildImagePromptAuthoringMessagesInput {
@@ -46,7 +49,7 @@ export interface BuildImagePromptMessagesInput {
 
 export const IMAGE_PROMPT_MAX_TOKENS = 1024;
 
-const FLUX_GUIDE = `FLUX and advanced next-gen image models use detailed natural-language descriptions, not keyword lists.
+const CHROMA_GUIDE = `Chroma image models use detailed natural-language descriptions, not keyword lists.
 - Plan internally before writing: identify the subject, mood, best-fitting medium/style, composition/framing, lighting, and grounded details.
 - Preserve the user's original subjects, actions, colors, spatial relationships, and requested medium. Do not add new objects, props, characters, or animals unless clearly implied.
 - Write one cohesive paragraph with practical T2I structure: subject and attributes first, then action/pose, spatial layout, environment, composition/framing, lighting, and medium/style.
@@ -62,32 +65,31 @@ Prompt structure (in this order):
 2. Details — appearance, clothing, expression, pose
 3. Environment — setting, background, time of day
 4. Lighting & mood — lighting setup, atmosphere
-5. Quality/style boosters — technical quality keywords (e.g. "highly detailed, 8K, photorealistic")
-For anime SDXL models, use danbooru-style tags: "1girl, long hair, blue eyes" with quality tags first: "masterpiece, best quality".
-Camera/lens terminology helps photorealistic models: "Canon EOS R5, 85mm lens, f/1.4, shallow depth of field".`;
+5. Medium/style terms that the selected checkpoint understands
+For anime SDXL fine-tunes, concise Danbooru-style tags may be appropriate. For photographic fine-tunes, use observable framing, depth of field, lighting, and material detail. Do not add fake resolution claims, camera brands, score tags, or generic quality incantations unless the selected checkpoint explicitly requires them.`;
 
 const SD15_GUIDE = `SD 1.5 models are most responsive to keyword/tag-based prompts. Structured comma-separated tags give the best results.
 Prompt structure (in this order):
-1. Quality boosters first: "RAW photo, best quality, masterpiece, highly detailed"
-2. Subject description
+1. Subject description
+2. Appearance, pose, and action
 3. Environment/setting
-4. Style/medium: "watercolor, oil painting, digital art, photograph"
-5. Lighting/camera: "studio lighting, golden hour, Fujifilm XT3, 85mm"
-For photorealistic: start with "RAW photo" or "photograph", include camera references and film grain.
-For anime: use danbooru tags "1girl, solo, long_hair", quality tags first "masterpiece, best quality", higher guidance (8-14).
-Keep prompts keyword-rich rather than conversational.`;
+4. Style/medium
+5. Lighting and composition
+Use the vocabulary of the actual fine-tune: photographic descriptors for photo checkpoints and concise tags for anime checkpoints. Keep prompts keyword-rich and syntactically simple; do not invent sampler, guidance, camera-brand, or resolution claims as prompt content.`;
 
 const PONY_GUIDE = `Pony Diffusion models use a unique score-based tag system for quality control.
 Add score tags at the BEGINNING of the prompt:
 - Full range: "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up"
 - Short range: "score_9, score_8_up, score_7_up"
 After score tags, describe the subject using comma-separated tags similar to SDXL.
-Content rating tags are available: "rating_safe", "rating_suggestive".
+Content-rating tags include "rating_safe", "rating_questionable", and "rating_explicit"; add one only when it matches the user's requested content.
+Source tags such as "source_pony", "source_furry", "source_cartoon", and "source_anime" can help when the requested source domain is explicit.
+Pony V6 understands both natural-language captions and tags. Do not add generic "HD", "masterpiece", resolution, or camera-brand boosters.
 The model understands character names from anime/cartoon/anthro fandoms.
-Example: "score_9, score_8_up, score_7_up, punk rock singer, leather jacket, crazy hair, dynamic angle, highly detailed, film grain, 8k"`;
+Example: "score_9, score_8_up, score_7_up, punk rock singer, leather jacket, spiked hair, dynamic low angle, concert backlight, film grain"`;
 
 const FAST_GUIDE = `Turbo, Lightning, and LCM models are optimized for speed (2-7 steps). They have less capacity to process complex prompts.
-- Keep prompts concise and direct — under ~50 tokens for best results.
+- Keep prompts concise and direct.
 - Focus on the core subject and one clear style direction.
 - Use strong, specific descriptors.
 - Don't overload with quality boosters — at very low guidance they have minimal effect.
@@ -103,12 +105,12 @@ const SD3_GUIDE = `SD3 has improved natural language understanding, multi-subjec
 - SD3 handles complex scenes better than SD1.5/SDXL.`;
 
 const KREA2_GUIDE = `Krea 2 and Krea 2 Turbo are caption-conditioned image models built for aesthetic exploration and precise creative steering.
-- Write one dense but fluent visual caption, usually 50-120 words. Krea 2 was trained on rich captions; do not reduce the request to SD-style keyword soup.
-- Preserve ambiguity when the user wants exploration. When the user specifies a direction, make subject, action, composition, medium, palette, lighting, texture, and atmosphere concrete enough to narrow the output deliberately.
+- Match prompt specificity to the requested control. Preserve a short or ambiguous idea when the user wants exploration; add subject, action, composition, medium, palette, lighting, texture, and atmosphere only when the user asks to narrow the direction.
+- When detail is wanted, write one rich but fluent visual caption rather than SD-style keyword soup. Krea 2 was trained across short, medium, and long caption forms, so there is no mandatory word count.
 - Describe observable visual qualities instead of generic quality boosters such as "masterpiece" or "8K".
 - Keep the subject and requested content dominant. Do not bury a simple idea under invented props, wardrobe, characters, symbols, or narrative beats.
 - If visible text is requested, reproduce the exact wording in double quotes and state its placement and treatment.
-- Krea 2 Turbo is distilled for few-step generation; use a cohesive caption with strong nouns and visual relationships rather than repeated emphasis tokens or prompt weights.`;
+- Use a cohesive caption with strong nouns and visual relationships rather than repeated emphasis tokens or prompt weights.`;
 
 const QWEN_GUIDE = `Qwen Image 2512 uses detailed natural-language image descriptions and is especially strong at instruction following, spatial composition, human realism, fine natural detail, and visible text.
 - Write a cohesive descriptive prompt with the subject and action first, followed by spatial layout, environment, composition, lighting, materials, and style.
@@ -149,13 +151,6 @@ const GPT_IMAGE_EDIT_GUIDE = `GPT Image 2 editing follows precise natural-langua
 - For visible text edits, preserve exact wording in double quotes and specify placement, hierarchy, typography, and treatment.
 - Use explicit layout and preservation requirements rather than diffusion weights, score tags, or a negative-prompt list.`;
 
-const FLUX_EDIT_GUIDE = `FLUX editing models use direct natural-language transformation instructions with explicit reference roles.
-- State the edit goal first, then name the source elements to preserve and the concrete visual changes to make.
-- Refer to multiple images by their ordered role when supplied; do not merge identities, styles, or objects implicitly.
-- Use positive desired-state language. FLUX.2 does not support negative prompts.
-- Quote exact visible text and describe its placement when typography is requested.
-- Keep simple edits concise; use detailed spatial and material direction only when the edit requires it.`;
-
 const EDITING_GUIDE = `Image editing models accept reference images alongside text prompts. The prompt acts as an instruction for how to modify or build upon the input image(s).
 - Write prompts as transformation instructions referencing the existing image.
 - Describe changes as transformations: "is now wearing", "now has", "the background changes to".
@@ -165,7 +160,8 @@ const EDITING_GUIDE = `Image editing models accept reference images alongside te
 - The reference image drives the result more than the prompt.`;
 
 const PROMPTING_GUIDES: Record<ImagePromptingType, string> = {
-  flux: FLUX_GUIDE,
+  flux: CHROMA_GUIDE,
+  chroma: CHROMA_GUIDE,
   sdxl: SDXL_GUIDE,
   sd15: SD15_GUIDE,
   pony: PONY_GUIDE,
@@ -179,7 +175,6 @@ const PROMPTING_GUIDES: Record<ImagePromptingType, string> = {
   "qwen-edit": QWEN_EDIT_GUIDE,
   "krea2-edit": KREA2_EDIT_GUIDE,
   "gpt-image-edit": GPT_IMAGE_EDIT_GUIDE,
-  "flux-edit": FLUX_EDIT_GUIDE,
   video: "",
 };
 
@@ -334,19 +329,16 @@ const PONY_MODEL_NAMES = new Set([
   "cyberrealistic-pony-v7",
 ]);
 
-const FLUX_MODEL_NAMES = new Set([
-  "flux",
-  "flux-1",
-  "flux-1-schnell",
-  "flux-schnell",
-  "flux1-krea",
-  "flux-1-krea",
-  "flux2",
-  "flux-2",
-  "flux-2-dev",
+// These are active Chroma selectors whose caption grammar is FLUX-derived.
+// Do not add historical FLUX catalog ids here: catalog/analytics recognition is
+// intentionally separate from the set of models users can target for authoring.
+const CHROMA_MODEL_NAMES = new Set([
   "chroma-v46-flash",
+  "chroma-v-46-flash-fp8",
   "chroma1-hd",
+  "chroma1-hd-fp8-scaled",
   "chroma-detail",
+  "chroma-v48-detail-svd-fp8",
 ]);
 
 const KREA2_MODEL_NAMES = new Set([
@@ -366,6 +358,8 @@ const QWEN_GENERATE_MODEL_NAMES = new Set([
   "qwen-2512",
   "qwen-2512-lightning",
   "qwen-image-2512-lightning",
+  "qwen-image-2512-fp8",
+  "qwen-image-2512-fp8-lightning",
 ]);
 
 const QWEN_EDIT_MODEL_NAMES = new Set([
@@ -375,6 +369,8 @@ const QWEN_EDIT_MODEL_NAMES = new Set([
   "qwen-image-edit",
   "qwen-image-edit-2511",
   "qwen-image-edit-2511-lightning",
+  "qwen-image-edit-2511-fp8",
+  "qwen-image-edit-2511-fp8-lightning",
 ]);
 
 const KREA2_EDIT_MODEL_NAMES = new Set([
@@ -384,6 +380,9 @@ const KREA2_EDIT_MODEL_NAMES = new Set([
   "krea2-identity-edit-v1-2",
   "dark-beast-krea2-identity-edit",
   "dark-beast-krea-2-identity-edit",
+  "dark-beast-krea2-identity-edit-v1-2",
+  "dark-beast-krea-2-identity-edit-v1-2",
+  "krea2-identity-edit-sogni-v0-3-alpha",
 ]);
 
 const GPT_IMAGE_MODEL_NAMES = new Set([
@@ -392,12 +391,6 @@ const GPT_IMAGE_MODEL_NAMES = new Set([
   "gpt-2-image",
   "openai-gpt-image-2",
   "chatgpt-image-2",
-]);
-
-const FLUX_EDIT_MODEL_NAMES = new Set([
-  "flux2",
-  "flux-2",
-  "flux-2-dev",
 ]);
 
 function normalizeImagePromptModelName(value: string): string {
@@ -444,6 +437,7 @@ function imageProfile(args: {
   promptingType: ImagePromptingType;
   operation: ImagePromptAuthoringOperation;
   outputFormat?: ImagePromptAuthoringOutputFormat;
+  maxReferenceImages?: number;
 }): ImagePromptAuthoringProfile {
   return {
     id: args.id,
@@ -451,6 +445,9 @@ function imageProfile(args: {
     promptingType: args.promptingType,
     operation: args.operation,
     outputFormat: args.outputFormat ?? "prompt",
+    ...(args.maxReferenceImages !== undefined
+      ? { maxReferenceImages: args.maxReferenceImages }
+      : {}),
   };
 }
 
@@ -464,7 +461,8 @@ export function resolveImagePromptAuthoringProfile(
   requestedOperation?: string | null,
 ): ImagePromptAuthoringProfile | null {
   const model = normalizeImagePromptModelName(targetModel);
-  const intrinsicEdit = QWEN_EDIT_MODEL_NAMES.has(model) || KREA2_EDIT_MODEL_NAMES.has(model);
+  const intrinsicEdit = QWEN_EDIT_MODEL_NAMES.has(model)
+    || KREA2_EDIT_MODEL_NAMES.has(model);
   const normalizedRequestedOperation = normalizeImagePromptOperation(requestedOperation);
   if (requestedOperation && !normalizedRequestedOperation) return null;
   const operation = normalizedRequestedOperation ?? (intrinsicEdit ? "edit" : "generate");
@@ -477,6 +475,7 @@ export function resolveImagePromptAuthoringProfile(
       modelTitle: "GPT Image 2",
       promptingType: operation === "edit" ? "gpt-image-edit" : "gpt-image",
       operation,
+      ...(operation === "edit" ? { maxReferenceImages: 16 } : {}),
     });
   }
   if (QWEN_EDIT_MODEL_NAMES.has(model)) {
@@ -485,6 +484,7 @@ export function resolveImagePromptAuthoringProfile(
       modelTitle: "Qwen Image Edit 2511",
       promptingType: "qwen-edit",
       operation: "edit",
+      maxReferenceImages: 3,
     });
   }
   if (KREA2_EDIT_MODEL_NAMES.has(model)) {
@@ -493,15 +493,16 @@ export function resolveImagePromptAuthoringProfile(
       modelTitle: "Krea 2 Identity Edit",
       promptingType: "krea2-edit",
       operation: "edit",
+      maxReferenceImages: 2,
     });
   }
-  if (FLUX_MODEL_NAMES.has(model)) {
-    if (operation === "edit" && !FLUX_EDIT_MODEL_NAMES.has(model)) return null;
+  if (CHROMA_MODEL_NAMES.has(model)) {
+    if (operation !== "generate") return null;
     return imageProfile({
-      id: operation === "edit" ? "flux-edit" : "flux-generate",
-      modelTitle: model.startsWith("chroma") ? "Chroma" : "FLUX",
-      promptingType: operation === "edit" ? "flux-edit" : "flux",
-      operation,
+      id: "chroma-generate",
+      modelTitle: "Chroma",
+      promptingType: "chroma",
+      operation: "generate",
     });
   }
   if (KREA2_MODEL_NAMES.has(model)) {
@@ -523,7 +524,7 @@ export function resolveImagePromptAuthoringProfile(
       outputFormat: "positive_negative",
     });
   }
-  if (model === "z-image" || model === "zimage") {
+  if (model === "z-image" || model === "zimage" || model === "z-image-bf16") {
     if (operation !== "generate") return null;
     return imageProfile({
       id: "z-image-generate",
@@ -539,6 +540,8 @@ export function resolveImagePromptAuthoringProfile(
     || model === "zimage-turbo"
     || model === "dark-beast-z-turbo"
     || model === "dark-beast-z-image-turbo"
+    || model === "z-image-turbo-bf16"
+    || model === "dark-beast-z-image-turbo-v9-bf16"
   ) {
     if (operation !== "generate") return null;
     return imageProfile({
@@ -637,9 +640,9 @@ ${guide}
 AUTHORING RULES:
 - Preserve every user-specified subject, action, setting, style, color, spatial relationship, exact quoted text, proper noun, and constraint.
 - Treat the user's request as source material. Meta-language asking you to write a prompt is not visual content for the image.
-- Add only concrete visual detail that supports the requested image or edit. Never invent extra subjects, props, labels, slogans, symbols, panels, or story events.
+- When adding detail, add only concrete visual information that supports the requested image or edit. Never invent extra subjects, props, labels, slogans, symbols, panels, or story events.
 - Preserve emotional polarity, audience, genre, intensity, and content boundaries exactly.
-- Commit to one observable composition or one precise edit. Do not hedge with alternatives.
+- Do not hedge with alternatives. Preserve deliberate exploratory ambiguity when the model guide and user request call for it; otherwise commit to one observable composition or one precise edit.
 - If the request is already production-ready, polish it lightly instead of replacing its direction.
 - Never claim to have inspected a reference image that is not attached to this authoring request.
 

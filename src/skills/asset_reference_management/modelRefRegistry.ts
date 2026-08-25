@@ -14,6 +14,9 @@
  */
 
 import type { AssetType, KnownAssetModelId } from './types.js';
+import { isSeedanceVideoModelId } from '../../utils/seedanceModelIds.js';
+import { resolveRegisteredVideoModelFamily } from '../../utils/videoModelIds.js';
+import { resolveRegisteredImageReferenceModelId } from '../../utils/imageReferenceModelIds.js';
 
 export interface ParsedModelRef {
   /** 1-indexed unless the format is explicitly 0-indexed. */
@@ -168,21 +171,13 @@ function normalizeModelRefId(modelId: string): string {
 }
 
 function resolveContextModelRefId(modelId: string): KnownAssetModelId | null {
-  if (modelId.startsWith('wan')) return 'wan';
-  if (modelId.startsWith('qwen-image')) {
-    return 'qwen-image-edit';
-  }
-  if (
-    modelId === 'krea-identity-edit' ||
-    modelId.startsWith('krea-2-identity-edit') ||
-    modelId.startsWith('krea2-identity-edit') ||
-    modelId.startsWith('dark-beast-krea2-identity-edit') ||
-    modelId.startsWith('dark-beast-krea-2-identity-edit')
-  ) {
-    return 'krea-identity-edit';
-  }
-  if (modelId.startsWith('ltx25')) return 'ltx25';
-  if (modelId.startsWith('ltx')) return 'ltx23';
+  const videoFamily = resolveRegisteredVideoModelFamily(modelId);
+  if (videoFamily === 'wan22') return 'wan';
+  if (videoFamily === 'ltx25') return 'ltx25';
+  if (videoFamily === 'ltx23' || videoFamily === 'ltx2') return 'ltx23';
+  const imageReferenceModelId = resolveRegisteredImageReferenceModelId(modelId);
+  if (imageReferenceModelId === 'qwen-image-edit') return 'qwen-image-edit';
+  if (imageReferenceModelId === 'krea-identity-edit') return 'krea-identity-edit';
   return null;
 }
 
@@ -203,17 +198,21 @@ export function getModelRefFormatResolution(modelId: string): ModelRefFormatReso
       fell_back: false,
     };
   }
-  // Heuristic fallbacks — model ids in chat are sometimes more specific
-  // (e.g. "ltx23-fast", "seedance-1080p").
-  if (trimmed.startsWith('seedance')) return { format: SEEDANCE_FORMAT, model_id: 'seedance', fell_back: false };
-  if (trimmed.startsWith('happyhorse')) return { format: HAPPYHORSE_FORMAT, model_id: 'happyhorse', fell_back: false };
-  // Covers the full backend ids too: 'minimax-h3-ref2va-fp8_r2v' normalizes to
-  // 'minimax-h3-ref2va-fp8-r2v'.
-  if (trimmed.startsWith('minimax')) return { format: MINIMAX_H3_FORMAT, model_id: 'minimax-h3', fell_back: false };
-  if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) {
+  if (isSeedanceVideoModelId(trimmed)) {
+    return { format: SEEDANCE_FORMAT, model_id: 'seedance', fell_back: false };
+  }
+  const videoFamily = resolveRegisteredVideoModelFamily(trimmed);
+  if (videoFamily === 'happyhorse-1.1') {
+    return { format: HAPPYHORSE_FORMAT, model_id: 'happyhorse', fell_back: false };
+  }
+  if (videoFamily === 'minimax-h3') {
+    return { format: MINIMAX_H3_FORMAT, model_id: 'minimax-h3', fell_back: false };
+  }
+  const imageReferenceModelId = resolveRegisteredImageReferenceModelId(trimmed);
+  if (imageReferenceModelId === 'gpt-image-2' || imageReferenceModelId === 'flux') {
     return {
       format: GPT_IMAGE_2_FORMAT,
-      model_id: trimmed.startsWith('flux') ? 'flux' : 'gpt-image-2',
+      model_id: imageReferenceModelId,
       fell_back: false,
     };
   }

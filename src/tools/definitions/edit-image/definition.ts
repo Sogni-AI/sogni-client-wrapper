@@ -115,7 +115,7 @@ COMPOSITE GPT IMAGE 2 STORYBOARD SHEETS: When numberOfVariations=1 and the user 
           minItems: 1,
           maxItems: 8,
           items: { type: 'string', minLength: 1 },
-          description: `Ordered LoRA IDs for the edit. ONLY valid with model="krea-identity-edit" or model="dark-beast-krea2-identity-edit" — Qwen, Flux.2 and GPT Image 2 accept no LoRAs and the IDs are dropped. Use when the user asks to shift a trait the identity edit itself does not change, such as age, build, skin, lighting or grain, while the identity LoRA holds the likeness. ${LORA_STACKING_GUIDANCE}
+          description: `Ordered LoRA IDs for the edit. ONLY valid with model="krea-identity-edit" or model="dark-beast-krea2-identity-edit" — Qwen and GPT Image 2 accept no LoRAs and the IDs are dropped. Use when the user asks to shift a trait the identity edit itself does not change, such as age, build, skin, lighting or grain, while the identity LoRA holds the likeness. ${LORA_STACKING_GUIDANCE}
 
 ${KREA2_LORA_CATALOG_REFERENCE}`,
         },

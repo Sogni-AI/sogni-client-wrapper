@@ -14,6 +14,12 @@ import {
   PROMPT_CONTRACTS,
 } from '../contracts/data/index.js';
 import { normalizeSignalSource } from '../contracts/turnPolicy.js';
+import {
+  isSeedanceVideoModelId,
+  SEEDANCE_VIDEO_MODEL_IDS,
+} from '../utils/seedanceModelIds.js';
+import { resolveRegisteredVideoModelFamily } from '../utils/videoModelIds.js';
+import { resolveRegisteredImageReferenceModelId } from '../utils/imageReferenceModelIds.js';
 
 type LtxWorkflow = 't2v' | 'i2v' | 'ia2v' | 'a2v' | 'v2v';
 type Ltx25Workflow = LtxWorkflow;
@@ -993,22 +999,18 @@ const HAPPYHORSE_MODEL_REF_FORMAT: ModelRefFormat = {
 
 export function getModelRefFormat(modelId: string): ModelRefFormat {
   const trimmed = modelId.trim().toLowerCase().replace(/[_.\s]+/g, '-').replace(/-+/g, '-');
-  if (trimmed.startsWith('seedance')) return SEEDANCE_MODEL_REF_FORMAT;
-  // Full backend ids normalize into these prefixes too:
-  // 'minimax-h3-ref2va-fp8_r2v' -> 'minimax-h3-ref2va-fp8-r2v'.
-  if (trimmed.startsWith('minimax')) return MINIMAX_H3_MODEL_REF_FORMAT;
-  if (trimmed.startsWith('happyhorse')) return HAPPYHORSE_MODEL_REF_FORMAT;
-  if (trimmed.startsWith('gpt-image') || trimmed.startsWith('flux')) return GPT_IMAGE_MODEL_REF_FORMAT;
-  if (
-    trimmed.startsWith('ltx') ||
-    trimmed.startsWith('wan') ||
-    trimmed.startsWith('qwen-image') ||
-    trimmed === 'krea-identity-edit' ||
-    trimmed.startsWith('krea-2-identity-edit') ||
-    trimmed.startsWith('krea2-identity-edit') ||
-    trimmed.startsWith('dark-beast-krea2-identity-edit') ||
-    trimmed.startsWith('dark-beast-krea-2-identity-edit')
-  ) {
+  if (trimmed === 'seedance' || isSeedanceVideoModelId(trimmed)) return SEEDANCE_MODEL_REF_FORMAT;
+  const videoFamily = resolveRegisteredVideoModelFamily(trimmed);
+  if (videoFamily === 'minimax-h3') return MINIMAX_H3_MODEL_REF_FORMAT;
+  if (videoFamily === 'happyhorse-1.1') return HAPPYHORSE_MODEL_REF_FORMAT;
+  if (videoFamily === 'ltx25' || videoFamily === 'ltx23' || videoFamily === 'ltx2' || videoFamily === 'wan22') {
+    return CONTEXT_MODEL_REF_FORMAT;
+  }
+  const imageReferenceModelId = resolveRegisteredImageReferenceModelId(trimmed);
+  if (imageReferenceModelId === 'gpt-image-2' || imageReferenceModelId === 'flux') {
+    return GPT_IMAGE_MODEL_REF_FORMAT;
+  }
+  if (imageReferenceModelId === 'qwen-image-edit' || imageReferenceModelId === 'krea-identity-edit') {
     return CONTEXT_MODEL_REF_FORMAT;
   }
   console.warn(`[SOGNI RUNTIME] Unknown model_id "${modelId}" fell back to GPT Image model_ref format.`);
@@ -1633,12 +1635,14 @@ export const storyboardAdapterRegistry: StoryboardAdapterRegistryLike = {
     const trimmed = modelId.trim().toLowerCase();
     const exact = PUBLIC_STORYBOARD_ADAPTERS.find(adapter => adapter.modelId === trimmed);
     if (exact) return exact;
-    if (trimmed.startsWith('seedance')) return PUBLIC_SEEDANCE_ADAPTER;
-    if (trimmed.startsWith('gpt-image')) return PUBLIC_GPT_IMAGE_2_ADAPTER;
-    if (trimmed.startsWith('ltx25')) return PUBLIC_LTX25_ADAPTER;
-    if (trimmed.startsWith('ltx23') || trimmed.startsWith('ltx2-')) return PUBLIC_LTX23_ADAPTER;
-    if (trimmed.startsWith('ltx')) return PUBLIC_LTX25_ADAPTER;
-    if (trimmed.startsWith('wan')) return PUBLIC_WAN_ADAPTER;
+    if (trimmed === 'seedance' || isSeedanceModelSelection(trimmed)) return PUBLIC_SEEDANCE_ADAPTER;
+    if (resolveRegisteredImageReferenceModelId(trimmed) === 'gpt-image-2') {
+      return PUBLIC_GPT_IMAGE_2_ADAPTER;
+    }
+    const videoFamily = resolveRegisteredVideoModelFamily(trimmed);
+    if (videoFamily === 'ltx25') return PUBLIC_LTX25_ADAPTER;
+    if (videoFamily === 'ltx23' || videoFamily === 'ltx2') return PUBLIC_LTX23_ADAPTER;
+    if (videoFamily === 'wan22') return PUBLIC_WAN_ADAPTER;
     return null;
   },
   list() {
@@ -1794,13 +1798,13 @@ export function resolveLtx23WorkflowModelForQuality(
 }
 
 export const SEEDANCE_WORKFLOW_MODELS = Object.freeze({
-  t2v: 'seedance-2-0',
-  t2vMini: 'seedance-2-0-mini',
-  ia2v: 'seedance-2-0',
-  v2v: 'seedance-2-0',
+  t2v: SEEDANCE_VIDEO_MODEL_IDS.standard,
+  t2vMini: SEEDANCE_VIDEO_MODEL_IDS.mini,
+  ia2v: SEEDANCE_VIDEO_MODEL_IDS.standard,
+  v2v: SEEDANCE_VIDEO_MODEL_IDS.standard,
   // Seedance 2.5 is a single canonical model id across every workflow it
   // supports (t2v, i2v, flf2v, r2v, ia2v, v2v), like the 2.0 family.
-  t2v25: 'seedance-2-5'
+  t2v25: SEEDANCE_VIDEO_MODEL_IDS.v25
 });
 
 // Alibaba HappyHorse 1.1 — three discrete vendor models (no mini variant).
@@ -2100,6 +2104,14 @@ export const EXPANDED_VIDEO_MODEL_REGISTRY = (() => {
       steps: 20
     };
   }
+  registry['wan_v2.2-14b-fp8_t2v'] = {
+    ...registry['wan_v2.2-14b-fp8_t2v_lightx2v'],
+    steps: 20
+  };
+  registry['wan_v2.2-14b-fp8_i2v'] = {
+    ...registry['wan_v2.2-14b-fp8_i2v_lightx2v'],
+    steps: 20
+  };
   return Object.freeze(registry);
 })();
 
@@ -2216,23 +2228,20 @@ export const IMAGE_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
 });
 
 export function isLtx2Model(modelId: string | null | undefined): boolean {
-  return modelId?.startsWith('ltx2-') || modelId?.startsWith('ltx23-') || modelId?.startsWith('ltx25-') || false;
+  const family = resolveRegisteredVideoModelFamily(modelId);
+  return family === 'ltx2' || family === 'ltx23' || family === 'ltx25';
 }
 
 export function isWanModel(modelId: string | null | undefined): boolean {
-  return modelId?.startsWith('wan_') || false;
+  return resolveRegisteredVideoModelFamily(modelId) === 'wan22';
 }
 
-// Matches the whole Seedance family — `seedance-2-0*` AND `seedance-2-5*`.
-// Anchoring this to 'seedance-2-0' made isSeedanceModelSelection() false for an
-// explicit Seedance 2.5 selection, which discarded the storyboard plan, and made
-// inferDefaultVideoSteps() hand a step count to an external-API vendor model.
 export function isSeedanceModel(modelId: string | null | undefined): boolean {
-  return modelId?.startsWith('seedance-2-') || false;
+  return isSeedanceVideoModelId(modelId);
 }
 
 export function isHappyHorseModel(modelId: string | null | undefined): boolean {
-  return modelId?.startsWith('happyhorse-1.1') || false;
+  return resolveRegisteredVideoModelFamily(modelId) === 'happyhorse-1.1';
 }
 
 export function resolveVideoControlNetStrength(
@@ -2283,56 +2292,7 @@ export function getBuiltinVideoModelConfig(
   if (!modelId) return null;
   const id = resolveVideoModelAlias(modelId);
   if (!id) return null;
-  if (EXPANDED_VIDEO_MODEL_REGISTRY[id]) return EXPANDED_VIDEO_MODEL_REGISTRY[id];
-  const workflow = inferVideoWorkflowFromModel(id);
-  if (!workflow) return null;
-  if (id.startsWith('ltx23-') && isLtxWorkflow(workflow)) {
-    return EXPANDED_VIDEO_MODEL_REGISTRY[LTX23_WORKFLOW_MODELS[workflow]] || null;
-  }
-  if (id.startsWith('ltx25-') && isLtxWorkflow(workflow)) {
-    return EXPANDED_VIDEO_MODEL_REGISTRY[LTX25_WORKFLOW_MODELS[workflow]] || null;
-  }
-  if (id.startsWith('ltx2-')) {
-    return {
-      workflow,
-      family: 'ltx2',
-      defaultWidth: 768,
-      defaultHeight: 768,
-      minDimension: 480,
-      maxDimension: 1536,
-      dimensionMultiple: 64,
-      steps: id.includes('distilled') ? 8 : 20,
-      guidance: 1.0,
-      fps: workflow === 'v2v' ? 25 : 24,
-      frameStep: 8,
-      minFrames: 25,
-      maxFrames: 321,
-      sampler: 'euler_ancestral',
-      scheduler: 'simple'
-    };
-  }
-  if (isWanModel(id)) {
-    return {
-      workflow,
-      family: 'wan22',
-      defaultWidth: workflow === 't2v' ? 640 : 832,
-      defaultHeight: workflow === 't2v' ? 640 : 480,
-      minDimension: 480,
-      maxDimension: 1536,
-      dimensionMultiple: 16,
-      steps: id.includes('lightx2v') ? 4 : 20,
-      guidance: 1.0,
-      fps: 32,
-      internalFps: 16,
-      frameStep: 1,
-      minFrames: 17,
-      maxFrames: workflow === 't2v' ? 161 : 321,
-      sampler: workflow === 's2v' ? 'uni_pc' : 'euler',
-      scheduler: 'simple',
-      shift: workflow === 't2v' ? 5.0 : 8.0
-    };
-  }
-  return null;
+  return EXPANDED_VIDEO_MODEL_REGISTRY[id] || null;
 }
 
 export function getBuiltinImageModelDefaults(
@@ -2362,6 +2322,7 @@ export function inferVideoWorkflowFromModel(modelId: string | null | undefined):
   if (!modelId) return null;
   const resolvedModelId = resolveVideoModelAlias(modelId);
   if (!resolvedModelId) return null;
+  if (!resolveRegisteredVideoModelFamily(resolvedModelId)) return null;
   const id = resolvedModelId.toLowerCase();
   if (id.includes('animate-move')) return 'animate-move';
   if (id.includes('animate-replace')) return 'animate-replace';

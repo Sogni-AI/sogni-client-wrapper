@@ -138,6 +138,7 @@ export {
   isWanVideoModel,
   isLtxVideoModel,
   isSeedanceVideoModel,
+  isSeedance25VideoModel,
   isHappyHorseVideoModel,
   isMiniMaxH3VideoModel,
   getVideoDimensionRules,
@@ -150,6 +151,13 @@ export {
   supportsContextImages,
 } from './utils/helpers.js';
 export type { VideoDimensionRules } from './utils/helpers.js';
+export {
+  isSeedance25VideoModelId,
+  isSeedanceVideoModelId,
+  resolveSeedanceVideoModelId,
+  SEEDANCE_VIDEO_MODEL_IDS,
+} from './utils/seedanceModelIds.js';
+export type { SeedanceVideoModelId } from './utils/seedanceModelIds.js';
 
 // SDK chat tool-calling helpers
 export {

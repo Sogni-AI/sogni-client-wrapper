@@ -70,6 +70,11 @@ import {
   retry,
   getMaxContextImages,
   getVideoDimensionRules,
+  isHappyHorseVideoModel,
+  isLtxVideoModel,
+  isSeedance25VideoModel,
+  isSeedanceVideoModel,
+  isWanVideoModel,
 } from '../utils/helpers.js';
 
 const LTX2_FRAME_STEP = 8;
@@ -1364,7 +1369,7 @@ export class SogniClientWrapper extends EventEmitter {
    * Get recommended settings for a model
    */
   private getRecommendedSettings(modelId: string): ModelInfo['recommendedSettings'] {
-    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
+    if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {
       return { fps: 24 };
     }
 
@@ -1398,33 +1403,21 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   private isWanModel(modelId: string): boolean {
-    return modelId.startsWith('wan_');
+    return isWanVideoModel(modelId);
   }
 
   private isLtx2Model(modelId: string): boolean {
-    return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-') || modelId.startsWith('ltx25-');
-  }
-
-  // Every Seedance generation shares the fixed-24fps / mp4 vendor envelope, so
-  // this must match the whole family — `seedance-2-0*` AND `seedance-2-5*`.
-  // Anchoring it to 'seedance-2-0' silently dropped 2.5 out of the fps forcing,
-  // the frame math, and the duration bounds below.
-  private isSeedanceModel(modelId: string): boolean {
-    return modelId.startsWith('seedance-2-');
-  }
-
-  private isSeedance25Model(modelId: string): boolean {
-    return modelId.startsWith('seedance-2-5');
+    return isLtxVideoModel(modelId);
   }
 
   private isHappyHorseModel(modelId: string): boolean {
-    return modelId.startsWith('happyhorse-1.1');
+    return isHappyHorseVideoModel(modelId);
   }
 
   private getVideoDurationBounds(modelId: string): { min: number; max: number } {
-    if (this.isSeedanceModel(modelId)) {
+    if (isSeedanceVideoModel(modelId)) {
       // Seedance 2.5 renders up to 30s in a single call; the 2.0 family stops at 15s.
-      return { min: 4, max: this.isSeedance25Model(modelId) ? 30 : 15 };
+      return { min: 4, max: isSeedance25VideoModel(modelId) ? 30 : 15 };
     }
     if (this.isHappyHorseModel(modelId)) {
       return { min: 3, max: 15 };
@@ -1439,14 +1432,14 @@ export class SogniClientWrapper extends EventEmitter {
     if (this.isWanModel(modelId)) {
       return 16;
     }
-    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
+    if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {
       return 24;
     }
     return fps;
   }
 
   private getVideoFps(modelId: string, fps: number | undefined): number {
-    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
+    if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {
       if (fps !== undefined && fps !== 24) {
         throw new SogniValidationError(
           this.isHappyHorseModel(modelId)
@@ -1469,7 +1462,7 @@ export class SogniClientWrapper extends EventEmitter {
       return Math.round(duration * 16) + 1;
     }
 
-    if (this.isSeedanceModel(modelId) || this.isHappyHorseModel(modelId)) {
+    if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {
       return Math.round(duration * 24) + 1;
     }
 

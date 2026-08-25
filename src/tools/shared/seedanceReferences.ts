@@ -12,6 +12,7 @@
  * constants, error class, and pure counter helper belong in the shared SDK.
  */
 import { seedanceReferenceLimitsCatalog } from './_catalogs.generated.js';
+import { resolveSeedanceVideoModelId } from '../../utils/seedanceModelIds.js';
 
 export interface SeedanceReferenceLimits {
   readonly images: number;
@@ -59,8 +60,13 @@ export const SEEDANCE_REFERENCE_LIMITS_BY_MODEL: Readonly<
  * reach the vendor, and both are worse than a loud failure.
  */
 export function getSeedanceReferenceLimits(modelId: string): SeedanceReferenceLimits {
-  // legacy alias: Seedance 2.0 Fast was retired 2026-08; Mini replaced it
-  const canonicalModelId = modelId === 'seedance-2-0-fast' ? 'seedance-2-0-mini' : modelId;
+  const canonicalModelId = resolveSeedanceVideoModelId(modelId);
+  if (!canonicalModelId) {
+    throw new Error(
+      `No Seedance reference limits are defined for model "${modelId}". ` +
+      'Register the model contract before using it.',
+    );
+  }
   const limits = SEEDANCE_REFERENCE_LIMITS_BY_MODEL[canonicalModelId];
   if (!limits) {
     throw new Error(

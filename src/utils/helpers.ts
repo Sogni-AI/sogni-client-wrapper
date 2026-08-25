@@ -11,9 +11,18 @@ import type {
 } from '../types/index.js';
 import { SogniValidationError } from './errors.js';
 import {
-  SEEDANCE_REFERENCE_LIMITS,
-  SEEDANCE_REFERENCE_LIMITS_BY_MODEL,
+  getSeedanceReferenceLimits,
 } from '../tools/shared/seedanceReferences.js';
+import {
+  isSeedance25VideoModelId,
+  isSeedanceVideoModelId,
+} from './seedanceModelIds.js';
+import {
+  isRegisteredHappyHorseVideoModelId,
+  isRegisteredLtxVideoModelId,
+  isRegisteredMiniMaxH3VideoModelId,
+  isRegisteredWanVideoModelId,
+} from './videoModelIds.js';
 
 /**
  * Generate a unique app ID. Uses the universal `globalThis.crypto`
@@ -50,35 +59,28 @@ export function isAudioProjectConfig(config: ProjectConfig): config is AudioProj
 }
 
 export function isWanVideoModel(modelId: string): boolean {
-  return modelId.startsWith('wan_');
+  return isRegisteredWanVideoModelId(modelId);
 }
 
 export function isLtxVideoModel(modelId: string): boolean {
-  return modelId.startsWith('ltx2-') || modelId.startsWith('ltx23-') || modelId.startsWith('ltx25-');
+  return isRegisteredLtxVideoModelId(modelId);
 }
 
-/**
- * True for every Seedance generation (`seedance-2-0*` and `seedance-2-5*`).
- * The whole family shares the fixed-24fps / mp4 vendor envelope; only the
- * duration ceiling and the reference caps differ, and those are branched on
- * `isSeedance25VideoModel` at the point of use. Anchoring this predicate to
- * 'seedance-2-0' silently skipped ALL Seedance validation for 2.5.
- */
 export function isSeedanceVideoModel(modelId: string): boolean {
-  return modelId.startsWith('seedance-2-');
+  return isSeedanceVideoModelId(modelId);
 }
 
-/** Seedance 2.5 renders 4-30s and carries the larger 30/10/10/30 reference budget. */
+/** Seedance 2.5 renders 4-30s and carries the larger reference budget. */
 export function isSeedance25VideoModel(modelId: string): boolean {
-  return modelId.startsWith('seedance-2-5');
+  return isSeedance25VideoModelId(modelId);
 }
 
 export function isHappyHorseVideoModel(modelId: string): boolean {
-  return modelId.startsWith('happyhorse-1.1');
+  return isRegisteredHappyHorseVideoModelId(modelId);
 }
 
 export function isMiniMaxH3VideoModel(modelId: string): boolean {
-  return modelId.startsWith('minimax-h3');
+  return isRegisteredMiniMaxH3VideoModelId(modelId);
 }
 
 /**
@@ -441,11 +443,7 @@ export function validateProjectConfig(config: ProjectConfig): void {
       // Caps are read from the protocol catalog rather than re-hard-coded here.
       const isSeedance25 = isSeedance25VideoModel(config.modelId);
       const maxSeedanceDuration = isSeedance25 ? 30 : 15;
-      const seedanceLimitsKey = SEEDANCE_REFERENCE_LIMITS_BY_MODEL[config.modelId]
-        ? config.modelId
-        : (isSeedance25 ? 'seedance-2-5' : 'seedance-2-0');
-      const seedanceLimits =
-        SEEDANCE_REFERENCE_LIMITS_BY_MODEL[seedanceLimitsKey] ?? SEEDANCE_REFERENCE_LIMITS;
+      const seedanceLimits = getSeedanceReferenceLimits(config.modelId);
 
       if (config.duration !== undefined) {
         if (typeof config.duration !== 'number' || config.duration < 4 || config.duration > maxSeedanceDuration) {

@@ -7273,10 +7273,15 @@ function inferStoryboardStorySpine(text: string, fallbackBrief: string): string 
   const explicit = cleanStoryboardStorySpine(text.match(
     /\b(?:story\s+spine|narrative\s+spine|throughline|story\s+arc|creative\s+intent)\s*:\s*([^\n]{1,360})/i,
   )?.[1] || '');
-  if (explicit) return explicit;
+  // A compiled storyboard can become the assistant-authored source of a later
+  // compile. Do not mistake our own fallback sentence for fresh authorial
+  // intent on that second pass: it may contain superseded layout metadata from
+  // the earlier prompt. Prefer the current structured-scene fallback instead.
+  const generatedFallbackPrefix = 'One continuous progression from the source brief:';
+  if (explicit && !explicit.startsWith(generatedFallbackPrefix)) return explicit;
 
   const fromHeading = inferStoryboardStorySpineFromHeading(text);
-  if (fromHeading) return fromHeading;
+  if (fromHeading && !fromHeading.startsWith(generatedFallbackPrefix)) return fromHeading;
 
   const compactFallback = sanitizeStoryboardExternalAudioReferences(
     truncateStoryboardText(cleanStoryboardNarrativeSourceText(fallbackBrief || text), 260),
@@ -7566,12 +7571,29 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     ? scenesWithEndCardText
     : retimeStoryboardScenesForDialogue(scenesWithEndCardText, durationSec);
   const voiceLines = assignVoiceLinesToScenes(normalizedScenes, sourceText);
-  const structuredSceneStorySpine = inferStoryboardStorySpineFromScenes(normalizedScenes);
+  // Even when an assistant draft undercounts the requested board and the
+  // renderer must synthesize the missing scene slots, derive the narrative
+  // spine from the authored scene records that were actually present. Using
+  // the synthesized slots here can turn surrounding layout instructions into
+  // story content on a later compile.
+  const authoredStorySpineSections = approvedSections.length > 0
+    ? approvedSections
+    : sourceSections;
+  const authoredStorySpineScenes = authoredStorySpineSections.map(section => buildSceneFromSection(
+    section,
+    references,
+    null,
+    storyboardScenePlanningContractForIndex(options.planningContract, section.number),
+  ));
+  const structuredSceneStorySpine = inferStoryboardStorySpineFromScenes(
+    authoredStorySpineScenes.length > 0 ? authoredStorySpineScenes : normalizedScenes,
+  );
   const assistantStorySpineSource = approvedScriptContext || sourceText;
-  const storySpineFallback = approvedScriptContext
-    || (options.promptAuthorship === 'assistant'
-      ? structuredSceneStorySpine || cleanStoryboardNarrativeSourceText(primarySourceBrief)
-      : cleanStoryboardNarrativeSourceText(primarySourceBrief))
+  const storySpineFallback = (options.promptAuthorship === 'assistant'
+    ? structuredSceneStorySpine
+      || cleanStoryboardNarrativeSourceText(primarySourceBrief)
+      || approvedScriptContext
+    : approvedScriptContext || cleanStoryboardNarrativeSourceText(primarySourceBrief))
     || prompt
     || narrativeUserIntentText;
   const storySpine = inferStoryboardStorySpine(

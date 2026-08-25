@@ -3597,6 +3597,33 @@ async function runTests() {
     }
   })();
 
+  await test('Should not preserve a generated fallback story spine as fresh intent', () => {
+    const staleCompiledDraft = [
+      'STORY / CONTINUITY:',
+      'Story spine: One continuous progression from the source brief: Create exactly 10 storyboard frames. Target final video aspect ratio: 9:16.',
+      '',
+      'SCENES:',
+      'SCENE_01 - OPENING HOOK',
+      'Visual/Action: A polished vehicle enters a coastal highway at sunset.',
+      'Camera/Motion: Low tracking shot beside the vehicle.',
+      'Dialogue/VO: [no dialogue]',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: staleCompiledDraft,
+      userIntentText: 'Recompile the storyboard as a 16:9 board with exactly 16 frames.',
+      frameCount: 16,
+      promptAuthorship: 'assistant',
+    });
+
+    if (/target final video aspect ratio|9:16/i.test(project.creativeBrief.storySpine)) {
+      throw new Error(`Generated fallback metadata survived recompilation: ${project.creativeBrief.storySpine}`);
+    }
+    if (!/vehicle enters a coastal highway/i.test(project.creativeBrief.storySpine)) {
+      throw new Error(`Structured scene content did not replace the generated fallback: ${project.creativeBrief.storySpine}`);
+    }
+  })();
+
   await test('Should keep workflow controls out of storyboard creative constraints', () => {
     const userIntent = [
       'Create a 9:16 product teaser.',

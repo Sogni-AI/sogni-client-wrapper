@@ -1,3 +1,10 @@
+# [3.23.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.6...v3.23.0) (2026-08-25)
+
+
+### Features
+
+* **prompts:** add exact model authoring contracts ([cb068f3](https://github.com/Sogni-AI/sogni-intelligence-client/commit/cb068f379d1eb158e42aac6e5baf123d4d063870))
+
 ## [3.22.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.22.5...v3.22.6) (2026-08-25)
 
 

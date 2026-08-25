@@ -1,3 +1,19 @@
+# [3.24.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.6...v3.24.0) (2026-08-25)
+
+
+### Bug Fixes
+
+* **deps:** consume Wan3 SDK contracts ([1c76501](https://github.com/Sogni-AI/sogni-intelligence-client/commit/1c765013a401dac884ae6535a0eac0f94fc975d0))
+* **prompts:** sync exact protocol contract ([2476e0d](https://github.com/Sogni-AI/sogni-intelligence-client/commit/2476e0de00def2ee23144c4f60e6895611401f20))
+* **video:** complete Wan3 contracts ([c3b3431](https://github.com/Sogni-AI/sogni-intelligence-client/commit/c3b34314817ce898f9512eb6fc6351a9d8fa4c98))
+* **video:** preserve official LTX routing ([ba45610](https://github.com/Sogni-AI/sogni-intelligence-client/commit/ba456101551ae628c52358413328908976e32738))
+
+
+### Features
+
+* **video:** define Alibaba Wan 3 ([1e50a11](https://github.com/Sogni-AI/sogni-intelligence-client/commit/1e50a1128c415653cf65e22e4b6ec8e2132426b1))
+* **video:** merge Wan3 integration ([08acf1a](https://github.com/Sogni-AI/sogni-intelligence-client/commit/08acf1a21f18873640cae11fba7459cafc49f6e6))
+
 ## [3.23.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.5...v3.23.6) (2026-08-25)
 
 

@@ -18,7 +18,7 @@ export const definition: ToolDefinition = {
   function: {
     name: "video_to_video",
     description:
-      'Transform an existing video using AI. Uses WAN 2.2 Animate (move/replace) with a reference image, LTX 2.5 V2V controls by default (canny/pose/depth/detailer plus distilled inpaint/outpaint), LTX 2.3 as rollback, or Seedance V2V when explicitly requested. Requires an uploaded video file. Use when the user wants to animate a photo with video motion, replace subjects, restyle footage, extend its canvas, regenerate a region, or enhance quality.',
+      'Transform an existing video using AI. Uses WAN 2.2 Animate (move/replace) with a reference image, LTX 2.5 V2V controls by default (canny/pose/depth/detailer plus distilled inpaint/outpaint), LTX 2.3 as rollback, or Seedance V2V when explicitly requested. LTX 2.5 Fast, HQ, and Pro use the release-validated official Distilled workflow for canny/pose/depth/detailer/inpaint/outpaint; Dev is not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe. Requires an uploaded video file. Use when the user wants to animate a photo with video motion, replace subjects, restyle footage, extend its canvas, regenerate a region, or enhance quality. Wan 3 source-video editing and continuation uses videoModel="wan3.0-video" with controlMode="seedance-v2v".',
     parameters: {
       type: "object",
       properties: {
@@ -28,18 +28,18 @@ export const definition: ToolDefinition = {
 
 ${LITERAL_SEEDANCE_PROMPT_OVERRIDE}
 
-For LTX 2.5 or 2.3 canny/depth/pose modes, the source video preserves composition, depth, or motion. Spend prompt detail on style, atmosphere, lighting, surface texture, color palette, scale, and pacing.
+For LTX 2.5 or 2.3 canny/depth/pose modes, the source video preserves composition, depth, or motion. Spend prompt detail on style, atmosphere, lighting, surface texture, color palette, scale, and pacing. LTX 2.5 Fast, HQ, and Pro use the release-validated official Distilled workflow for canny/pose/depth/detailer/inpaint/outpaint; Dev is not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe.
 
 Examples by mode:
 - animate-move (DEFAULT — WAN 2.2 Animate Move: applies camera/motion from source video to reference image): "Smooth cinematic camera movement following the subject through the scene."
 - animate-replace (WAN 2.2 Animate Replace: replaces the subject in the source video with the reference image): "The person from the reference photo performing the actions from the video."
-- canny (LTX-2.3 — edge-detection restyle): "Hand-drawn watercolor anime style with soft ink edges, muted teal and coral palette, rain mist, neon reflections, warm rim light, preserving original silhouettes and composition."
+- canny (LTX 2.5 default; LTX 2.3 rollback — edge-detection restyle): "Hand-drawn watercolor anime style with soft ink edges, muted teal and coral palette, rain mist, neon reflections, warm rim light, preserving original silhouettes and composition."
 - pose (LTX 2.5 or LTX 2.3 — tracks skeleton and transfers the reference-image subject): "A glossy cartoon robot from the reference image performs the source video's motion, with brushed metal texture, glowing cyan joints, and energetic stage lighting." This mode requires a reference image as well as the source video.
-- depth (LTX-2.3 — depth-map restyle): "A misty alpine valley at golden hour, expansive scale, volumetric haze, cool blue shadows, warm rim light, cinematic depth, lingering continuous shot."
-- detailer (LTX-2.3 — enhance quality): DESCRIBE THE SOURCE, do not request changes. Append quality qualifiers only. E.g. "The same scene, ultra-sharp and clean, crisp high-resolution detail, preserving all original content, composition, and color." Avoid words like "enhanced textures", "restyled", or any new subjects/objects — they cause drift.
+- depth (LTX 2.5 default; LTX 2.3 rollback — depth-map restyle): "A misty alpine valley at golden hour, expansive scale, volumetric haze, cool blue shadows, warm rim light, cinematic depth, lingering continuous shot."
+- detailer (LTX 2.5 default; LTX 2.3 rollback — enhance quality): DESCRIBE THE SOURCE, do not request changes. Append quality qualifiers only. E.g. "The same scene, ultra-sharp and clean, crisp high-resolution detail, preserving all original content, composition, and color." Avoid words like "enhanced textures", "restyled", or any new subjects/objects — they cause drift.
 - seedance-v2v (BytePlus Dreamina Seedance 2.0 V2V): "Restyle the source clip in a watercolor look with soft ink edges, while preserving its motion and composition." Use natural prose; Seedance reads the reference video holistically rather than via control-net constraints, so describe target style/mood/dialogue rather than control strength.
-- outpaint (LTX-2.3 — canvas extension): describe what fills the NEWLY REVEALED area around the original frame, consistent with the source scene. E.g. "The same street scene continues seamlessly into the newly revealed space — more wet asphalt, parked cars, and glowing shopfronts, matching the original lighting and perspective." Set outpaintPosition (and optionally outpaintAspectRatio); no mask needed.
-- inpaint (LTX-2.3 — masked region regeneration): describe ONLY what the inpainted region should become; the rest of the frame is preserved. E.g. "A vintage red convertible parked at the curb, matching the scene's lighting and shadows." If the user supplied a mask, set maskImageIndex. If no mask was supplied, omit maskImageIndex so execution derives a mask from the source video and prompt.
+- outpaint (LTX 2.5 default; LTX 2.3 rollback — canvas extension): describe what fills the NEWLY REVEALED area around the original frame, consistent with the source scene. E.g. "The same street scene continues seamlessly into the newly revealed space — more wet asphalt, parked cars, and glowing shopfronts, matching the original lighting and perspective." Set outpaintPosition (and optionally outpaintAspectRatio); no mask needed.
+- inpaint (LTX 2.5 default; LTX 2.3 rollback — masked region regeneration): describe ONLY what the inpainted region should become; the rest of the frame is preserved. E.g. "A vintage red convertible parked at the curb, matching the scene's lighting and shadows." If the user supplied a mask, set maskImageIndex. If no mask was supplied, omit maskImageIndex so execution derives a mask from the source video and prompt.
 
 Present tense. Positive phrasing. Concrete visual details.
 

@@ -107,6 +107,7 @@ import {
   buildImageEditExecutionControls,
   calculateVideoDimensions,
   calculateVideoFrames,
+  CONTEXT_MODELS,
   DEFAULT_VIDEO_MODEL,
   getVideoModelConfig,
   getLtx25ModelNameForQuality,
@@ -400,6 +401,16 @@ async function runTests() {
       if (!resolution.fell_back || resolution.model_id !== 'unknown') {
         throw new Error(`Prompt/catalog identity leaked into reference syntax for ${modelWithoutReferenceGrammar}`);
       }
+    }
+  })();
+
+  await test('Should keep retired FLUX context checkpoints out of active enhancement routing', () => {
+    const expected = [
+      'qwen_image_edit_2511_fp8',
+      'qwen_image_edit_2511_fp8_lightning',
+    ];
+    if (JSON.stringify(CONTEXT_MODELS) !== JSON.stringify(expected)) {
+      throw new Error(`Unexpected active context-model registry: ${CONTEXT_MODELS.join(', ')}`);
     }
   })();
 

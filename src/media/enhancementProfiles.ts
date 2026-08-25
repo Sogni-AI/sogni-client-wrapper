@@ -11,7 +11,6 @@ export interface EnhancementCategory {
 }
 
 export const CONTEXT_MODELS = [
-  'flux1-dev-kontext_fp8_scaled',
   'qwen_image_edit_2511_fp8',
   'qwen_image_edit_2511_fp8_lightning',
 ] as const;

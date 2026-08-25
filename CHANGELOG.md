@@ -1,3 +1,10 @@
+## [3.23.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.2...v3.23.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* restore FLUX.1 Schnell prompt support ([218e513](https://github.com/Sogni-AI/sogni-intelligence-client/commit/218e513354a3cd7bb7b555c2663f759c395c9687))
+
 ## [3.23.2](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.1...v3.23.2) (2026-08-25)
 
 

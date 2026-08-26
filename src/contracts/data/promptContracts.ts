@@ -1046,10 +1046,8 @@ const VIDEO_TO_VIDEO_CONTRACT: PromptContract = {
   baseDescription: [
     'video_to_video transforms an uploaded video. Use for uploaded-video restyling, enhancement,',
     'upscaling/remastering, motion transfer from video to image, subject replacement, edge/pose/',
-    'depth-guided restyle, or explicit Seedance/Wan 3 V2V transforms.',
-    'For an explicit Wan 3 edit or continuation, set videoModel="wan3.0-video"; the uploaded',
-    'source is sent as reference_video and total input-plus-output duration must remain at most',
-    '30 seconds. Wan 3 uses the prompt itself to express edit or extension intent.',
+    'depth-guided restyle, or explicit Seedance V2V transforms. Wan 3 is not a V2V model;',
+    'its video inputs are loose references for new generation through generate_video.',
     '',
     'This tool requires an uploaded video source. Do not use it for generated video indices. For',
     'generated or uploaded partial edits use replace_video_segment; for appended time use',
@@ -1067,7 +1065,7 @@ const VIDEO_TO_VIDEO_CONTRACT: PromptContract = {
   parameterDocs: {
     prompt: 'Describe the target appearance in present tense. For detailer, describe the original content plus quality qualifiers only. For outpaint, describe what fills the new area; for inpaint, describe only the masked region.',
     videoSourceIndex: 'Uploaded video index. Omit when there is one uploaded video; use 0 for first uploaded video or -1 if using negative upload notation.',
-    controlMode: 'Pick from intent: detailer for enhance, seedance-v2v for explicit Seedance or Wan 3 V2V, canny/depth for video-only control restyles, pose for motion transfer onto a reference-image subject, animate-move/replace for WAN Animate, outpaint to extend/expand the canvas, inpaint to regenerate a masked region.',
+    controlMode: 'Pick from intent: detailer for enhance, seedance-v2v for explicit Seedance V2V, canny/depth for video-only control restyles, pose for motion transfer onto a reference-image subject, animate-move/replace for WAN Animate, outpaint to extend/expand the canvas, inpaint to regenerate a masked region.',
     sourceImageIndex: 'Required for animate-move, animate-replace, and pose when more than one image is available; the sole reference image may be auto-selected. LTX pose always needs a reference image. Ignored by canny, depth, detailer, outpaint, and inpaint.',
     outpaintPosition: 'outpaint only. Where the original frame sits in the expanded canvas (center/top/bottom/left/right); determines grow direction. Default center.',
     outpaintAspectRatio: 'outpaint only, optional. Target aspect ratio (e.g. 16:9) for the expanded canvas; the canvas only grows, never crops. Set only when the user names a target shape/orientation.',

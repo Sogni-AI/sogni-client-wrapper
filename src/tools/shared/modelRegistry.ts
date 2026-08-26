@@ -119,7 +119,6 @@ export const MODELS_BY_TOOL: Record<string, ModelOption[]> = {
     { key: 'seedance2', displayName: 'Seedance 2.0' },
     { key: 'seedance2-mini', displayName: 'Seedance 2.0 Mini' },
     { key: 'seedance2-5', displayName: 'Seedance 2.5' },
-    { key: 'wan3.0-video', displayName: 'Wan 3 Edit/Extend' },
   ],
   generate_music: [
     { key: 'turbo', displayName: 'ACE-Step 1.5 Turbo' },

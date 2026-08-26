@@ -97,16 +97,21 @@ export function runWan3VideoTests(): { passed: number; failed: number } {
   expect('audio prompt reference', formatModelRef('wan3', 1, 'audio'), 'Audio 1');
   expect('reference registry does not fall back', getModelRefFormatResolution('wan3.0-video').fell_back, false);
 
-  for (const toolName of ['generate_video', 'animate_photo', 'sound_to_video', 'video_to_video']) {
+  for (const toolName of ['generate_video', 'animate_photo', 'sound_to_video']) {
     expect(
       `${toolName} exposes Wan 3`,
       MODELS_BY_TOOL[toolName]?.some(option => option.key === 'wan3.0-video'),
       true,
     );
   }
+  expect(
+    'video_to_video excludes Wan 3',
+    MODELS_BY_TOOL.video_to_video?.some(option => option.key === 'wan3.0-video'),
+    false,
+  );
   const videoToVideoProperties = videoToVideoDefinition.function.parameters.properties ?? {};
-  expect('v2v exposes Wan 3 document context', 'referenceFileUrl' in videoToVideoProperties, true);
-  expect('v2v exposes Wan 3 webpage context', 'referenceLinkUrl' in videoToVideoProperties, true);
+  expect('v2v excludes Wan 3 document context', 'referenceFileUrl' in videoToVideoProperties, false);
+  expect('v2v excludes Wan 3 webpage context', 'referenceLinkUrl' in videoToVideoProperties, false);
   const soundToVideoProperties = soundToVideoDefinition.function.parameters.properties ?? {};
   expect('sound-to-video exposes Wan 3 document context', 'referenceFileUrl' in soundToVideoProperties, true);
   expect('sound-to-video exposes Wan 3 webpage context', 'referenceLinkUrl' in soundToVideoProperties, true);

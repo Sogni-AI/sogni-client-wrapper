@@ -1114,6 +1114,105 @@ async function runTests() {
     }
   })();
 
+  await test('Should preserve output canvases for loose-reference video models', async () => {
+    const { default: sharp } = await import('sharp');
+    const source = await sharp({
+      create: {
+        width: 1404,
+        height: 2362,
+        channels: 3,
+        background: { r: 236, g: 42, b: 142 },
+      },
+    }).png().toBuffer();
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+    const prepare = (
+      client as unknown as {
+        prepareProjectConfig: (config: VideoProjectConfig) => Promise<VideoProjectConfig>;
+      }
+    ).prepareProjectConfig.bind(client);
+
+    for (const testCase of [
+      {
+        modelId: 'minimax-h3-ref2va-fp8_r2v',
+        width: 832,
+        height: 480,
+      },
+      {
+        modelId: 'minimax-h3-ref2va-fp8_r2v_turbo',
+        width: 832,
+        height: 480,
+      },
+      {
+        modelId: 'happyhorse-1.1-r2v',
+        width: 1920,
+        height: 1080,
+      },
+    ]) {
+      const prepared = await prepare({
+        type: 'video',
+        modelId: testCase.modelId,
+        positivePrompt: 'Use the supplied character as a loose identity reference.',
+        width: testCase.width,
+        height: testCase.height,
+        referenceImage: source,
+        numberOfMedia: 1,
+      } as VideoProjectConfig);
+      const metadata = await sharp(prepared.referenceImage as Buffer).metadata();
+
+      if (prepared.width !== testCase.width || prepared.height !== testCase.height) {
+        throw new Error(
+          `${testCase.modelId} loose reference changed ${testCase.width}x${testCase.height} `
+          + `to ${prepared.width}x${prepared.height}`,
+        );
+      }
+      if (prepared.referenceImage !== source || metadata.width !== 1404 || metadata.height !== 2362) {
+        throw new Error(
+          `${testCase.modelId} loose reference was resized to ${metadata.width}x${metadata.height}`,
+        );
+      }
+    }
+
+    const seedanceReference = await prepare({
+      type: 'video',
+      modelId: 'seedance-2-5',
+      seedanceTaskType: 'reference',
+      positivePrompt: 'Use the supplied character as loose visual context.',
+      width: 832,
+      height: 480,
+      referenceImage: source,
+      numberOfMedia: 1,
+    } as VideoProjectConfig);
+    if (
+      seedanceReference.width !== 832
+      || seedanceReference.height !== 480
+      || seedanceReference.referenceImage !== source
+    ) {
+      throw new Error(
+        `Seedance loose-reference task changed the requested canvas or reference asset`,
+      );
+    }
+
+    const modelDefault = await prepare({
+      type: 'video',
+      modelId: 'minimax-h3-ref2va-fp8_r2v_turbo',
+      positivePrompt: 'Use the supplied character as a loose identity reference.',
+      referenceImage: source,
+      numberOfMedia: 1,
+    } as VideoProjectConfig);
+    if (modelDefault.width !== undefined || modelDefault.height !== undefined) {
+      throw new Error(
+        `Loose reference replaced the model-default canvas with ${modelDefault.width}x${modelDefault.height}`,
+      );
+    }
+    if (modelDefault.referenceImage !== source) {
+      throw new Error('Loose reference was modified while retaining the model-default canvas');
+    }
+  })();
+
   // Test 4: Validation error for missing username
   await test('Should throw validation error for missing username', () => {
     try {

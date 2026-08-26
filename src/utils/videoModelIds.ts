@@ -95,6 +95,18 @@ const MINIMAX_H3_MODEL_IDS = normalizedSet([
   'minimax-h3-ref2va-fp8_r2v_turbo',
 ]);
 
+// These workflows treat every supplied image as loose conditioning context,
+// never as a first/last-frame canvas anchor. Keep this list separate from the
+// broader family registry: the wrapper uses it to decide whether a binary
+// `referenceImage` may define or resize the output canvas.
+const LOOSE_REFERENCE_VIDEO_MODEL_IDS = normalizedSet([
+  'minimax-h3-r2v',
+  'minimax-h3-r2v-turbo',
+  'minimax-h3-ref2va-fp8_r2v',
+  'minimax-h3-ref2va-fp8_r2v_turbo',
+  'happyhorse-1.1-r2v',
+]);
+
 const HAPPYHORSE_11_MODEL_IDS = normalizedSet([
   'happyhorse-1.1',
   'happyhorse-1.1-t2v',
@@ -135,6 +147,11 @@ export function isRegisteredWanVideoModelId(value: string | null | undefined): b
 
 export function isRegisteredMiniMaxH3VideoModelId(value: string | null | undefined): boolean {
   return resolveRegisteredVideoModelFamily(value) === 'minimax-h3';
+}
+
+export function isRegisteredLooseReferenceVideoModelId(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return LOOSE_REFERENCE_VIDEO_MODEL_IDS.has(normalizeVideoModelId(value));
 }
 
 export function isRegisteredHappyHorseVideoModelId(value: string | null | undefined): boolean {

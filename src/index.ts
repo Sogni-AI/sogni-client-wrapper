@@ -141,6 +141,7 @@ export {
   isSeedance25VideoModel,
   isHappyHorseVideoModel,
   isMiniMaxH3VideoModel,
+  isLooseReferenceVideoModel,
   getVideoDimensionRules,
   isCookieAuth,
   sleep,

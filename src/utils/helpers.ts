@@ -20,6 +20,7 @@ import {
 import {
   isRegisteredHappyHorseVideoModelId,
   isRegisteredLtxVideoModelId,
+  isRegisteredLooseReferenceVideoModelId,
   isRegisteredMiniMaxH3VideoModelId,
   isRegisteredWanVideoModelId,
 } from './videoModelIds.js';
@@ -81,6 +82,11 @@ export function isHappyHorseVideoModel(modelId: string): boolean {
 
 export function isMiniMaxH3VideoModel(modelId: string): boolean {
   return isRegisteredMiniMaxH3VideoModelId(modelId);
+}
+
+/** True when reference images are loose context rather than frame anchors. */
+export function isLooseReferenceVideoModel(modelId: string): boolean {
+  return isRegisteredLooseReferenceVideoModelId(modelId);
 }
 
 /**

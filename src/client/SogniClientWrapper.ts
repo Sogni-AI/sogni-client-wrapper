@@ -72,6 +72,7 @@ import {
   getVideoDimensionRules,
   isHappyHorseVideoModel,
   isLtxVideoModel,
+  isLooseReferenceVideoModel,
   isSeedance25VideoModel,
   isSeedanceVideoModel,
   isWanVideoModel,
@@ -995,8 +996,17 @@ export class SogniClientWrapper extends EventEmitter {
 
     const normalized: VideoProjectConfig = { ...config };
 
-    const hasReferenceImage = this.isProcessableMedia(config.referenceImage);
-    const hasReferenceImageEnd = this.isProcessableMedia(config.referenceImageEnd);
+    // I2V/FLF inputs are canvas anchors and must stay dimensionally aligned with
+    // the output. R2V inputs are loose conditioning references: their aspect
+    // ratio must never replace the requested video canvas. URL-based loose
+    // references are already ignored by this binary-media path; the explicit
+    // model guard covers H3 and direct HappyHorse r2v callers that use a Buffer.
+    const referenceImagesDefineCanvas = config.seedanceTaskType !== 'reference'
+      && !isLooseReferenceVideoModel(config.modelId);
+    const hasReferenceImage = referenceImagesDefineCanvas
+      && this.isProcessableMedia(config.referenceImage);
+    const hasReferenceImageEnd = referenceImagesDefineCanvas
+      && this.isProcessableMedia(config.referenceImageEnd);
 
     let baseKey: 'referenceImage' | 'referenceImageEnd' | null = null;
     if (hasReferenceImage) {

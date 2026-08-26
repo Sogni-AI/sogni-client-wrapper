@@ -317,7 +317,8 @@ async function runTests() {
     }
     if (
       !kreaSystem.includes('caption-conditioned') ||
-      !kreaSystem.includes('short or ambiguous idea') ||
+      !kreaSystem.includes('explicitly wants open-ended exploration') ||
+      !kreaSystem.includes('finished model-ready direction') ||
       !kreaSystem.includes('no mandatory word count')
     ) {
       throw new Error('Krea 2 authoring lost its caption-conditioned guidance');
@@ -3548,6 +3549,108 @@ async function runTests() {
       if (prompt.includes(forbidden)) {
         throw new Error(`Compiled prompt included overfit narration fallback text: ${forbidden}`);
       }
+    }
+  })();
+
+  await test('Should synthesize storyboard scenes from plain story prose without a Script heading', () => {
+    const userIntent = [
+      '1990s VHS home video, 9:16.',
+      'A cluttered apartment bedroom is lit by a warm bedside lamp.',
+      'An elderly man lies on the bed looking confused.',
+      'A chubby orange cat walks in carrying a boombox, hits play, and starts breakdancing.',
+      'The man stares in silence.',
+      '“Chairman Meow, what are you doing?” the man finally gasps.',
+      'The cat meows and slinks away.',
+      'Turn this script into a GPT Image 2 storyboard for a 15 second video.',
+    ].join(' ');
+    const project = buildStoryboardProject({
+      prompt: 'Create the requested eight-panel storyboard sheet.',
+      userIntentText: userIntent,
+      frameCount: 8,
+      promptAuthorship: 'assistant',
+    });
+    if (project.scenes.length !== 8) {
+      throw new Error(`Expected 8 synthesized prose scenes, got ${project.scenes.length}`);
+    }
+    if (project.scenes.some(scene => /Turn this script|GPT Image 2 storyboard/i.test(scene.visual))) {
+      throw new Error('Trailing storyboard production instructions leaked into a synthesized visual scene');
+    }
+    if (!project.voiceover.fullScript.includes('Chairman Meow')) {
+      throw new Error(`Quoted dialogue was not preserved: ${project.voiceover.fullScript}`);
+    }
+    const compiled = compileVideoStoryboardImagePrompt({
+      prompt: 'Create the requested eight-panel storyboard sheet.',
+      userIntentText: userIntent,
+      frameCount: 8,
+      promptAuthorship: 'assistant',
+    });
+    const audit = auditCompiledStoryboardImagePrompt({ prompt: compiled, expectedFrameCount: 8 });
+    if (!audit.ok) {
+      throw new Error(`Plain prose storyboard audit failed: ${audit.fatalIssues.map(issue => `${issue.code} ${JSON.stringify(issue.metadata ?? {})}`).join(', ')}; project timings ${JSON.stringify(project.scenes.map(scene => [scene.startSec, scene.endSec, scene.durationSec]))}`);
+    }
+  })();
+
+  await test('Should segment user-designated story prose without capitalization or Latin word-boundary assumptions', () => {
+    const lowercaseStory = [
+      'a rain-soaked cyclist enters an empty station while the last train leaves.',
+      'she notices a blinking suitcase beneath the bench and kneels beside it.',
+      'the station lights fail as the suitcase begins to hum and glow.',
+      'turn this story into a storyboard.',
+    ].join(' ');
+    const lowercaseProject = buildStoryboardProject({
+      prompt: 'Create the requested storyboard.',
+      userIntentText: lowercaseStory,
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    if (lowercaseProject.scenes.length !== 3) {
+      throw new Error(`Expected 3 lowercase prose scenes, got ${lowercaseProject.scenes.length}`);
+    }
+
+    const cjkStory = [
+      '雨の駅に一人の旅人が到着し、誰もいないホームをゆっくり見渡す。',
+      '古い鞄の中から青い光が漏れ始め、濡れた床に不思議な模様を描く。',
+      '遠くの時計が止まり、旅人は光る鞄を抱えて暗い階段へ走り出す。',
+      'Turn this story into a storyboard.',
+    ].join(' ');
+    const cjkProject = buildStoryboardProject({
+      prompt: 'Create the requested storyboard.',
+      userIntentText: cjkStory,
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+    if (cjkProject.scenes.length !== 3) {
+      throw new Error(`Expected 3 CJK prose scenes, got ${cjkProject.scenes.length}`);
+    }
+  })();
+
+  await test('Should not invent scenes from a formatting-only storyboard request', () => {
+    const request = 'Create a ten-panel 9:16 storyboard sheet with GPT Image 2.';
+    const project = buildStoryboardProject({
+      prompt: request,
+      userIntentText: request,
+      frameCount: 10,
+      promptAuthorship: 'user',
+    });
+    if (project.scenes.length !== 0) {
+      throw new Error(`Formatting-only request invented ${project.scenes.length} narrative scenes`);
+    }
+  })();
+
+  await test('Should not pad an undercounted storyboard brief with synthesized instruction scenes', () => {
+    const request = [
+      'Create a polished video storyboard image for a 60 second multi-character product launch commercial.',
+      'Use timing labels, shot labels, readable captions, dialogue, recurring cast anchors, product transformation beats, reference roles, and a logo end card.',
+      'Keep every frame cinematic. Preserve exact continuity. Include production-ready camera and lighting notes.',
+    ].join(' ');
+    const project = buildStoryboardProject({
+      prompt: 'Panel 1: opening hook. Panel 2: product reveal. Panel 3: logo end card.',
+      userIntentText: request,
+      frameCount: 12,
+      promptAuthorship: 'assistant',
+    });
+    if (project.scenes.length !== 0) {
+      throw new Error(`Undercounted draft was padded to ${project.scenes.length} synthesized scenes`);
     }
   })();
 

@@ -115,7 +115,7 @@ const SD3_GUIDE = `SD3 has improved natural language understanding, multi-subjec
 - SD3 handles complex scenes better than SD1.5/SDXL.`;
 
 const KREA2_GUIDE = `Krea 2 and Krea 2 Turbo are caption-conditioned image models built for aesthetic exploration and precise creative steering.
-- Match prompt specificity to the requested control. Preserve a short or ambiguous idea when the user wants exploration; add subject, action, composition, medium, palette, lighting, texture, and atmosphere only when the user asks to narrow the direction.
+- Match prompt specificity to the requested control. Preserve a short or ambiguous idea only when the user explicitly wants open-ended exploration. Otherwise, a request to author a finished prompt should commit to one production-ready visual direction with concrete subject, action, composition, medium, palette, lighting, texture, and atmosphere details that remain faithful to the brief.
 - When detail is wanted, write one rich but fluent visual caption rather than SD-style keyword soup. Krea 2 was trained across short, medium, and long caption forms, so there is no mandatory word count.
 - Describe observable visual qualities instead of generic quality boosters such as "masterpiece" or "8K".
 - Keep the subject and requested content dominant. Do not bury a simple idea under invented props, wardrobe, characters, symbols, or narrative beats.
@@ -672,6 +672,7 @@ AUTHORING RULES:
 - When adding detail, add only concrete visual information that supports the requested image or edit. Never invent extra subjects, props, labels, slogans, symbols, panels, or story events.
 - Preserve emotional polarity, audience, genre, intensity, and content boundaries exactly.
 - Do not hedge with alternatives. Preserve deliberate exploratory ambiguity when the model guide and user request call for it; otherwise commit to one observable composition or one precise edit.
+- Treat a request to author, generate, or develop a model prompt as a request for a finished model-ready direction unless the user explicitly asks to keep it short, sparse, ambiguous, or exploratory.
 - If the request is already production-ready, polish it lightly instead of replacing its direction.
 - Never claim to have inspected a reference image that is not attached to this authoring request.
 

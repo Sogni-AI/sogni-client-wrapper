@@ -1,3 +1,14 @@
+## [3.24.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.3...v3.24.4) (2026-08-26)
+
+
+### Bug Fixes
+
+* **deps:** align intelligence package dependencies ([88c6f1f](https://github.com/Sogni-AI/sogni-intelligence-client/commit/88c6f1f))
+* **prompts:** define model-native video shaping ([01f07f2](https://github.com/Sogni-AI/sogni-intelligence-client/commit/01f07f2))
+* **prompts:** merge model-native prompt audit ([14922cc](https://github.com/Sogni-AI/sogni-intelligence-client/commit/14922cc))
+* **prompts:** preserve authored visual narratives ([0c27665](https://github.com/Sogni-AI/sogni-intelligence-client/commit/0c27665))
+* **video:** keep Wan 3 references generative ([40bda2c](https://github.com/Sogni-AI/sogni-intelligence-client/commit/40bda2c))
+
 ## [3.24.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.2...v3.24.3) (2026-08-26)
 
 

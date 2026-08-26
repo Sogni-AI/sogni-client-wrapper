@@ -7630,7 +7630,16 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     sections.length > 0 && storyboardSectionsHavePreservableExplicitTiming(sections);
   const preserveAssistantExplicitTiming =
     options.promptAuthorship === 'assistant' && selectedSectionsHaveExplicitTiming;
-  const synthesizedSections = sections.length === 0
+  // Plain narration is a valid source for scene synthesis, but an assistant
+  // draft with explicit scene/beat structure is not plain narration. If that
+  // structured draft undercounts the requested board, keep the project
+  // incomplete so validation can request a repaired draft instead of slicing
+  // the existing rows and surrounding production metadata into invented beats.
+  const maySynthesizeNarration =
+    sections.length === 0
+    && !assistantApprovedDraftUndercounted
+    && !assistantDraftUndercounted;
+  const synthesizedSections = maySynthesizeNarration
     ? [
         { text: approvedScriptContext, allowUnlabeledProse: true },
         { text: narrativeUserIntentText, allowUnlabeledProse: false },
@@ -7692,11 +7701,9 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
     ? scenesWithEndCardText
     : retimeStoryboardScenesForDialogue(scenesWithEndCardText, durationSec);
   const voiceLines = assignVoiceLinesToScenes(normalizedScenes, sourceText);
-  // Even when an assistant draft undercounts the requested board and the
-  // renderer must synthesize the missing scene slots, derive the narrative
-  // spine from the authored scene records that were actually present. Using
-  // the synthesized slots here can turn surrounding layout instructions into
-  // story content on a later compile.
+  // When an assistant draft undercounts the requested board, derive the
+  // narrative spine from the authored scene records that were actually
+  // present even though the compiled project remains intentionally incomplete.
   const authoredStorySpineSections = approvedSections.length > 0
     ? approvedSections
     : sourceSections;

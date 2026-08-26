@@ -3658,6 +3658,27 @@ async function runTests() {
     }
   })();
 
+  await test('Should not reinterpret an undercounted approved storyboard as plain narration', () => {
+    const approvedScriptContext = [
+      'Working Title: Product Launch',
+      'Duration: 15 Seconds',
+      '',
+      'Beat 1: Opening Detail (0:00-0:15)',
+      'Visual: Extreme close-up of a metallic product floating in a dark studio.',
+      'Audio/SFX: Low pulse and subtle electrical texture.',
+    ].join('\n');
+    const project = buildStoryboardProject({
+      prompt: approvedScriptContext,
+      userIntentText: 'Create a six-beat vertical storyboard for a 15 second product launch video.',
+      approvedScriptContext,
+      frameCount: 6,
+      promptAuthorship: 'assistant',
+    });
+    if (project.scenes.length !== 0) {
+      throw new Error(`Undercounted approved draft was reinterpreted as ${project.scenes.length} narration scenes`);
+    }
+  })();
+
   await test('Should preserve user end-scene copy from assistant storyboard drafts', () => {
     const userIntent = [
       'Generate a fun 420p 10s video storyboard using this mascot image.',

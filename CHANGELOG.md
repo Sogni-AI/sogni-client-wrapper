@@ -1,3 +1,10 @@
+## [3.24.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.2...v3.24.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **video:** quote Wan 3 durations through 30 seconds ([548df56](https://github.com/Sogni-AI/sogni-intelligence-client/commit/548df56c2bc73d91b59d3ff120baef3e065b2027))
+
 ## [3.24.2](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.1...v3.24.2) (2026-08-26)
 
 

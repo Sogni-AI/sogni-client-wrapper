@@ -1,3 +1,10 @@
+## [3.24.2](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.1...v3.24.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **deps:** consume H3 pricing SDK ([ed3ab58](https://github.com/Sogni-AI/sogni-intelligence-client/commit/ed3ab58a5b658735593415e07f807dce2ff70c65))
+
 ## [3.24.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.0...v3.24.1) (2026-08-26)
 
 

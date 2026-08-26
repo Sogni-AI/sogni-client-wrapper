@@ -1,3 +1,10 @@
+## [3.24.7](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.6...v3.24.7) (2026-08-26)
+
+
+### Bug Fixes
+
+* **storyboard:** reject undercounted structured drafts ([845aad2](https://github.com/Sogni-AI/sogni-intelligence-client/commit/845aad2bc4ef1e141da3e686d3acfef8285b0b5d))
+
 ## [3.24.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.5...v3.24.6) (2026-08-26)
 
 

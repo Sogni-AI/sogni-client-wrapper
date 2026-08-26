@@ -1,3 +1,17 @@
+## [3.24.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.2...v3.24.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **video:** quote Wan 3 durations through 30 seconds ([548df56](https://github.com/Sogni-AI/sogni-intelligence-client/commit/548df56c2bc73d91b59d3ff120baef3e065b2027))
+
+## [3.24.2](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.1...v3.24.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **deps:** consume H3 pricing SDK ([ed3ab58](https://github.com/Sogni-AI/sogni-intelligence-client/commit/ed3ab58a5b658735593415e07f807dce2ff70c65))
+
 ## [3.24.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.0...v3.24.1) (2026-08-26)
 
 

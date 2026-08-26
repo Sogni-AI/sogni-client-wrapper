@@ -2401,6 +2401,78 @@ async function runTests() {
     }
   })();
 
+  await test('Should apply Wan 3 estimate duration bounds and fixed 30fps generation', async () => {
+    const client = new SogniClientWrapper({
+      username: 'test-user',
+      password: 'test-pass',
+      autoConnect: false,
+    });
+
+    const capturedEstimateParams: any[] = [];
+    (client as any).client = {
+      projects: {
+        estimateVideoCost: async (params: any) => {
+          capturedEstimateParams.push(params);
+          return { token: '1', usd: '1', spark: '1', sogni: '1' };
+        },
+      },
+    };
+    (client as any).connectionState = {
+      ...(client as any).connectionState,
+      isConnected: true,
+    };
+
+    for (const duration of [2, 15, 30]) {
+      await client.estimateVideoCost({
+        modelId: 'wan3.0-video',
+        width: 1280,
+        height: 720,
+        duration,
+      });
+    }
+
+    const expectedFrames = [61, 451, 901];
+    capturedEstimateParams.forEach((params, index) => {
+      if (params.fps !== 30) {
+        throw new Error(`Expected Wan 3 fps=30, got ${params.fps}`);
+      }
+      if (params.frames !== expectedFrames[index]) {
+        throw new Error(
+          `Expected Wan 3 frames=${expectedFrames[index]}, got ${params.frames}`,
+        );
+      }
+    });
+
+    for (const duration of [1, 31]) {
+      try {
+        await client.estimateVideoCost({
+          modelId: 'wan3.0-video',
+          width: 1280,
+          height: 720,
+          duration,
+        });
+        throw new Error(`Expected Wan 3 duration=${duration} to fail validation`);
+      } catch (error) {
+        if (!(error instanceof SogniValidationError)) throw error;
+        if (!error.message.includes('between 2 and 30 seconds')) throw error;
+      }
+    }
+
+    try {
+      await client.estimateVideoCost({
+        modelId: 'wan3.0-video',
+        width: 1280,
+        height: 720,
+        duration: 15,
+        fps: 24,
+      });
+      throw new Error('Expected Wan 3 fps=24 to fail validation');
+    } catch (error) {
+      if (!(error instanceof SogniValidationError)) throw error;
+      if (!error.message.includes('require fps to be 30')) throw error;
+    }
+  })();
+
   await test('Should forward valid video reference image counts and reject invalid counts', async () => {
     const client = new SogniClientWrapper({
       username: 'test-user',

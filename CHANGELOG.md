@@ -1,3 +1,10 @@
+## [3.24.5](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.4...v3.24.5) (2026-08-26)
+
+
+### Bug Fixes
+
+* **storyboard:** require typed prose provenance ([c56d66c](https://github.com/Sogni-AI/sogni-intelligence-client/commit/c56d66c8c6a512164bc71278ff55954c3710e2a4))
+
 ## [3.24.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.3...v3.24.4) (2026-08-26)
 
 

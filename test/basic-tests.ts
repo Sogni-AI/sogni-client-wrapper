@@ -3402,6 +3402,34 @@ async function runTests() {
     }
   })();
 
+  await test('Should not promote unlabeled audio or VO from mixed storyboard columns to visible text', () => {
+    const brief = [
+      '| Time | Visual Scene / Action | Camera / Motion | Audio / VO / Text Overlay |',
+      '| :--- | :--- | :--- | :--- |',
+      '| 00:00 - 00:02 | A mascot sits in a quiet office. | Slow push-in. | Ambient office hum. No music. |',
+      '| 00:02 - 00:05 | The mascot looks into camera. | Static hold. | VO: "Welcome home." |',
+      '| 00:05 - 00:07 | The logo resolves on black. | Locked end card. | Text Overlay: "CREATE ANYTHING" |',
+    ].join('\n');
+
+    const project = buildStoryboardProject({
+      prompt: brief,
+      userIntentText: 'Create a seven second three-scene storyboard.',
+      approvedScriptContext: brief,
+      frameCount: 3,
+      promptAuthorship: 'assistant',
+    });
+
+    if (project.scenes[0]?.textInImage.length !== 0) {
+      throw new Error(`Ambient audio became visible text: ${project.scenes[0]?.textInImage.join(', ')}`);
+    }
+    if (project.scenes[1]?.textInImage.length !== 0) {
+      throw new Error(`Voiceover became visible text: ${project.scenes[1]?.textInImage.join(', ')}`);
+    }
+    if (!project.scenes[2]?.textInImage.includes('CREATE ANYTHING')) {
+      throw new Error(`Explicit mixed-column overlay was lost: ${project.scenes[2]?.textInImage.join(', ')}`);
+    }
+  })();
+
   await test('Should synthesize storyboard scenes from plain narration scripts', () => {
     const brief = [
       'Create one finished GPT Image 2 storyboard sheet image now using all six uploaded assets as visual references.',

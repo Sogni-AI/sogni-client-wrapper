@@ -6189,9 +6189,26 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
             ? ''
             : normalizeStoryboardDialogue(extractQuotedDialogueSegments(dialogueCell || audioCell)[0] || dialogueCell || audioCell)
           : '';
+    const visibleTextHeader = headers?.[visibleTextHeaderIndex] || '';
+    const visibleTextHeaderIsMixedWithAudioOrVoice =
+      visibleTextHeaderIndex >= 0
+      && /\b(?:audio|sfx|sound|foley|music|dialogue|vo|v\.o\.|voiceover|speech|narration)\b/i.test(visibleTextHeader);
+    const explicitlyLabeledVisibleText = extractStoryboardField(
+      audioCell,
+      ['Visible text', 'On-screen text', 'Onscreen text', 'Text overlay', 'Text', 'CTA'],
+    );
+    // A mixed column such as "Audio / VO / Text Overlay" does not make every
+    // unlabeled cell value visible copy. Treating its ambient sound or quoted
+    // VO as textInImage produces boards that literally render the soundtrack.
+    // Mixed columns require an explicit visible-text label inside the cell;
+    // dedicated visible-text columns may continue to use plain cell values.
     const visibleText = normalizeStoryboardVisibleText(
-      extractStoryboardField(audioCell, ['Visible text', 'On-screen text', 'Onscreen text', 'Text', 'CTA'])
-        || (visibleTextHeaderIndex >= 0 ? compactStoryboardLine(visibleTextCell) : ''),
+      explicitlyLabeledVisibleText
+        || (
+          visibleTextHeaderIndex >= 0 && !visibleTextHeaderIsMixedWithAudioOrVoice
+            ? compactStoryboardLine(visibleTextCell)
+            : ''
+        ),
     );
     const audio = extractStoryboardField(audioCell, ['Audio/SFX', 'Audio', 'SFX', 'FX', 'Foley', 'Sound', 'Sounds'])
       || storyboardTableCellWithoutDialogue(soundCell || audioCell, dialogue);

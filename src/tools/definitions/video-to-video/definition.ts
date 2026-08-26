@@ -142,12 +142,12 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: "string",
           enum: ["edit", "extend"],
           description:
-            'Wan 3 only. Use "edit" to transform the source or "extend" to continue it. Extension automatically uses ratio="adaptive" and the prompt should explicitly describe continuation intent.',
+            'Wan 3 only. Use "edit" to transform the source or "extend" to continue it. For extension, explicitly describe the intended continuation.',
         },
         ratio: {
           type: "string",
           enum: ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
-          description: 'Wan 3 only. Extension requires "adaptive"; edit defaults to adaptive.',
+          description: 'Wan 3 only. Output ratio. Use "adaptive" to let the provider choose from the source; omit to use the provider default.',
         },
         referenceFileUrl: {
           type: "string",

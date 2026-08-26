@@ -101,7 +101,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
           type: "string",
           enum: ["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"],
           description:
-            'Wan 3 only. Output ratio. Use "adaptive" to inherit source/context shape; extension requires adaptive. Omit for automatic behavior.',
+            'Wan 3 only. Output ratio. Use "adaptive" to let the provider choose from the source or context; omit to use the provider default.',
         },
         watermark: {
           type: "boolean",
@@ -146,7 +146,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. This i
             SEEDANCE_TOOL_MULTIMODAL_REFERENCE_GUIDANCE +
             ' ' +
             HAPPYHORSE_GENERATE_VIDEO_MODEL_DESCRIPTION +
-            ' "wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text, first/last frames, loose multimodal references, audio-driven generation, document/web context, editing, and extension. It renders 2-30s or smart duration at fixed 30 fps with optional native audio, prompt expansion control, optional watermark, 480p/720p/1080p, and adaptive/16:9/4:3/1:1/3:4/9:16 ratios. It accepts up to 10 images, 5 videos, 5 audios, one file, or one webpage. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, sound_to_video when audio drives timing, and video_to_video with controlMode="seedance-v2v" for edits or extensions.',
+            ' "wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text, first/last frames, loose multimodal references, audio-driven generation, document/web context, editing, and extension. It renders 2-30s or smart duration at fixed 30 fps with optional native audio, provider prompt expansion control, optional watermark, 480p/720p/1080p, and adaptive/16:9/4:3/1:1/3:4/9:16 ratios. It accepts up to 10 images, 5 videos, 5 audios, one file, or one webpage. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, sound_to_video when audio drives timing, and video_to_video with controlMode="seedance-v2v" for edits or extensions.',
         },
         generateAudio: {
           type: "boolean",

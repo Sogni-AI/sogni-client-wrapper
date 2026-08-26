@@ -8,7 +8,7 @@ export const LITERAL_VIDEO_PROMPT_OVERRIDE =
   `${LITERAL_PROMPT_OVERRIDE} Set skipPromptProcessing=true; for Seedance or Wan 3 also set expandPrompt=false.`;
 
 export const SEEDANCE_EXPAND_PROMPT_DESCRIPTION =
-  'Seedance and Wan 3 only. Whether to expand the prompt before dispatch. Defaults to true. For Wan 3, a successful Sogni expansion disables Alibaba prompt_extend to prevent a second rewrite; false disables both expansion layers so exact prompts remain exact.';
+  'Seedance and Wan 3 only. Whether to run Sogni\'s exact-model prompt shaper before dispatch. Defaults to true. Set false when the supplied prompt is already model-ready and must remain exact.';
 
 export const GENERATE_VIDEO_SKIP_PROMPT_PROCESSING_DESCRIPTION =
   'Bypass automatic prompt shaping/refinement and voice-identity prompt formatting so the prompt text is sent unchanged to the video model. Set true ONLY when the user explicitly says not to modify/rewrite/enhance/expand/change/improve the prompt, or to use/send it exactly, verbatim, or as-is, AND the provided prompt already satisfies the tool requirements. Continue to set non-prompt parameters such as model, duration, count, aspect ratio, and seed. For Seedance or Wan 3 literal prompt requests, also set expandPrompt=false. Do not set for ordinary underspecified requests.';

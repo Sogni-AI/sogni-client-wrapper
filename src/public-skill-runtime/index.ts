@@ -2434,10 +2434,19 @@ export function extractQuotedDialogueSegments(prompt: string | null | undefined)
     matches.push(dialogue.trim());
     return ' ';
   });
-  const pattern = /"([^"]{1,800})"/g;
-  let match;
-  while ((match = pattern.exec(untaggedPrompt)) !== null) {
-    matches.push(match[1]);
+  const quotePatterns = [
+    /"([^"\r\n]{1,800})"/g,
+    /“([^”\r\n]{1,800})”/g,
+    /‘([^’\r\n]{1,800})’/g,
+    /«([^»\r\n]{1,800})»/g,
+    /「([^」\r\n]{1,800})」/g,
+    /『([^』\r\n]{1,800})』/g,
+  ];
+  for (const pattern of quotePatterns) {
+    let match;
+    while ((match = pattern.exec(untaggedPrompt)) !== null) {
+      matches.push(match[1]);
+    }
   }
   return matches;
 }
@@ -6189,9 +6198,26 @@ function splitStoryboardTableSections(text: string): Array<{ number: number; hea
             ? ''
             : normalizeStoryboardDialogue(extractQuotedDialogueSegments(dialogueCell || audioCell)[0] || dialogueCell || audioCell)
           : '';
+    const visibleTextHeader = headers?.[visibleTextHeaderIndex] || '';
+    const visibleTextHeaderIsMixedWithAudioOrVoice =
+      visibleTextHeaderIndex >= 0
+      && /\b(?:audio|sfx|sound|foley|music|dialogue|vo|v\.o\.|voiceover|speech|narration)\b/i.test(visibleTextHeader);
+    const explicitlyLabeledVisibleText = extractStoryboardField(
+      audioCell,
+      ['Visible text', 'On-screen text', 'Onscreen text', 'Text overlay', 'Text', 'CTA'],
+    );
+    // A mixed column such as "Audio / VO / Text Overlay" does not make every
+    // unlabeled cell value visible copy. Treating its ambient sound or quoted
+    // VO as textInImage produces boards that literally render the soundtrack.
+    // Mixed columns require an explicit visible-text label inside the cell;
+    // dedicated visible-text columns may continue to use plain cell values.
     const visibleText = normalizeStoryboardVisibleText(
-      extractStoryboardField(audioCell, ['Visible text', 'On-screen text', 'Onscreen text', 'Text', 'CTA'])
-        || (visibleTextHeaderIndex >= 0 ? compactStoryboardLine(visibleTextCell) : ''),
+      explicitlyLabeledVisibleText
+        || (
+          visibleTextHeaderIndex >= 0 && !visibleTextHeaderIsMixedWithAudioOrVoice
+            ? compactStoryboardLine(visibleTextCell)
+            : ''
+        ),
     );
     const audio = extractStoryboardField(audioCell, ['Audio/SFX', 'Audio', 'SFX', 'FX', 'Foley', 'Sound', 'Sounds'])
       || storyboardTableCellWithoutDialogue(soundCell || audioCell, dialogue);
@@ -6392,14 +6418,45 @@ function extractPlainNarrationScriptText(text: string): string {
   if (!source) return '';
   const markers = Array.from(source.matchAll(/^\s*(?:#{1,6}\s*)?(?:voice[-\s]?over\s+|narration\s+)?script\s*:\s*$/gim));
   const marker = markers[markers.length - 1];
-  if (!marker || marker.index === undefined) return '';
-  const body = source.slice(marker.index + marker[0].length).trim();
-  return body
+  if (marker?.index !== undefined) {
+    const body = source.slice(marker.index + marker[0].length).trim();
+    return body
+      .split(/\r?\n/)
+      .map(line => stripStoryboardMarkup(line).trim())
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+  }
+
+  // Plain story prose is also valid storyboard source even when the user did
+  // not add a `Script:` heading. Remove only a trailing meta-instruction that
+  // explicitly refers to the preceding material as a script/story/concept and
+  // asks to turn it into a storyboard; never delete narrative sentences merely
+  // because they mention cameras, models, video, or a storyboard in-world.
+  const plainProse = source.replace(
+    /(?:^|(?<=[.!?。！？])\s+)(?:please\s+)?(?:turn|convert|adapt|transform)\s+(?:this|that|the|the\s+above|the\s+preceding)\s+(?:script|story|description|concept|narrative|prose)\b[^.!?。！？]*(?:story\s*board|storyboard)[^.!?。！？]*[.!?。！？]?\s*$/i,
+    '',
+  ).trim();
+  // Without a label, the trailing instruction is the provenance boundary that
+  // says the preceding prose is authored story material. Do not reinterpret a
+  // long production request, an undercounted draft, or validation feedback as
+  // missing story beats and fabricate panels from it.
+  if (plainProse === source) return '';
+  const phrases = splitPlainNarrationPhrases(plainProse);
+  const narrativeCharacterCount = countNarrativeCharacters(plainProse);
+  if (phrases.length < 3 || (countWords(plainProse) < 24 && narrativeCharacterCount < 80)) return '';
+  return plainProse
     .split(/\r?\n/)
     .map(line => stripStoryboardMarkup(line).trim())
     .filter(Boolean)
     .join('\n\n')
     .trim();
+}
+
+function countNarrativeCharacters(text: string): number {
+  return Array.from(text)
+    .filter(character => /[\p{L}\p{N}]/u.test(character))
+    .length;
 }
 
 function splitPlainNarrationPhrases(text: string): string[] {
@@ -6408,12 +6465,42 @@ function splitPlainNarrationPhrases(text: string): string[] {
     .trim();
   if (!normalized) return [];
 
-  const sentenceMatches = normalized.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [normalized];
+  const sentenceMatches: string[] = [];
+  let sentenceStart = 0;
+  for (let index = 0; index < normalized.length; index += 1) {
+    if (!/[.!?。！？]/u.test(normalized[index])) continue;
+    const terminator = normalized[index];
+    let boundaryEnd = index + 1;
+    while (boundaryEnd < normalized.length && /["'”’»」』)\]]/u.test(normalized[boundaryEnd])) {
+      boundaryEnd += 1;
+    }
+    let nextStart = boundaryEnd;
+    while (nextStart < normalized.length && /\s/.test(normalized[nextStart])) nextStart += 1;
+    const next = normalized[nextStart] ?? '';
+    const hasClosingQuote = boundaryEnd > index + 1;
+    // Keep a lower-case dialogue attribution (for example, `” she said.`)
+    // with the quote. This is a Unicode structural test, not a catalog of
+    // English speech verbs or character names.
+    if (hasClosingQuote && /\p{Ll}/u.test(next)) continue;
+    // A decimal point is not a sentence boundary. Other terminators are valid
+    // without following whitespace so CJK prose is segmented correctly.
+    if (terminator === '.'
+      && boundaryEnd === nextStart
+      && /\d/.test(normalized[index - 1] ?? '')
+      && /\d/.test(next)) continue;
+    const sentence = normalized.slice(sentenceStart, boundaryEnd).trim();
+    if (sentence) sentenceMatches.push(sentence);
+    sentenceStart = nextStart;
+    index = Math.max(index, boundaryEnd - 1);
+  }
+  const tail = normalized.slice(sentenceStart).trim();
+  if (tail) sentenceMatches.push(tail);
+  if (sentenceMatches.length === 0) sentenceMatches.push(normalized);
   return sentenceMatches
     .flatMap(sentence => sentence
       .split(/\s*(?:;|:\s+|,\s+(?=(?:and|but|so|whether|from|across|under|while|as)\b))\s*/i)
       .map(part => compactStoryboardLine(part)))
-    .filter(part => countWords(part) > 0);
+    .filter(part => countNarrativeCharacters(part) > 0);
 }
 
 function splitPhraseAtWordMidpoint(value: string): [string, string] | null {
@@ -6471,8 +6558,9 @@ function synthesizeStoryboardSectionsFromPlainNarration(
   frameCount: number,
   references: ReferenceAsset[],
 ): Array<{ number: number; heading: string; body: string }> {
+  const explicitlyLabeledNarration = /^\s*(?:#{1,6}\s*)?(?:voice[-\s]?over\s+|narration\s+)?script\s*:\s*$/im.test(sourceText);
   const script = extractPlainNarrationScriptText(sourceText);
-  if (!script || countWords(script) < 8) return [];
+  if (!script || (countWords(script) < 8 && countNarrativeCharacters(script) < 24)) return [];
   const phrases = splitPlainNarrationPhrases(script);
   const segments = normalizeNarrationSegmentCount(phrases, frameCount).slice(0, frameCount);
   if (segments.length === 0) return [];
@@ -6487,20 +6575,31 @@ function synthesizeStoryboardSectionsFromPlainNarration(
     'Tracking or reveal-style composition that moves the story into the next idea.',
   ];
 
-  return segments.map((segment, index) => ({
-    number: index + 1,
-    heading: `Scene ${index + 1} - ${titleFromNarrationSegment(segment, index)}`,
-    body: [
-      `Purpose: Translate narration beat ${index + 1} into a concrete ordered storyboard moment.`,
-      `Visual/Action: Create a concrete visual moment using only this narration beat and the supplied references: ${segment}`,
-      `Camera/Motion: ${cameraPresets[index % cameraPresets.length]}`,
-      'Lighting/Style: Match the visual style, genre, and tone implied by the user request and supplied references; keep the frame cinematic but readable as a storyboard panel.',
-      'Transition: Maintain continuity from the previous beat through subject, setting, gesture, camera direction, color, or motion when those cues are present.',
-      `Dialogue/VO: ${segment}`,
-      'Audio/SFX: Use only audio cues implied by the narration or user request; otherwise keep ambience or music generic and unobtrusive.',
-      referenceLine,
-    ].filter(Boolean).join('\n'),
-  }));
+  return segments.map((segment, index) => {
+    // In user-designated story prose, preserve quoted text as authored speech
+    // without an English verb/name catalog. The quote itself is the structural
+    // signal; unquoted prose remains visual/action material.
+    const quotedSpeech = extractQuotedDialogueSegments(segment)
+      .map(item => compactStoryboardLine(item))
+      .filter(Boolean);
+    const dialogue = explicitlyLabeledNarration
+      ? segment
+      : quotedSpeech.join(' ') || '[no dialogue]';
+    return {
+      number: index + 1,
+      heading: `Scene ${index + 1} - ${titleFromNarrationSegment(segment, index)}`,
+      body: [
+        `Purpose: Translate story beat ${index + 1} into a concrete ordered storyboard moment.`,
+        `Visual/Action: Create a concrete visual moment using only this story beat and the supplied references: ${segment}`,
+        `Camera/Motion: ${cameraPresets[index % cameraPresets.length]}`,
+        'Lighting/Style: Match the visual style, genre, and tone implied by the user request and supplied references; keep the frame cinematic but readable as a storyboard panel.',
+        'Transition: Maintain continuity from the previous beat through subject, setting, gesture, camera direction, color, or motion when those cues are present.',
+        `Dialogue/VO: ${dialogue}`,
+        'Audio/SFX: Use only audio cues implied by the story or user request; otherwise keep ambience or music generic and unobtrusive.',
+        referenceLine,
+      ].filter(Boolean).join('\n'),
+    };
+  });
 }
 
 function storyboardSectionsHavePreservableExplicitTiming(
@@ -6770,7 +6869,16 @@ function buildSceneFromSection(
   planningContract?: StoryboardScenePlanningContract | null,
 ): SceneSpec {
   const combined = `${section.heading}\n${section.body}`;
-  const timing = extractStoryboardTiming(combined) ?? fallbackTiming;
+  // A scene ordinal is structure, not a time value. Exclude the leading
+  // `Scene 1 -`/`Shot 2:` marker before applying the permissive legacy timing
+  // parser so numeric titles (years, model names, versions) cannot create a
+  // false timeline offset. Explicit timing later in the heading or body stays
+  // available to the parser.
+  const timingSource = `${section.heading.replace(
+    /^\s*(?:[-*+>#_]{1,6}\s*)*(?:[*_]{1,3})?\s*(?:Scene|Shot|Beat|Panel|Frame)\s*_?\s*\d{1,2}\b\s*(?:[-:.)|]\s*)?/i,
+    '',
+  )}\n${section.body}`;
+  const timing = extractStoryboardTiming(timingSource) ?? fallbackTiming;
   const normalizedHeading = stripStoryboardMarkup(section.heading)
     .replace(/^\s*#{1,6}\s*/, '');
   const title = compactStoryboardLine(
@@ -7535,7 +7643,10 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const preserveAssistantExplicitTiming =
     options.promptAuthorship === 'assistant' && selectedSectionsHaveExplicitTiming;
   const synthesizedSections = sections.length === 0
-    ? synthesizeStoryboardSectionsFromPlainNarration(`${sourceText}\n\n${narrativeUserIntentText}`, options.frameCount, references)
+    ? [approvedScriptContext, narrativeUserIntentText, sourceText]
+        .filter((candidate, index, candidates) => candidate && candidates.indexOf(candidate) === index)
+        .map(candidate => synthesizeStoryboardSectionsFromPlainNarration(candidate, options.frameCount, references))
+        .find(candidate => candidate.length > 0) ?? []
     : [];
   const storyboardSections = sections.length > 0 ? sections : synthesizedSections;
   const parsedScenes = storyboardSections.length > 0

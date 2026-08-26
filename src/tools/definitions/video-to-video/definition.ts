@@ -4,10 +4,13 @@
  */
 
 import type { ToolDefinition } from '../types.js';
+import { LITERAL_PROMPT_OVERRIDE } from '../../../contracts/promptOverrideMarker.js';
 import {
-  LITERAL_SEEDANCE_PROMPT_OVERRIDE,
   SEEDANCE_TOOL_V2V_REFERENCE_GUIDANCE,
 } from '../../../contracts/toolPromptMarkers.js';
+
+const LITERAL_SEEDANCE_V2V_PROMPT_OVERRIDE =
+  `${LITERAL_PROMPT_OVERRIDE} For Seedance, set expandPrompt=false.`;
 
 export const definition: ToolDefinition = {
   type: "function",
@@ -22,7 +25,7 @@ export const definition: ToolDefinition = {
           type: "string",
           description: `Describe the TARGET appearance (not the transformation process). 2-4 present-tense sentences.
 
-${LITERAL_SEEDANCE_PROMPT_OVERRIDE.replace('For Seedance or Wan 3', 'For Seedance')}
+${LITERAL_SEEDANCE_V2V_PROMPT_OVERRIDE}
 
 For LTX 2.5 or 2.3 canny/depth/pose modes, the source video preserves composition, depth, or motion. Spend prompt detail on style, atmosphere, lighting, surface texture, color palette, scale, and pacing. LTX 2.5 Fast, HQ, and Pro use the release-validated official Distilled workflow for canny/pose/depth/detailer/inpaint/outpaint; Dev is not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe.
 

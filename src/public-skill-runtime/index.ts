@@ -6413,7 +6413,7 @@ function splitStoryboardSections(text: string): Array<{ number: number; heading:
   return sectionHeadings.length > 0 ? sectionHeadings : tableSections;
 }
 
-function extractPlainNarrationScriptText(text: string): string {
+function extractPlainNarrationScriptText(text: string, allowUnlabeledProse = false): string {
   const source = text.trim();
   if (!source) return '';
   const markers = Array.from(source.matchAll(/^\s*(?:#{1,6}\s*)?(?:voice[-\s]?over\s+|narration\s+)?script\s*:\s*$/gim));
@@ -6428,24 +6428,11 @@ function extractPlainNarrationScriptText(text: string): string {
       .trim();
   }
 
-  // Plain story prose is also valid storyboard source even when the user did
-  // not add a `Script:` heading. Remove only a trailing meta-instruction that
-  // explicitly refers to the preceding material as a script/story/concept and
-  // asks to turn it into a storyboard; never delete narrative sentences merely
-  // because they mention cameras, models, video, or a storyboard in-world.
-  const plainProse = source.replace(
-    /(?:^|(?<=[.!?。！？])\s+)(?:please\s+)?(?:turn|convert|adapt|transform)\s+(?:this|that|the|the\s+above|the\s+preceding)\s+(?:script|story|description|concept|narrative|prose)\b[^.!?。！？]*(?:story\s*board|storyboard)[^.!?。！？]*[.!?。！？]?\s*$/i,
-    '',
-  ).trim();
-  // Without a label, the trailing instruction is the provenance boundary that
-  // says the preceding prose is authored story material. Do not reinterpret a
-  // long production request, an undercounted draft, or validation feedback as
-  // missing story beats and fabricate panels from it.
-  if (plainProse === source) return '';
-  const phrases = splitPlainNarrationPhrases(plainProse);
-  const narrativeCharacterCount = countNarrativeCharacters(plainProse);
-  if (phrases.length < 3 || (countWords(plainProse) < 24 && narrativeCharacterCount < 80)) return '';
-  return plainProse
+  // Unlabeled prose is accepted only from the typed approved-script channel.
+  // User/request text still needs a Script: marker so production instructions
+  // cannot be reinterpreted as narrative because they resemble a story.
+  if (!allowUnlabeledProse) return '';
+  return source
     .split(/\r?\n/)
     .map(line => stripStoryboardMarkup(line).trim())
     .filter(Boolean)
@@ -6557,9 +6544,10 @@ function synthesizeStoryboardSectionsFromPlainNarration(
   sourceText: string,
   frameCount: number,
   references: ReferenceAsset[],
+  allowUnlabeledProse = false,
 ): Array<{ number: number; heading: string; body: string }> {
   const explicitlyLabeledNarration = /^\s*(?:#{1,6}\s*)?(?:voice[-\s]?over\s+|narration\s+)?script\s*:\s*$/im.test(sourceText);
-  const script = extractPlainNarrationScriptText(sourceText);
+  const script = extractPlainNarrationScriptText(sourceText, allowUnlabeledProse);
   if (!script || (countWords(script) < 8 && countNarrativeCharacters(script) < 24)) return [];
   const phrases = splitPlainNarrationPhrases(script);
   const segments = normalizeNarrationSegmentCount(phrases, frameCount).slice(0, frameCount);
@@ -7643,9 +7631,19 @@ export function buildStoryboardProject(options: StoryboardPromptCompileOptions):
   const preserveAssistantExplicitTiming =
     options.promptAuthorship === 'assistant' && selectedSectionsHaveExplicitTiming;
   const synthesizedSections = sections.length === 0
-    ? [approvedScriptContext, narrativeUserIntentText, sourceText]
-        .filter((candidate, index, candidates) => candidate && candidates.indexOf(candidate) === index)
-        .map(candidate => synthesizeStoryboardSectionsFromPlainNarration(candidate, options.frameCount, references))
+    ? [
+        { text: approvedScriptContext, allowUnlabeledProse: true },
+        { text: narrativeUserIntentText, allowUnlabeledProse: false },
+        { text: sourceText, allowUnlabeledProse: false },
+      ]
+        .filter((candidate, index, candidates) =>
+          candidate.text && candidates.findIndex(other => other.text === candidate.text) === index)
+        .map(candidate => synthesizeStoryboardSectionsFromPlainNarration(
+          candidate.text,
+          options.frameCount,
+          references,
+          candidate.allowUnlabeledProse,
+        ))
         .find(candidate => candidate.length > 0) ?? []
     : [];
   const storyboardSections = sections.length > 0 ? sections : synthesizedSections;

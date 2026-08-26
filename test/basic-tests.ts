@@ -3553,7 +3553,7 @@ async function runTests() {
   })();
 
   await test('Should synthesize storyboard scenes from plain story prose without a Script heading', () => {
-    const userIntent = [
+    const story = [
       '1990s VHS home video, 9:16.',
       'A cluttered apartment bedroom is lit by a warm bedside lamp.',
       'An elderly man lies on the bed looking confused.',
@@ -3561,11 +3561,12 @@ async function runTests() {
       'The man stares in silence.',
       '“Chairman Meow, what are you doing?” the man finally gasps.',
       'The cat meows and slinks away.',
-      'Turn this script into a GPT Image 2 storyboard for a 15 second video.',
-    ].join(' ');
+    ];
+    const userIntent = [...story, 'Turn this script into a GPT Image 2 storyboard for a 15 second video.'].join(' ');
     const project = buildStoryboardProject({
       prompt: 'Create the requested eight-panel storyboard sheet.',
       userIntentText: userIntent,
+      approvedScriptContext: story.join(' '),
       frameCount: 8,
       promptAuthorship: 'assistant',
     });
@@ -3581,6 +3582,7 @@ async function runTests() {
     const compiled = compileVideoStoryboardImagePrompt({
       prompt: 'Create the requested eight-panel storyboard sheet.',
       userIntentText: userIntent,
+      approvedScriptContext: story.join(' '),
       frameCount: 8,
       promptAuthorship: 'assistant',
     });
@@ -3591,15 +3593,16 @@ async function runTests() {
   })();
 
   await test('Should segment user-designated story prose without capitalization or Latin word-boundary assumptions', () => {
-    const lowercaseStory = [
+    const lowercaseStoryBeats = [
       'a rain-soaked cyclist enters an empty station while the last train leaves.',
       'she notices a blinking suitcase beneath the bench and kneels beside it.',
       'the station lights fail as the suitcase begins to hum and glow.',
-      'turn this story into a storyboard.',
-    ].join(' ');
+    ];
+    const lowercaseStory = [...lowercaseStoryBeats, 'turn this story into a storyboard.'].join(' ');
     const lowercaseProject = buildStoryboardProject({
       prompt: 'Create the requested storyboard.',
       userIntentText: lowercaseStory,
+      approvedScriptContext: lowercaseStoryBeats.join(' '),
       frameCount: 3,
       promptAuthorship: 'assistant',
     });
@@ -3607,15 +3610,16 @@ async function runTests() {
       throw new Error(`Expected 3 lowercase prose scenes, got ${lowercaseProject.scenes.length}`);
     }
 
-    const cjkStory = [
+    const cjkStoryBeats = [
       '雨の駅に一人の旅人が到着し、誰もいないホームをゆっくり見渡す。',
       '古い鞄の中から青い光が漏れ始め、濡れた床に不思議な模様を描く。',
       '遠くの時計が止まり、旅人は光る鞄を抱えて暗い階段へ走り出す。',
-      'Turn this story into a storyboard.',
-    ].join(' ');
+    ];
+    const cjkStory = [...cjkStoryBeats, 'Turn this story into a storyboard.'].join(' ');
     const cjkProject = buildStoryboardProject({
       prompt: 'Create the requested storyboard.',
       userIntentText: cjkStory,
+      approvedScriptContext: cjkStoryBeats.join(' '),
       frameCount: 3,
       promptAuthorship: 'assistant',
     });

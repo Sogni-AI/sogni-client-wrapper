@@ -1,3 +1,10 @@
+## [3.24.1](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.0...v3.24.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **video:** preserve canvases for loose references ([c99fa43](https://github.com/Sogni-AI/sogni-intelligence-client/commit/c99fa43f32e9d2c840533bae0bd95818de4a33c6))
+
 # [3.24.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.23.6...v3.24.0) (2026-08-25)
 
 

@@ -77,6 +77,7 @@ import {
   isSeedanceVideoModel,
   isWanVideoModel,
 } from '../utils/helpers.js';
+import { isRegisteredWan3VideoModelId } from '../utils/videoModelIds.js';
 
 const LTX2_FRAME_STEP = 8;
 
@@ -1424,7 +1425,14 @@ export class SogniClientWrapper extends EventEmitter {
     return isHappyHorseVideoModel(modelId);
   }
 
+  private isWan3Model(modelId: string): boolean {
+    return isRegisteredWan3VideoModelId(modelId);
+  }
+
   private getVideoDurationBounds(modelId: string): { min: number; max: number } {
+    if (this.isWan3Model(modelId)) {
+      return { min: 2, max: 30 };
+    }
     if (isSeedanceVideoModel(modelId)) {
       // Seedance 2.5 renders up to 30s in a single call; the 2.0 family stops at 15s.
       return { min: 4, max: isSeedance25VideoModel(modelId) ? 30 : 15 };
@@ -1442,6 +1450,9 @@ export class SogniClientWrapper extends EventEmitter {
     if (this.isWanModel(modelId)) {
       return 16;
     }
+    if (this.isWan3Model(modelId)) {
+      return 30;
+    }
     if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {
       return 24;
     }
@@ -1449,6 +1460,13 @@ export class SogniClientWrapper extends EventEmitter {
   }
 
   private getVideoFps(modelId: string, fps: number | undefined): number {
+    if (this.isWan3Model(modelId)) {
+      if (fps !== undefined && fps !== 30) {
+        throw new SogniValidationError('Wan 3 video models require fps to be 30');
+      }
+      return 30;
+    }
+
     if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {
       if (fps !== undefined && fps !== 24) {
         throw new SogniValidationError(
@@ -1470,6 +1488,10 @@ export class SogniClientWrapper extends EventEmitter {
   private calculateVideoFrames(modelId: string, duration: number, fps: number): number {
     if (this.isWanModel(modelId)) {
       return Math.round(duration * 16) + 1;
+    }
+
+    if (this.isWan3Model(modelId)) {
+      return Math.round(duration * 30) + 1;
     }
 
     if (isSeedanceVideoModel(modelId) || this.isHappyHorseModel(modelId)) {

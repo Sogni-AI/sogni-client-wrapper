@@ -1,3 +1,15 @@
+# [3.25.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.8...v3.25.0) (2026-08-27)
+
+
+### Bug Fixes
+
+* **deps:** bump sogni-client to 5.21.4 ([955a3ee](https://github.com/Sogni-AI/sogni-intelligence-client/commit/955a3ee0cc6a905dae5232e14f253ae9b9e74902))
+
+
+### Features
+
+* **video:** add typed H3 source audio policy ([21db1ad](https://github.com/Sogni-AI/sogni-intelligence-client/commit/21db1adb76283a6ffb45c39dfd3c9d02a854f25d))
+
 ## [3.24.8](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.7...v3.24.8) (2026-08-27)
 
 

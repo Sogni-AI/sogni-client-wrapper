@@ -78,24 +78,28 @@ export const KREA2_LORA_MODEL_IDS_SENTENCE =
  * own selectors so neither sends the other's.
  */
 export const H3_VIDEO_LORA_CATALOG_REFERENCE =
-  'One LoRA is published for MiniMax H3 today: h3-realism-people (fal), a realism pass trained on '
-  + 'live-action footage of people. It restores skin texture and pores, stray hairs, fabric weave '
-  + 'and a fine sensor grain that the base model smooths away, and holds up in close-up. It needs '
-  + 'its trigger word: put r34l1sm near the FRONT of the prompt, or the render comes back as '
-  + 'ordinary H3 with no error. Exact ranges and any LoRA published since: '
-  + 'GET /v1/loras/comfy?modelId=<model>. Do not invent ids.';
+  'Three LoRAs are published for MiniMax H3 today and the set differs by mode, so '
+  + 'GET /v1/loras/comfy?modelId=<model> is authoritative for the mode in hand and carries exact '
+  + 'ranges, maturity flags, and anything published since. h3-realism-people (fal) is a realism '
+  + 'pass trained on live-action footage of people: it restores skin texture and pores, stray '
+  + 'hairs, fabric weave and a fine sensor grain that the base model smooths away, and holds up in '
+  + 'close-up. It is the only one gated on a trigger word — put r34l1sm near the FRONT of the '
+  + 'prompt, or the render comes back as ordinary H3 with no error. h3-vbvr-video-reasoning is a '
+  + 'prompt-adherence pass that holds the model to what was asked instead of improvising. '
+  + 'h3-mystic-xxx-v4 is an uncensored adult fine-tune. Do not invent ids.';
 
 /** Shared video `loraStrengths` guidance: positive-only, and what pushing it costs. */
 export const H3_VIDEO_LORA_STRENGTHS_GUIDANCE =
   'Strength for each LoRA in loras, in the same order. Omitting the array applies 1.0 to every '
-  + 'LoRA, which is NOT the catalog default and for h3-realism-people is already at the top of its '
-  + 'band, so send explicit values. Video LoRAs are positive-only — unlike the bipolar Krea 2 image '
+  + 'LoRA, which is not every LoRA\'s catalog default and for h3-realism-people is already at the '
+  + 'top of its band, so send explicit values. Video LoRAs are positive-only — unlike the bipolar Krea 2 image '
   + 'sliders, a negative value is not an inverse effect and 0 is off. h3-realism-people takes 0-2 '
   + 'and its catalog default is 0.8; 0.6-1 is the '
   + 'usable band. It also pulls the camera in as it climbs: at 1.5 and above the shot reliably '
   + 'recomposes and the grade darkens, which on an image-conditioned mode can crop the subject out '
   + 'of the frame the user supplied. Raise it above 1 only when the user asks for more, and prefer '
-  + 'the default when they supplied a first or last frame.';
+  + 'the default when they supplied a first or last frame. h3-vbvr-video-reasoning and '
+  + 'h3-mystic-xxx-v4 both take 0-1 and do default to 1.0, with usable bands of 0.7-1 and 0.2-1.';
 
 /**
  * Which selectors accept the H3 LoRAs, in the vocabulary of one tool.

@@ -233,7 +233,7 @@ const ANIMATE_PHOTO_CONTRACT: PromptContract = {
 // ---------------------------------------------------------------------------
 const GENERATE_VIDEO_CONTRACT: PromptContract = {
   contractId: 'generate_video_v1',
-  version: '1.1.0',
+  version: '1.2.0',
   toolName: 'generate_video',
   baseDescription: [
     'generate_video produces text-to-video clips and multimodal reference videos.',
@@ -246,6 +246,14 @@ const GENERATE_VIDEO_CONTRACT: PromptContract = {
     'to loose assets in English prompts as Image 1, Video 1, and Audio 1, numbered independently',
     'by type. Do not bracket or @-prefix these identifiers. Wan 3 renders 2-30 seconds at fixed',
     '30 fps, offers 480P/720P/1080P and 16:9/4:3/1:1/3:4/9:16, and can toggle native audio.',
+    '',
+    'MINIMAX H3 SOURCE AUDIO: Every H3 R2V call with a reference video or audio must set',
+    'sourceAudioPolicy. A specific/original/trending song is immutable: use reuse_exact, author',
+    'the official audio reuse task plus fully_copy, keep choreography on explicit source times,',
+    'and stream-copy/remux the original soundtrack after rendering. Never substitute, recompose,',
+    'remix, or add a copyright-avoidance mutation. H3 reference videos must themselves be exactly',
+    '24 fps; normalize other rates without changing duration/audio timing before submission.',
+    'Ref2VA cannot guarantee edit-level beat sync.',
     '',
     'SEEDANCE UPLOADED STORYBOARD DEFAULT: When the user uploads a storyboard, shot sheet,',
     'mood board, or trailer concept image and asks to make a movie trailer/video/clip from it,',

@@ -755,12 +755,16 @@ async function runTests() {
       generateParams.referenceImageIndices.description,
       generateParams.referenceVideoIndices.description,
       generateParams.referenceAudioIndices.description,
+      generateParams.sourceAudioPolicy.description,
     ].map((value) => String(value ?? '')).join('\n');
     if (!h3Docs.includes('at least one visual reference (image or video)')) {
       throw new Error('Ref2VA docs do not permit a video-only visual reference');
     }
     if (!h3Docs.includes('audio alone is invalid')) {
       throw new Error('Ref2VA docs do not reject audio-only input');
+    }
+    if (!/reference videos must themselves be exactly 24fps/i.test(h3Docs)) {
+      throw new Error('Ref2VA docs do not require 24fps reference media');
     }
     if (/at least one image is required|supplement a required image/i.test(h3Docs)) {
       throw new Error('Ref2VA docs still require an image instead of an image or video');

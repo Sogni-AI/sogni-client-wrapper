@@ -199,6 +199,64 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
     }).ok,
     true,
   );
+  const h3ExactAudioPrompt = `subject_definitions:
+<Video 1> supplies the dance. <Audio 1> is its immutable soundtrack.
+
+summary:
+[reference generation + audio reuse] Recreate <Video 1> on the original timeline.
+
+retention_analysis:
+<Video 1>: fully_preserved - preserve choreography timing.
+<Audio 1>: fully_copy - reuse the complete source signal unchanged.
+
+detailed_description:
+[Shot 1] Keep the opening pause and timed dance from <Video 1>.
+
+overall_soundscape:
+Reuse the source signal.
+
+non_diegetic_music:
+Directly reuse <Audio 1> unchanged.`;
+  expect(
+    'generate_video rejects implicit H3 source-audio intent',
+    validateAndNormalizeHostedToolArguments([generateVideoDefinition], 'generate_video', {
+      prompt: h3ExactAudioPrompt,
+      videoModel: 'minimax-h3-r2v',
+      referenceVideoIndices: [-1],
+    }).ok,
+    false,
+  );
+  expect(
+    'generate_video still rejects sourceAudioPolicy on a non-R2V model',
+    validateAndNormalizeHostedToolArguments([generateVideoDefinition], 'generate_video', {
+      prompt: 'a plain clip',
+      videoModel: 'minimax-h3-t2v',
+      sourceAudioPolicy: 'replace',
+    }).ok,
+    false,
+  );
+  expect(
+    'generate_video accepts typed exact H3 source-audio reuse',
+    validateAndNormalizeHostedToolArguments([generateVideoDefinition], 'generate_video', {
+      prompt: h3ExactAudioPrompt,
+      videoModel: 'minimax-h3-r2v',
+      referenceVideoIndices: [-1],
+      sourceAudioPolicy: 'reuse_exact',
+    }).ok,
+    true,
+  );
+  expect(
+    'generate_video rejects replacement prose under exact H3 source-audio reuse',
+    validateAndNormalizeHostedToolArguments([generateVideoDefinition], 'generate_video', {
+      prompt: h3ExactAudioPrompt
+        .replace('audio reuse', 'audio reference')
+        .replace('<Audio 1>: fully_copy', '<Audio 1>: reference'),
+      videoModel: 'minimax-h3-r2v',
+      referenceVideoIndices: [-1],
+      sourceAudioPolicy: 'reuse_exact',
+    }).ok,
+    false,
+  );
   expect(
     'animate_photo rejects loraStrengths without loras',
     validateAndNormalizeHostedToolArguments([animatePhotoDefinition], 'animate_photo', {

@@ -449,6 +449,58 @@ export function validateAndNormalizeHostedToolArguments(
     }
   }
 
+  // MiniMax H3 Ref2VA jointly generates audio, so a reference video's
+  // soundtrack cannot safely inherit an implicit creative role. Ask for a typed
+  // decision before dispatch and enforce the official Context-IR markers for the
+  // two source-conditioned policies. `replace` remains an explicit
+  // user-authorized escape hatch and therefore needs no source-retention marker.
+  //
+  // Absence is an ERROR and there is deliberately no default value. Defaulting
+  // to `reuse_exact` or `reference_only` would demand Context-IR markers the
+  // prompt does not carry, so those fail anyway; `replace` is the only value
+  // that validates without markers, and it is the copyright escape hatch — the
+  // one outcome this contract exists to stop a caller taking by accident. A
+  // warning was considered and rejected: the likely failure is an LLM omitting
+  // the argument, and letting that proceed lands exactly the silent recomposition
+  // the rule prevents. The error is actionable on both paths — the planner
+  // surfaces it in `validationErrors` before submission, and a durable start
+  // returns it as a 400 naming the argument.
+  if (toolName === 'generate_video') {
+    const model = cleanedRecord.videoModel;
+    const isH3R2v = model === 'minimax-h3-r2v' || model === 'minimax-h3-r2v-turbo';
+    const hasSourceMedia =
+      (Array.isArray(cleanedRecord.referenceVideoIndices) && cleanedRecord.referenceVideoIndices.length > 0)
+      || (Array.isArray(cleanedRecord.referenceAudioIndices) && cleanedRecord.referenceAudioIndices.length > 0);
+    const sourceAudioPolicy = cleanedRecord.sourceAudioPolicy;
+    if (isH3R2v && hasSourceMedia && sourceAudioPolicy === undefined) {
+      context.errors.push(
+        'Argument "sourceAudioPolicy" is required for MiniMax H3 R2V reference video/audio. Use "reuse_exact" for a specific/original/trending song.'
+      );
+    }
+    if (sourceAudioPolicy !== undefined && !isH3R2v) {
+      context.errors.push('Argument "sourceAudioPolicy" is only supported by MiniMax H3 R2V models');
+    }
+    if (isH3R2v && hasSourceMedia && typeof cleanedRecord.prompt === 'string') {
+      const prompt = cleanedRecord.prompt;
+      if (sourceAudioPolicy === 'reuse_exact') {
+        if (!/\[[^\]\n]*\baudio reuse\b[^\]\n]*\]/.test(prompt)) {
+          context.errors.push('MiniMax H3 sourceAudioPolicy="reuse_exact" requires the official "audio reuse" summary task');
+        }
+        if (!/<Audio\s+1>\s*:\s*fully_copy\b/.test(prompt)) {
+          context.errors.push('MiniMax H3 sourceAudioPolicy="reuse_exact" requires <Audio 1>: fully_copy in retention_analysis');
+        }
+        if (!/non_diegetic_music:\s*[\s\S]*<Audio\s+1>/.test(prompt)) {
+          context.errors.push('MiniMax H3 sourceAudioPolicy="reuse_exact" requires non_diegetic_music to name <Audio 1> directly');
+        }
+      } else if (
+        sourceAudioPolicy === 'reference_only'
+        && !/\[[^\]\n]*\baudio reference\b[^\]\n]*\]/.test(prompt)
+      ) {
+        context.errors.push('MiniMax H3 sourceAudioPolicy="reference_only" requires the official "audio reference" summary task');
+      }
+    }
+  }
+
   return {
     ok: context.errors.length === 0,
     errors: context.errors,

@@ -1,3 +1,10 @@
+## [3.24.8](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.7...v3.24.8) (2026-08-27)
+
+
+### Bug Fixes
+
+* **loras:** describe every published H3 adapter ([8a0e911](https://github.com/Sogni-AI/sogni-intelligence-client/commit/8a0e9118d1c75b176ca065ccaee0a40ecd802ed5))
+
 ## [3.24.7](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.24.6...v3.24.7) (2026-08-26)
 
 

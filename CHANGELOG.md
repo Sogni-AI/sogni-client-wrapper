@@ -1,3 +1,10 @@
+## [3.25.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.25.3...v3.25.4) (2026-08-29)
+
+
+### Bug Fixes
+
+* **workflows:** type explicit workflow waiting-state fields ([730d2fc](https://github.com/Sogni-AI/sogni-intelligence-client/commit/730d2fce45d38da7f940db1910d978480ace1ee3))
+
 ## [3.25.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.25.2...v3.25.3) (2026-08-29)
 
 

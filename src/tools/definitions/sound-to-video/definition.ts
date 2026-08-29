@@ -12,7 +12,7 @@ import {
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
 
 const WAN3_VIDEO_MODEL_GUIDANCE =
-  '"wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text-to-video, first-frame and first+last-frame animation, loose multimodal references, and audio-driven generation. It renders 2-30s at fixed 30 fps with optional native audio, supports 480p/720p/1080p and 16:9/4:3/1:1/3:4/9:16, accepts up to 10 reference images, 5 reference videos, and 5 reference audios, and uses plain per-type prompt labels Image 1, Video 1, and Audio 1. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, and sound_to_video when audio is the primary driver. Video references are loose conditioning, not source-video edit or extend modes.';
+  '"wan3.0-video" is Alibaba Wan 3 and "wan3.0-spicy-video" is MuleRouter w3.0-video. Both support 2-30s or smart duration at 30 fps, optional native audio, prompt expansion, 480p/720p/1080p, adaptive/fixed ratios, and up to 10 image/5 video/5 audio references. Enhanced has no document/web context or watermark. Frame anchors cannot be mixed with loose references. Do not send negativePrompt; video references are loose conditioning, not edit or extend modes.';
 
 export const definition: ToolDefinition = {
   type: "function",
@@ -93,17 +93,17 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         },
         watermark: {
           type: "boolean",
-          description: "Wan 3 only. Add Alibaba's visible watermark. Defaults to false.",
+          description: "Alibaba wan3.0-video only. Add the visible watermark. Defaults to false.",
         },
         referenceFileUrl: {
           type: "string",
           description:
-            "Wan 3 only. One public HTTPS document URL for additional audio-driven context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl.",
+            "Alibaba wan3.0-video only. One public HTTPS document URL for additional audio-driven context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl.",
         },
         referenceLinkUrl: {
           type: "string",
           description:
-            "Wan 3 only. One public HTTPS webpage URL for additional audio-driven context. Mutually exclusive with referenceFileUrl.",
+            "Alibaba wan3.0-video only. One public HTTPS webpage URL for additional audio-driven context. Mutually exclusive with referenceFileUrl.",
         },
         videoModel: {
           type: "string",

@@ -1111,11 +1111,11 @@ export const VIDEO_GENERATION_SKILL: SkillManifest = {
   id: 'video_generation',
   name: 'Video generation',
   description:
-    'Text-to-video synthesis with LTX, Wan, Seedance, HappyHorse, and MiniMax H3, including Wan 3.0 Enhanced through Mulerouter. Use when the user wants a new video clip generated from a prompt or loose reference set.',
+    'Text-to-video synthesis with LTX, Wan, Seedance, HappyHorse, and MiniMax H3, including Wan 3.0 Enhanced through MuleRouter. Use when the user wants a new video clip generated from a prompt or loose reference set.',
   toolNames: ['generate_video'],
   constraints: [
     'For My Personas video requests, default to image_editing first to produce a conditioned scene image before animation. Use direct video only when the user explicitly asks to animate an existing persona image/reference or no source image is available for a voice-only request.',
-    'Wan 3.0 Enhanced uses exact model id wan3.0-spicy-video: fixed 2-30 seconds at 30 fps, 480p/720p/1080p, native audio, fixed ratios, up to 10 image/5 video/5 audio references, and optional frame anchors mixed with loose references. It has no smart duration, adaptive ratio, document/web context, watermark, provider prompt expansion, negative prompt, source-video edit, or extend mode.',
+    'Wan 3.0 Enhanced uses exact Sogni model id wan3.0-spicy-video (MuleRouter provider id w3.0-video): 2-30 seconds or smart duration at 30 fps, 480p/720p/1080p, native audio, prompt expansion, adaptive/fixed ratios, and up to 10 image/5 video/5 audio references. First/last-frame mode and loose-reference mode are mutually exclusive. It has no document/web context, watermark, negative prompt, source-video edit, or extend mode.',
   ],
 };
 

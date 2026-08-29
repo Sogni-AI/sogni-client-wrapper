@@ -631,10 +631,13 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     maxFrames: 901,
     nativeAudio: true,
     supportsAudioToggle: true,
+    supportsAdaptiveRatio: true,
+    supportsSmartDuration: true,
+    supportsPromptExtend: true,
   },
 };
 
-// Wan 3 unified multimodal capability contract (Alibaba Model Studio, 2026-08).
+// Wan 3 unified multimodal capability contract (provider APIs, 2026-08).
 export const WAN3_VIDEO_MODEL_ID = "wan3.0-video" as const;
 export const WAN3_ENHANCED_VIDEO_MODEL_ID = "wan3.0-spicy-video" as const;
 export type Wan3Resolution = "480P" | "720P" | "1080P";

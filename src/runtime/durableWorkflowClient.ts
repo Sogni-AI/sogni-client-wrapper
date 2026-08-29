@@ -31,10 +31,25 @@ interface ApiEnvelope<T> {
   error?: unknown;
 }
 
+export type DurableCreativeWorkflowWaitingReason =
+  | 'ask_clarifying_question'
+  | 'select_media_required'
+  | 'cost_approval_required'
+  | 'cost_reauthorization_required'
+  | 'safety_review_required'
+  | 'workflow_user_input_required'
+  | 'insufficient_credit'
+  | 'permission_required'
+  | 'other';
+
 export interface DurableCreativeWorkflowRecord {
   workflowId: string;
   title?: string;
   status: BackboneWorkflowStatus;
+  /** Why a `waiting_for_user` workflow is paused. */
+  waitingReason?: DurableCreativeWorkflowWaitingReason;
+  /** True only when the workflow's confirm-cost endpoint is the valid resolution. */
+  awaitingCostApproval?: boolean;
   input?: Record<string, unknown>;
   plan?: BackboneDurableWorkflowRunContract;
   steps?: unknown[];

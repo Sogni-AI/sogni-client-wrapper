@@ -98,6 +98,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             "minimax-h3-flf2v",
             "minimax-h3-flf2v-turbo",
             "wan3.0-video",
+            "wan3.0-spicy-video",
           ],
           description:
             '"ltx25" (default): LTX 2.5 I2V or first/last-frame video with native audio; Fast, HQ, and Pro currently use the release-validated official Distilled INT8 workflow. The Dev checkpoints are not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe. ' +

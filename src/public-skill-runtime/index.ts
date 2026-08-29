@@ -1111,10 +1111,11 @@ export const VIDEO_GENERATION_SKILL: SkillManifest = {
   id: 'video_generation',
   name: 'Video generation',
   description:
-    'Text-to-video synthesis (LTX-2). Use when the user wants a new video clip generated from a prompt with no source image, audio, or clip.',
+    'Text-to-video synthesis with LTX, Wan, Seedance, HappyHorse, and MiniMax H3, including Wan 3.0 Enhanced through Mulerouter. Use when the user wants a new video clip generated from a prompt or loose reference set.',
   toolNames: ['generate_video'],
   constraints: [
     'For My Personas video requests, default to image_editing first to produce a conditioned scene image before animation. Use direct video only when the user explicitly asks to animate an existing persona image/reference or no source image is available for a voice-only request.',
+    'Wan 3.0 Enhanced uses exact model id wan3.0-spicy-video: fixed 2-30 seconds at 30 fps, 480p/720p/1080p, native audio, fixed ratios, up to 10 image/5 video/5 audio references, and optional frame anchors mixed with loose references. It has no smart duration, adaptive ratio, document/web context, watermark, provider prompt expansion, negative prompt, source-video edit, or extend mode.',
   ],
 };
 
@@ -1839,6 +1840,7 @@ export const HAPPYHORSE_WORKFLOW_MODELS = Object.freeze({
 
 // Wan 3 is one canonical Alibaba model whose media shape selects every mode.
 export const WAN3_WORKFLOW_MODEL = 'wan3.0-video';
+export const WAN3_ENHANCED_WORKFLOW_MODEL = 'wan3.0-spicy-video';
 
 export const VIDEO_MODEL_REGISTRY = Object.freeze({
   [LTX23_WORKFLOW_MODELS.t2v]: {
@@ -2086,6 +2088,20 @@ export const VIDEO_MODEL_REGISTRY = Object.freeze({
     minFrames: 61,
     maxFrames: 901,
     supportsNativeAudio: true
+  },
+  [WAN3_ENHANCED_WORKFLOW_MODEL]: {
+    workflow: 't2v',
+    family: 'wan3',
+    defaultWidth: 1920,
+    defaultHeight: 1080,
+    minDimension: 480,
+    maxDimension: 1920,
+    dimensionMultiple: 1,
+    fps: 30,
+    frameStep: 1,
+    minFrames: 61,
+    maxFrames: 901,
+    supportsNativeAudio: true
   }
 } satisfies Record<string, SkillVideoModelConfig>);
 
@@ -2202,7 +2218,12 @@ export const VIDEO_MODEL_ALIASES: Readonly<Record<string, string>> = Object.free
   wan3: WAN3_WORKFLOW_MODEL,
   'wan3.0': WAN3_WORKFLOW_MODEL,
   'wan3-video': WAN3_WORKFLOW_MODEL,
-  'wan3.0-video': WAN3_WORKFLOW_MODEL
+  'wan3.0-video': WAN3_WORKFLOW_MODEL,
+  'wan3-enhanced': WAN3_ENHANCED_WORKFLOW_MODEL,
+  'wan3.0-enhanced': WAN3_ENHANCED_WORKFLOW_MODEL,
+  'wan3-spicy': WAN3_ENHANCED_WORKFLOW_MODEL,
+  'wan3.0-spicy': WAN3_ENHANCED_WORKFLOW_MODEL,
+  'wan3.0-spicy-video': WAN3_ENHANCED_WORKFLOW_MODEL
 } satisfies Record<string, string>);
 
 export const QUALITY_TIERS = Object.freeze({

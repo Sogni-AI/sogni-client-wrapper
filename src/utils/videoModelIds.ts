@@ -118,6 +118,11 @@ const WAN3_MODEL_IDS = normalizedSet([
   'wan3.0',
   'wan3-video',
   'wan3.0-video',
+  'wan3-enhanced',
+  'wan3.0-enhanced',
+  'wan3-spicy',
+  'wan3.0-spicy',
+  'wan3.0-spicy-video',
 ]);
 
 export function resolveRegisteredVideoModelFamily(

@@ -1,3 +1,16 @@
+# [3.26.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.25.4...v3.26.0) (2026-08-29)
+
+
+### Bug Fixes
+
+* **video:** describe enhanced Wan3 controls ([6626e65](https://github.com/Sogni-AI/sogni-intelligence-client/commit/6626e659ab91bb37a6c2fb509261dff73c67ae5c))
+
+
+### Features
+
+* **video:** expose Wan 3 Enhanced model ([8b2c6c8](https://github.com/Sogni-AI/sogni-intelligence-client/commit/8b2c6c8e8d49e258640cb35112bedc9946833526))
+* **video:** register Wan 3 Enhanced ([d7cf858](https://github.com/Sogni-AI/sogni-intelligence-client/commit/d7cf85823e645f303d7276d04bacc717c7322f6d))
+
 ## [3.25.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.25.3...v3.25.4) (2026-08-29)
 
 

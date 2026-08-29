@@ -12,7 +12,7 @@ import {
 import { ASPECT_RATIO_DESCRIPTION } from '../../../media/index.js';
 
 const WAN3_VIDEO_MODEL_GUIDANCE =
-  '"wan3.0-video" is Alibaba Wan 3: one canonical premium-vendor model for text-to-video, first-frame and first+last-frame animation, loose multimodal references, and audio-driven generation. It renders 2-30s at fixed 30 fps with optional native audio, supports 480p/720p/1080p and 16:9/4:3/1:1/3:4/9:16, accepts up to 10 reference images, 5 reference videos, and 5 reference audios, and uses plain per-type prompt labels Image 1, Video 1, and Audio 1. Do not send negativePrompt. Use animate_photo for native first/last frames, generate_video for text or loose references, and sound_to_video when audio is the primary driver. Video references are loose conditioning, not source-video edit or extend modes.';
+  '"wan3.0-video" is Alibaba Wan 3 and "wan3.0-spicy-video" is MuleRouter w3.0-video. Both support 2-30s or smart duration at 30 fps, optional native audio, prompt expansion, 480p/720p/1080p, adaptive/fixed ratios, and up to 10 image/5 video/5 audio references. Enhanced has no document/web context or watermark. Frame anchors cannot be mixed with loose references. Do not send negativePrompt; video references are loose conditioning, not edit or extend modes.';
 
 export const definition: ToolDefinition = {
   type: "function",
@@ -93,21 +93,21 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         },
         watermark: {
           type: "boolean",
-          description: "Wan 3 only. Add Alibaba's visible watermark. Defaults to false.",
+          description: "Alibaba wan3.0-video only. Add the visible watermark. Defaults to false.",
         },
         referenceFileUrl: {
           type: "string",
           description:
-            "Wan 3 only. One public HTTPS document URL for additional audio-driven context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl.",
+            "Alibaba wan3.0-video only. One public HTTPS document URL for additional audio-driven context (DOCX/DOC/XLSX/XLS/PPTX/PPT/PDF/TXT/KEY/PAGES/NUMBERS/Markdown, up to 100 MB; PDF/DOCX/DOC/PPTX/PPT/KEY/PAGES up to 50 pages). Mutually exclusive with referenceLinkUrl.",
         },
         referenceLinkUrl: {
           type: "string",
           description:
-            "Wan 3 only. One public HTTPS webpage URL for additional audio-driven context. Mutually exclusive with referenceFileUrl.",
+            "Alibaba wan3.0-video only. One public HTTPS webpage URL for additional audio-driven context. Mutually exclusive with referenceFileUrl.",
         },
         videoModel: {
           type: "string",
-          enum: ["wan-s2v", "seedance2", "seedance2-mini", "seedance2-5", "ltx25-ia2v", "ltx25-a2v", "ltx23-ia2v", "ltx23-a2v", "wan3.0-video"],
+          enum: ["wan-s2v", "seedance2", "seedance2-mini", "seedance2-5", "ltx25-ia2v", "ltx25-a2v", "ltx23-ia2v", "ltx23-a2v", "wan3.0-video", "wan3.0-spicy-video"],
           description:
             '"ltx25-ia2v" (default with image) and "ltx25-a2v" (default without image): LTX 2.5 image+audio and audio-only modes; Fast, HQ, and Pro currently use the release-validated official Distilled INT8 workflows. The Dev checkpoints are not publicly routed until upstream publishes and Sogni validates official ComfyUI Dev recipes. ' +
             'Video model. "ltx23-ia2v" (rollback with image): LTX 2.3 image+audio to video, audio-reactive with a reference image; Fast/HQ use the distilled 8-step worker and Default Media Quality Pro uses the non-distilled dev worker. "ltx23-a2v" (rollback without image): LTX 2.3 audio-only to video, no image needed, creates video purely from text prompt + audio with the same quality-tier routing. "wan-s2v": WAN 2.2 sound-to-video, best for lip-sync with a face image, fast 4-step. "seedance2": full Seedance 2.0 audio-reference video, 4-15s. "seedance2-mini": Seedance 2.0 Mini, 720p cap, fastest/lower-cost Seedance option. Seedance quality is selected only by this model value: pick "seedance2-mini" for faster/lower-cost drafts or explicit Mini requests, and pick "seedance2" for full-quality Seedance or 1080p/4K. Do not infer the Seedance model from Default Media Quality Fast/HQ/Pro. "seedance2-5": Seedance 2.5, the newest Seedance generation — 480p and 720p ONLY (it cannot render 1080p or 4K), 4-30s per clip at a fixed 24 fps, native audio, first-and-last-frame conditioning, and a much larger reference budget than the 2.0 family: up to 30 images, 10 videos, and 10 audios, with up to 50 reference media files total, subject to those per-modality caps. Choose "seedance2-5" when the user asks for Seedance 2.5, wants a single continuous Seedance clip longer than 15s (2.5 renders up to 30s in one call instead of being split and stitched), or wants a first-and-last-frame Seedance transition. Keep "seedance2" for 1080p/4K requests, which Seedance 2.5 cannot satisfy. ' +

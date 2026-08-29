@@ -27,7 +27,8 @@ export type VideoModelId =
   | "happyhorse-1.1-t2v"
   | "happyhorse-1.1-i2v"
   | "happyhorse-1.1-r2v"
-  | "wan3.0-video";
+  | "wan3.0-video"
+  | "wan3.0-spicy-video";
 export type VideoQualityTier = "fast" | "hq" | "pro";
 export type Ltx23Workflow = "t2v" | "i2v" | "a2v" | "ia2v";
 export type Ltx25Workflow = "t2v" | "i2v" | "a2v" | "ia2v" | "v2v";
@@ -618,10 +619,27 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     supportsDocumentReference: true,
     supportsWebpageReference: true,
   },
+  "wan3.0-spicy-video": {
+    model: "wan3.0-spicy-video",
+    fps: 30,
+    dimensionDivisor: 1,
+    minDimension: 480,
+    maxDimension: 1920,
+    frameBase: 1,
+    frameStep: 1,
+    minFrames: 61,
+    maxFrames: 901,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsAdaptiveRatio: true,
+    supportsSmartDuration: true,
+    supportsPromptExtend: true,
+  },
 };
 
-// Wan 3 unified multimodal capability contract (Alibaba Model Studio, 2026-08).
+// Wan 3 unified multimodal capability contract (provider APIs, 2026-08).
 export const WAN3_VIDEO_MODEL_ID = "wan3.0-video" as const;
+export const WAN3_ENHANCED_VIDEO_MODEL_ID = "wan3.0-spicy-video" as const;
 export type Wan3Resolution = "480P" | "720P" | "1080P";
 export const WAN3_SUPPORTED_RATIOS: readonly string[] = Object.freeze([
   "adaptive", "16:9", "4:3", "1:1", "3:4", "9:16",

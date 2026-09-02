@@ -1,3 +1,16 @@
+# [3.27.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.26.0...v3.27.0) (2026-09-02)
+
+
+### Bug Fixes
+
+* **deps:** bump @sogni-ai/sogni-client to 5.26.3 ([3994740](https://github.com/Sogni-AI/sogni-intelligence-client/commit/3994740684b4fb3d0a40e173963f8966b0ef721e))
+* **deps:** bump sogni-protocol to 1.0.0-alpha.32 and sogni-client to 5.26.4 ([61a3df7](https://github.com/Sogni-AI/sogni-intelligence-client/commit/61a3df74ab5487f6075d29e8eea545c27d3096ab))
+
+
+### Features
+
+* **video:** expose MiniMax H3 FastH3 Turbo selectors ([423aa55](https://github.com/Sogni-AI/sogni-intelligence-client/commit/423aa550edef1e522c5edf3b55e568097fa70647))
+
 # [3.26.0](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.25.4...v3.26.0) (2026-08-29)
 
 

@@ -83,6 +83,7 @@ const WAN22_MODEL_IDS = normalizedSet([
 const MINIMAX_H3_MODEL_IDS = normalizedSet([
   'minimax-h3',
   'minimax-h3-turbo',
+  'minimax-h3-fasth3-turbo',
   ...['t2v', 'i2v', 'flf2v', 'r2v'].flatMap(workflow => [
     `minimax-h3-${workflow}`,
     `minimax-h3-${workflow}-turbo`,
@@ -90,6 +91,8 @@ const MINIMAX_H3_MODEL_IDS = normalizedSet([
   ...['t2v', 'i2v', 'flf2v'].flatMap(workflow => [
     `minimax-h3-fl2va-fp8_${workflow}`,
     `minimax-h3-fl2va-fp8_${workflow}_turbo`,
+    `minimax-h3-fasth3-${workflow}-turbo`,
+    `minimax-h3-fastvideo-int8_${workflow}_turbo`,
   ]),
   'minimax-h3-ref2va-fp8_r2v',
   'minimax-h3-ref2va-fp8_r2v_turbo',

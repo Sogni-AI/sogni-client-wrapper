@@ -100,21 +100,24 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
   const generateVideoModelKeys = getModelOptions('generate_video').map(option => option.key);
   const animatePhotoModelKeys = getModelOptions('animate_photo').map(option => option.key);
   expect(
-    'model registry: generate_video includes H3 T2V and R2V Turbo selectors',
+    'model registry: generate_video includes H3 LightX2V, FastH3, and R2V Turbo selectors',
     {
       t2vTurbo: generateVideoModelKeys.includes('minimax-h3-t2v-turbo'),
+      fastH3T2vTurbo: generateVideoModelKeys.includes('minimax-h3-fasth3-t2v-turbo'),
       r2vTurbo: generateVideoModelKeys.includes('minimax-h3-r2v-turbo'),
     },
-    { t2vTurbo: true, r2vTurbo: true },
+    { t2vTurbo: true, fastH3T2vTurbo: true, r2vTurbo: true },
   );
   expect(
     'model registry: animate_photo includes H3 I2V and FLF2V Turbo selectors',
     {
       i2vTurbo: animatePhotoModelKeys.includes('minimax-h3-i2v-turbo'),
       flf2vTurbo: animatePhotoModelKeys.includes('minimax-h3-flf2v-turbo'),
+      fastH3I2vTurbo: animatePhotoModelKeys.includes('minimax-h3-fasth3-i2v-turbo'),
+      fastH3Flf2vTurbo: animatePhotoModelKeys.includes('minimax-h3-fasth3-flf2v-turbo'),
       r2vTurbo: animatePhotoModelKeys.includes('minimax-h3-r2v-turbo'),
     },
-    { i2vTurbo: true, flf2vTurbo: true, r2vTurbo: false },
+    { i2vTurbo: true, flf2vTurbo: true, fastH3I2vTurbo: true, fastH3Flf2vTurbo: true, r2vTurbo: false },
   );
   const generateImageProperties = generateImageDefinition.function.parameters.properties ?? {};
   expect(
@@ -151,8 +154,8 @@ export function runToolsSharedTests(): { passed: number; failed: number } {
   // MiniMax H3 video LoRAs. The two tools split the H3 modes between them, so
   // each must carry the arrays and name only its own selectors.
   for (const [toolName, definition, expectedSelectors] of [
-    ['generate_video', generateVideoDefinition, ['minimax-h3-t2v', 'minimax-h3-t2v-turbo', 'minimax-h3-r2v', 'minimax-h3-r2v-turbo']],
-    ['animate_photo', animatePhotoDefinition, ['minimax-h3-i2v', 'minimax-h3-i2v-turbo', 'minimax-h3-flf2v', 'minimax-h3-flf2v-turbo']],
+    ['generate_video', generateVideoDefinition, ['minimax-h3-t2v', 'minimax-h3-t2v-turbo', 'minimax-h3-fasth3-t2v-turbo', 'minimax-h3-r2v', 'minimax-h3-r2v-turbo']],
+    ['animate_photo', animatePhotoDefinition, ['minimax-h3-i2v', 'minimax-h3-i2v-turbo', 'minimax-h3-fasth3-i2v-turbo', 'minimax-h3-flf2v', 'minimax-h3-flf2v-turbo', 'minimax-h3-fasth3-flf2v-turbo']],
   ] as const) {
     const properties = definition.function.parameters.properties ?? {};
     expect(

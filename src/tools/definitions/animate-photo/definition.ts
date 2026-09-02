@@ -26,8 +26,10 @@ import {
 const H3_LORA_SELECTORS = [
   "minimax-h3-i2v",
   "minimax-h3-i2v-turbo",
+  "minimax-h3-fasth3-i2v-turbo",
   "minimax-h3-flf2v",
   "minimax-h3-flf2v-turbo",
+  "minimax-h3-fasth3-flf2v-turbo",
 ] as const;
 
 const WAN3_VIDEO_MODEL_GUIDANCE =
@@ -95,14 +97,16 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
             "happyhorse-1.1-r2v",
             "minimax-h3-i2v",
             "minimax-h3-i2v-turbo",
+            "minimax-h3-fasth3-i2v-turbo",
             "minimax-h3-flf2v",
             "minimax-h3-flf2v-turbo",
+            "minimax-h3-fasth3-flf2v-turbo",
             "wan3.0-video",
             "wan3.0-spicy-video",
           ],
           description:
             '"ltx25" (default): LTX 2.5 I2V or first/last-frame video with native audio; Fast, HQ, and Pro currently use the release-validated official Distilled INT8 workflow. The Dev checkpoints are not publicly routed until upstream publishes and Sogni validates an official ComfyUI Dev recipe. ' +
-            'Which video model to use. "ltx23": LTX 2.3 rollback with native audio. "wan22": quick simple motion without audio, up to 10s. "minimax-h3-i2v" and "minimax-h3-i2v-turbo": standard and 4-step Turbo MiniMax H3 from one first frame. "minimax-h3-flf2v" and "minimax-h3-flf2v-turbo": standard and 4-step Turbo MiniMax H3 between required first and last frames; use frameRole="both" and provide the end frame. H3 generates native audio at fixed 24fps for 5.17-15.08s and has no negative-prompt input. H3 Base and Turbo prompts use the exact three-field contract and the official mode-specific alignment line. Do not set Seedance here; use generate_video with Seedance references. ' +
+            'Which video model to use. "ltx23": LTX 2.3 rollback with native audio. "wan22": quick simple motion without audio, up to 10s. "minimax-h3-i2v" is standard MiniMax H3 from one first frame; "minimax-h3-i2v-turbo" is the existing 4-step LightX2V Turbo engine; "minimax-h3-fasth3-i2v-turbo" is the separate FastVideo VSA four-step FastH3 engine, about 2x faster and fixed to Euler/simple. The matching FLF2V selectors provide standard, LightX2V Turbo, and FastH3 Turbo first/last-frame generation; use frameRole="both" and provide the end frame. FastH3 has no R2V mode. H3 generates native audio at fixed 24fps for 5.17-15.08s and has no negative-prompt input. H3 Base and Turbo prompts use the exact three-field contract and the official mode-specific alignment line. Do not set Seedance here; use generate_video with Seedance references. ' +
             WAN3_VIDEO_MODEL_GUIDANCE,
         },
         negativePrompt: {

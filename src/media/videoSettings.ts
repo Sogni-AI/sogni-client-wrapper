@@ -21,6 +21,9 @@ export type VideoModelId =
   | "minimax-h3-i2v-turbo"
   | "minimax-h3-flf2v-turbo"
   | "minimax-h3-r2v-turbo"
+  | "minimax-h3-fasth3-t2v-turbo"
+  | "minimax-h3-fasth3-i2v-turbo"
+  | "minimax-h3-fasth3-flf2v-turbo"
   | "seedance2"
   | "seedance2-mini"
   | "seedance2-5"
@@ -534,6 +537,68 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     sampler: "euler",
     scheduler: "simple",
     resolutionTiers: [544],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  // FastH3 is the FastVideo VSA four-step recipe. It is separate from the
+  // existing LightX2V Turbo selectors and is qualified only with Euler/simple.
+  "minimax-h3-fasth3-t2v-turbo": {
+    model: "minimax-h3-fastvideo-int8_t2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "euler",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-fasth3-i2v-turbo": {
+    model: "minimax-h3-fastvideo-int8_i2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "euler",
+    scheduler: "simple",
+    resolutionTiers: [768],
+    frameBase: 124,
+    frameStep: 17,
+    minFrames: 124,
+    maxFrames: 362,
+    maxPixels: 1_032_192,
+    nativeAudio: true,
+    supportsAudioToggle: true,
+    supportsNegativePrompt: false,
+  },
+  "minimax-h3-fasth3-flf2v-turbo": {
+    model: "minimax-h3-fastvideo-int8_flf2v_turbo",
+    fps: 24,
+    steps: 4,
+    guidance: 1,
+    dimensionDivisor: 32,
+    minDimension: 32,
+    maxDimension: 1344,
+    sampler: "euler",
+    scheduler: "simple",
+    resolutionTiers: [768],
     frameBase: 124,
     frameStep: 17,
     minFrames: 124,

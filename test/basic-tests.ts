@@ -733,6 +733,25 @@ async function runTests() {
         throw new Error(`${selector} audio/negative-prompt capabilities are incorrect`);
       }
     }
+
+    const fastH3Expected = {
+      'minimax-h3-fasth3-t2v-turbo': 'minimax-h3-fastvideo-int8_t2v_turbo',
+      'minimax-h3-fasth3-i2v-turbo': 'minimax-h3-fastvideo-int8_i2v_turbo',
+      'minimax-h3-fasth3-flf2v-turbo': 'minimax-h3-fastvideo-int8_flf2v_turbo',
+    } as const;
+    for (const [selector, model] of Object.entries(fastH3Expected)) {
+      const config = getVideoModelConfig(selector as keyof typeof fastH3Expected);
+      if (config.model !== model) throw new Error(`${selector} mapped to ${config.model}`);
+      if (
+        config.fps !== 24 ||
+        config.steps !== 4 ||
+        config.guidance !== 1 ||
+        config.sampler !== 'euler' ||
+        config.scheduler !== 'simple'
+      ) {
+        throw new Error(`${selector} sampling defaults do not match the FastH3 recipe`);
+      }
+    }
   })();
 
   await test('Should expose every real MiniMax H3 Turbo tool and video-only Ref2VA guidance', () => {
@@ -742,7 +761,15 @@ async function runTests() {
     if (!generateModels.includes('minimax-h3-t2v-turbo')) {
       throw new Error('generate_video is missing MiniMax H3 T2V Turbo');
     }
+    if (!generateModels.includes('minimax-h3-fasth3-t2v-turbo')) {
+      throw new Error('generate_video is missing MiniMax H3 FastH3 T2V Turbo');
+    }
     for (const selector of ['minimax-h3-i2v-turbo', 'minimax-h3-flf2v-turbo']) {
+      if (!animateModels.includes(selector)) {
+        throw new Error(`animate_photo is missing ${selector}`);
+      }
+    }
+    for (const selector of ['minimax-h3-fasth3-i2v-turbo', 'minimax-h3-fasth3-flf2v-turbo']) {
       if (!animateModels.includes(selector)) {
         throw new Error(`animate_photo is missing ${selector}`);
       }

@@ -1,3 +1,11 @@
+## [3.27.5](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.27.4...v3.27.5) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deps:** consume REST-only SDK client startup ([3423592](https://github.com/Sogni-AI/sogni-intelligence-client/commit/3423592ecf7d877ce05c5c8830870147f993bcf5))
+* **replay:** normalize record serialization across nested fields ([48e6997](https://github.com/Sogni-AI/sogni-intelligence-client/commit/48e699738d78f5083a0ed4a3c4d673f82606e43a))
+
 ## [3.27.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.27.3...v3.27.4) (2026-09-05)
 
 

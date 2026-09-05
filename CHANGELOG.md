@@ -1,3 +1,10 @@
+## [3.27.4](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.27.3...v3.27.4) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deps:** consume SDK terminal recovery hardening ([ee853b4](https://github.com/Sogni-AI/sogni-intelligence-client/commit/ee853b44dbe80b0a9b390b79a56ce62c6a74a130))
+
 ## [3.27.3](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.27.2...v3.27.3) (2026-09-05)
 
 

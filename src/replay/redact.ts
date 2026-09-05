@@ -1,23 +1,17 @@
 /**
  * Secret redaction for RunRecords.
  *
- * Applied identically on both write paths (sogni-chat → API ingest, and
- * sogni-api server-side write). Single source of truth so a record
- * persisted via either path cannot leak credentials, signed URLs, or
- * user-provided secrets.
- *
- * Conservative by design: scrubs anything that looks like an API key,
- * Authorization header, bearer token, signed URL parameter, JWT, or
- * private-key fragment. False positives are acceptable (a redacted
- * record loses some context); false negatives are not (a persisted
- * record leaks a secret).
+ * Shared best-effort credential filtering for replay writers and readers.
+ * This is not anonymization: prompts, responses, and tool data remain
+ * part of a replay. Callers must avoid including sensitive information.
  *
  * Pure function — no side effects, no I/O. Safe to run in hot paths.
  */
 
-import type { RunRecord, RunRecordRound, RunRecordToolCall, RunRecordToolResult } from './types.js';
+import type { RunRecord } from './types.js';
 
 const REDACTION_PLACEHOLDER = '[REDACTED]';
+const LABELLED_CREDENTIAL = /((?:\b|_)(?:api[ _-]?key|access[ _-]?token|refresh[ _-]?token|id[ _-]?token|password|secret|private[ _-]?key|signing[ _-]?key|token)["']?\s*(?::|=|\bis\b)\s*)("(?:[^"\\\r\n]|\\.)*"|'(?:[^'\\\r\n]|\\.)*'|`[^`\r\n]*`|[^\s"'`<>{}\[\],;&]+)/gi;
 
 /**
  * Keys that always get redacted regardless of value. Lowercase comparison.
@@ -42,6 +36,9 @@ const SECRET_KEY_PATTERNS: ReadonlyArray<RegExp> = [
   /^pem$/i,
   /walletauth$/i,
   /^x-?api-?key$/i,
+  /^credentials?$/i,
+  /^(?:x-amz|x-goog)-(?:signature|credential|security-token)$/i,
+  /^(?:signature|sig|key-pair-id)$/i,
 ];
 
 /**
@@ -53,16 +50,13 @@ const VALUE_SCRUBBERS: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
   // Standard auth headers
   { pattern: /(Authorization\s*:\s*)(Bearer|Basic)\s+\S+/gi, replacement: `$1$2 ${REDACTION_PLACEHOLDER}` },
   // Standalone bearer tokens
-  { pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/g, replacement: `Bearer ${REDACTION_PLACEHOLDER}` },
+  { pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/gi, replacement: `Bearer ${REDACTION_PLACEHOLDER}` },
   // Signed S3-style URLs: keep the host/path, drop the signature payload
   { pattern: /([?&](?:X-Amz-Signature|Signature|sig|Policy|Key-Pair-Id|X-Amz-Credential)=)[^&\s"']+/gi, replacement: `$1${REDACTION_PLACEHOLDER}` },
   // OpenAI / Anthropic style API keys
-  { pattern: /\bsk-[A-Za-z0-9]{20,}/g, replacement: REDACTION_PLACEHOLDER },
-  { pattern: /\bsk-ant-[A-Za-z0-9-_]{20,}/g, replacement: REDACTION_PLACEHOLDER },
-  // JWTs (three base64url chunks separated by dots, length floor)
-  { pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, replacement: REDACTION_PLACEHOLDER },
-  // PEM-style private keys (one-liner heuristic)
-  { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, replacement: REDACTION_PLACEHOLDER },
+  { pattern: /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}/g, replacement: REDACTION_PLACEHOLDER },
+  // An incomplete private-key block is filtered through the end of the text.
+  { pattern: /-----BEGIN [A-Z ]{0,64}PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]{0,64}PRIVATE KEY-----|$)/g, replacement: REDACTION_PLACEHOLDER },
 ];
 
 /** True when the key (case-insensitive) matches a known secret pattern. */
@@ -75,70 +69,58 @@ function isSecretKey(key: string): boolean {
 export function redactStringValue(value: string): string {
   let out = value;
   for (const { pattern, replacement } of VALUE_SCRUBBERS) {
-    if (pattern.test(out)) {
-      // Each scrubber must reset its regex state if it's global.
-      pattern.lastIndex = 0;
-      out = out.replace(pattern, replacement);
-    }
+    pattern.lastIndex = 0;
+    out = out.replace(pattern, replacement);
   }
-  return out;
+  // Consume each candidate once, including malformed ones, before checking
+  // its segments. Repeated token prefixes must not trigger suffix rescans.
+  out = out.replace(/\beyJ[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]+)*/g, (candidate) => {
+    const segments = candidate.split('.');
+    return segments.length >= 3 && segments[1].length >= 10 && segments[2].length >= 10
+      ? REDACTION_PLACEHOLDER : candidate;
+  });
+  // UUIDs alone are also ordinary run/job ids. Filter labelled values,
+  // preserving quotes around embedded JSON and configuration values.
+  return out.replace(LABELLED_CREDENTIAL, (_match, prefix: string, credential: string) => {
+    const quote = /^["'`]/.test(credential) ? credential[0] : '';
+    return `${prefix}${quote}${REDACTION_PLACEHOLDER}${quote}`;
+  });
 }
 
 /**
  * Recursively redact a JSON-ish value. Returns a new structure; never
  * mutates the input. Handles primitives, arrays, plain records, and
  * preserves null. Circular references are not expected (RunRecord is
- * JSON-serializable) but are tolerated by tracking depth.
+ * JSON-serializable) are filtered without revisiting an ancestor.
  */
 export function redactPayload(
   value: unknown,
   depth = 0,
 ): unknown {
+  return redactValue(value, depth, new WeakSet<object>());
+}
+
+function redactValue(value: unknown, depth: number, ancestors: WeakSet<object>): unknown {
   if (depth > 32) return REDACTION_PLACEHOLDER;
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') return redactStringValue(value);
   if (typeof value === 'number' || typeof value === 'boolean') return value;
-  if (Array.isArray(value)) {
-    return value.map((item) => redactPayload(item, depth + 1));
-  }
   if (typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      if (isSecretKey(key)) {
-        out[key] = REDACTION_PLACEHOLDER;
-      } else {
-        out[key] = redactPayload(val, depth + 1);
-      }
+    if (ancestors.has(value)) return REDACTION_PLACEHOLDER;
+    ancestors.add(value);
+    try {
+      if (Array.isArray(value)) return value.map((item) => redactValue(item, depth + 1, ancestors));
+      // fromEntries creates own data properties even for __proto__.
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(
+        ([key, val]) => [key, isSecretKey(key) ? REDACTION_PLACEHOLDER : redactValue(val, depth + 1, ancestors)],
+      ));
+    } finally {
+      ancestors.delete(value);
     }
-    return out;
   }
   // Unknown primitive (bigint, symbol, function) — coerce to redacted
   // string rather than risk surfacing it.
   return REDACTION_PLACEHOLDER;
-}
-
-function redactToolCall(call: RunRecordToolCall): RunRecordToolCall {
-  return {
-    ...call,
-    arguments: redactPayload(call.arguments) as Record<string, unknown>,
-  };
-}
-
-function redactToolResult(result: RunRecordToolResult): RunRecordToolResult {
-  return {
-    ok: result.ok,
-    ...(result.error_type !== undefined ? { error_type: result.error_type } : {}),
-    payload: redactPayload(result.payload) as Record<string, unknown>,
-  };
-}
-
-function redactRound(round: RunRecordRound): RunRecordRound {
-  return {
-    round: round.round,
-    assistant_message: redactStringValue(round.assistant_message),
-    tool_calls: round.tool_calls.map(redactToolCall),
-    tool_results: round.tool_results.map(redactToolResult),
-  };
 }
 
 /**
@@ -148,14 +130,7 @@ function redactRound(round: RunRecordRound): RunRecordRound {
  */
 export function redactRunRecord(record: RunRecord): RunRecord {
   return {
-    ...record,
-    user_request: redactStringValue(record.user_request),
-    runtime_config: redactPayload(record.runtime_config) as Record<string, unknown>,
-    tool_schemas: record.tool_schemas.map(
-      (schema) => redactPayload(schema) as Record<string, unknown>,
-    ),
-    rounds: record.rounds.map(redactRound),
-    final_response: redactStringValue(record.final_response),
+    ...redactPayload(record) as RunRecord,
     redacted: true,
   };
 }

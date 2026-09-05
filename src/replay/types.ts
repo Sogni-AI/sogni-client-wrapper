@@ -16,10 +16,8 @@
  * the schema itself.
  *
  * Privacy: every replay record passes through `redactRunRecord` before
- * being persisted or surfaced. The redactor strips secrets at the
- * boundaries the schema cannot enforce (URLs containing API keys,
- * Authorization headers in metadata blobs, free-form notes that may
- * have captured a user-provided token, etc.).
+ * being persisted or surfaced. Credential filtering is best-effort,
+ * not anonymization; prompts, responses, and tool data are retained.
  */
 
 /**
@@ -62,8 +60,7 @@ export interface RunRecordToolResult {
   ok: boolean;
   /** Structured `ToolErrorCode` when ok is false; absent when ok is true. */
   error_type?: string;
-  /** Free-form fields the handler returned. Already passes through
-   *  `redactPayload` so secrets cannot leak via this surface. */
+  /** Free-form fields the handler returned, processed by `redactPayload`. */
   payload: Record<string, unknown>;
 }
 
@@ -113,8 +110,7 @@ export interface RunRecord {
   /** Model id the run was dispatched against (e.g. qwen3.6-35b-...) */
   model_id: string;
   /** Per-run runtime config snapshot: thinking mode, sampler params,
-   *  feature flags. Redacted of any keys ending in `_token` / `_key`
-   *  before persistence. */
+   *  feature flags. Processed by credential filtering before persistence. */
   runtime_config: Record<string, unknown>;
   /** Tool definitions visible to the LLM this run (post-gating). The
    *  full OpenAI function-call shape lives here so replay can rebuild

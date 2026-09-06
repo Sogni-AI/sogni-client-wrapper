@@ -1,3 +1,10 @@
+## [3.27.6](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.27.5...v3.27.6) (2026-09-06)
+
+
+### Bug Fixes
+
+* **deps:** pin sogni client release ([0111a49](https://github.com/Sogni-AI/sogni-intelligence-client/commit/0111a496048e8123102bd4a9e1e21253f2f8d2ed))
+
 ## [3.27.5](https://github.com/Sogni-AI/sogni-intelligence-client/compare/v3.27.4...v3.27.5) (2026-09-05)
 
 
